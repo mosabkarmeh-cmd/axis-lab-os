@@ -15,6 +15,14 @@ function setupAutoUpdater() {
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
 
+  if (process.env.AXIS_UPDATE_TEST_URL) {
+    autoUpdater.setFeedURL({
+      provider: 'generic',
+      url: process.env.AXIS_UPDATE_TEST_URL,
+    });
+    console.log('[AXIS UPDATER] Local test feed:', process.env.AXIS_UPDATE_TEST_URL);
+  }
+
   autoUpdater.on('error', (error) => {
     console.error('[AXIS UPDATER]', error);
   });
@@ -159,6 +167,8 @@ app.on('before-quit', () => {
   app.isQuitting = true;
   if (serverProcess && !serverProcess.killed) serverProcess.kill();
 });
+
+
 
 
 
