@@ -5259,6 +5259,46 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
                     )}
                   </div>
 
+                  {/* v0.3.0: Daily focus actions for the most common operational tasks */}
+                  <section className="rounded-2xl border border-[#c59257]/20 bg-gradient-to-br from-zinc-900/80 via-zinc-900/50 to-[#1a1510]/70 p-4 shadow-lg shadow-black/10">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Zap className="h-4 w-4 text-[#c59257]" />
+                          <h2 className="text-sm font-bold text-zinc-100">إجراءات اليوم</h2>
+                        </div>
+                        <p className="mt-1 text-[11px] text-zinc-500">انتقل مباشرة إلى أكثر المهام احتياجًا بدل البحث داخل القوائم.</p>
+                      </div>
+                      <span className={`inline-flex w-fit items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium ${lowStockCount > 0 ? "border-rose-500/30 bg-rose-500/10 text-rose-300" : "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${lowStockCount > 0 ? "bg-rose-400" : "bg-emerald-400"}`} />
+                        {lowStockCount > 0 ? `${lowStockCount} تنبيه مخزون` : "المخزون ضمن الحدود"}
+                      </span>
+                    </div>
+                    <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      <button
+                        onClick={() => { setActiveView("database"); setActiveProductSubTab("materials"); }}
+                        className="group flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-2.5 text-right transition hover:border-rose-500/40 hover:bg-rose-500/5"
+                      >
+                        <span><span className="block text-xs font-semibold text-zinc-200">مراجعة المخزون</span><span className="mt-0.5 block text-[10px] text-zinc-500">{lowStockCount > 0 ? "ابدأ بالخامات المنخفضة" : "فحص سريع للمواد"}</span></span>
+                        <AlertTriangle className={`h-4 w-4 ${lowStockCount > 0 ? "text-rose-400" : "text-zinc-500 group-hover:text-emerald-400"}`} />
+                      </button>
+                      <button
+                        onClick={() => { setActiveView("database"); }}
+                        className="group flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-2.5 text-right transition hover:border-indigo-500/40 hover:bg-indigo-500/5"
+                      >
+                        <span><span className="block text-xs font-semibold text-zinc-200">متابعة الطلبات</span><span className="mt-0.5 block text-[10px] text-zinc-500">{pendingOrders.length} طلب قيد المتابعة</span></span>
+                        <Briefcase className="h-4 w-4 text-indigo-400" />
+                      </button>
+                      <button
+                        onClick={() => setIsCurrencyConverterOpen(true)}
+                        className="group flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-2.5 text-right transition hover:border-[#c59257]/50 hover:bg-[#c59257]/5"
+                      >
+                        <span><span className="block text-xs font-semibold text-zinc-200">تحديث سعر الصرف</span><span className="mt-0.5 block text-[10px] text-zinc-500">1$ = {exchangeRate.toLocaleString()} ل.س</span></span>
+                        <Coins className="h-4 w-4 text-[#c59257]" />
+                      </button>
+                    </div>
+                  </section>
+
                   {/* Orders, Customers, and operational actions */}
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                     

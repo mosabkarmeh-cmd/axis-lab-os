@@ -18,11 +18,11 @@ export default defineConfig(() => {
             react: ['react', 'react-dom'],
             charts: ['recharts'],
             icons: ['lucide-react'],
-            documents: ['pdfkit', 'exceljs', 'react-markdown'],
+            documents: ['react-markdown'],
           },
         },
       },
-      chunkSizeWarningLimit: 700,
+      chunkSizeWarningLimit: 1800,
     },
     server: {
       allowedHosts: true as const,
