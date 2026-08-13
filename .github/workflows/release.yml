@@ -1,4 +1,4 @@
-name: Build Windows Release
+﻿name: Build Windows Release
 
 on:
   push:
@@ -25,7 +25,7 @@ jobs:
         run: npm ci
 
       - name: Build Windows installer
-        run: npm run desktop:package:win
+        run: npm run desktop:package:win -- --publish never
 
       - name: Publish GitHub Release
         env:
@@ -35,3 +35,4 @@ jobs:
           $installer = Get-ChildItem -Path dist -Filter '*Setup*.exe' | Select-Object -First 1
           $blockmap = Get-ChildItem -Path dist -Filter '*.blockmap' | Select-Object -First 1
           gh release create $env:GITHUB_REF_NAME $installer.FullName $blockmap.FullName --generate-notes --title "AXIS LAB OS $env:GITHUB_REF_NAME"
+
