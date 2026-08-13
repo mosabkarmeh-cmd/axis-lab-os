@@ -27,6 +27,14 @@ jobs:
       - name: Build Windows installer (Current User)
         run: npm run desktop:package:win:current -- --publish never
 
+      - name: Preserve Current User release assets
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release-assets | Out-Null
+          Copy-Item (Get-ChildItem -Path dist -Filter '*Setup*.exe' | Select-Object -First 1).FullName release-assets/
+          Copy-Item (Get-ChildItem -Path dist -Filter '*.blockmap' | Select-Object -First 1).FullName release-assets/
+          Copy-Item (Get-ChildItem -Path dist -Filter 'latest*.yml' | Select-Object -First 1).FullName release-assets/
+
       - name: Build Windows installer (All Users)
         run: npm run desktop:package:win:all -- --publish never
 
@@ -35,9 +43,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: pwsh
         run: |
-          $installer = Get-ChildItem -Path dist -Filter '*Setup*.exe' -Recurse | Select-Object -First 1
-          $blockmap = Get-ChildItem -Path dist -Filter '*.blockmap' -Recurse | Select-Object -First 1
-          $latest = Get-ChildItem -Path dist,dist-all-users -Filter 'latest*.yml' -Recurse | Select-Object -First 1
+          $installer = Get-ChildItem -Path release-assets -Filter '*Setup*.exe' | Select-Object -First 1
+          $blockmap = Get-ChildItem -Path release-assets -Filter '*.blockmap' | Select-Object -First 1
+          $latest = Get-ChildItem -Path release-assets -Filter 'latest*.yml' | Select-Object -First 1
           $allUsers = Get-ChildItem -Path dist-all-users -Filter '*AllUsers*.exe' -Recurse | Select-Object -First 1
           if (-not $latest) { throw 'electron-builder did not produce latest*.yml; auto-update metadata is missing.' }
           if (-not $allUsers) { throw 'All Users installer was not produced.' }
