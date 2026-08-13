@@ -24,8 +24,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Windows installer
-        run: npm run desktop:package:win -- --publish never
+      - name: Build Windows installer (Current User)
+        run: npm run desktop:package:win:current -- --publish never
+
+      - name: Build Windows installer (All Users)
+        run: npm run desktop:package:win:all -- --publish never
 
       - name: Publish GitHub Release
         env:
@@ -35,6 +38,8 @@ jobs:
           $installer = Get-ChildItem -Path dist -Filter '*Setup*.exe' | Select-Object -First 1
           $blockmap = Get-ChildItem -Path dist -Filter '*.blockmap' | Select-Object -First 1
           $latest = Get-ChildItem -Path dist -Filter 'latest*.yml' | Select-Object -First 1
+          $allUsers = Get-ChildItem -Path dist-all-users -Filter '*AllUsers*.exe' | Select-Object -First 1
           if (-not $latest) { throw 'electron-builder did not produce latest*.yml; auto-update metadata is missing.' }
-          gh release create $env:GITHUB_REF_NAME $installer.FullName $blockmap.FullName $latest.FullName --generate-notes --title "AXIS LAB OS $env:GITHUB_REF_NAME"
+          if (-not $allUsers) { throw 'All Users installer was not produced.' }
+          gh release create $env:GITHUB_REF_NAME $installer.FullName $blockmap.FullName $latest.FullName $allUsers.FullName --generate-notes --title "AXIS LAB OS $env:GITHUB_REF_NAME"
 

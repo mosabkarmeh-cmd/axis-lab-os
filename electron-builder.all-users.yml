@@ -1,6 +1,8 @@
 appId: com.axislab.os
 productName: AXIS LAB OS
 copyright: Copyright © 2026 AXIS LAB
+directories:
+  output: dist-all-users
 artifactName: AXIS-LAB-OS-Setup-${version}-AllUsers.${ext}
 files:
   - desktop/**/*
