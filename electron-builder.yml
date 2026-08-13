@@ -1,0 +1,38 @@
+﻿appId: com.axislab.os
+productName: AXIS LAB OS
+copyright: Copyright Â© 2026 AXIS LAB
+artifactName: AXIS-LAB-OS-Setup-${version}.${ext}
+files:
+  - desktop/**/*
+  - package.json
+  - assets/icon.ico
+  - node_modules/sql.js/**/*
+extraResources:
+  - from: dist/server.cjs
+    to: server.cjs
+  - from: dist/index.html
+    to: dist/index.html
+  - from: dist/assets
+    to: dist/assets
+  - from: assets/icon.ico
+    to: icon.ico
+  - from: node_modules/sql.js/dist/sql-wasm.wasm
+    to: sql-wasm.wasm
+  - from: dist/logo.jpg
+    to: dist/logo.jpg
+win:
+  icon: assets/icon.ico
+  target:
+    - nsis
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: AXIS LAB OS
+  installerLanguages:
+    - ar
+    - en
+  language: 1033
+

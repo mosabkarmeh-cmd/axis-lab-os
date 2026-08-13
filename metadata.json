@@ -1,0 +1,6 @@
+{
+  "name": "AXIS LAB",
+  "description": "Laser Workshop Operating System - High Density Management & Orchestration Platform.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,347 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Overriding indigo with luxurious Axis Lab Gold/Copper/Bronze */
+  --color-indigo-50: #fdf8f2;
+  --color-indigo-100: #f9efe2;
+  --color-indigo-200: #f3dfc5;
+  --color-indigo-300: #eccfa7;
+  --color-indigo-400: #e2bd8a; /* Gleaming gold highlight text */
+  --color-indigo-500: #d49f65; /* Bright gold hover state */
+  --color-indigo-600: #c59257; /* Core AXIS LAB luxurious gold-bronze */
+  --color-indigo-700: #a6773f; /* Deep rich metallic bronze */
+  --color-indigo-800: #845d2f; /* Dark aged bronze */
+  --color-indigo-900: #634420; /* Deepest bronze accent */
+  --color-indigo-950: #3d2811; /* Dark warm bronze shadow/background */
+
+  /* Warm Accent colors for laser/glow and status tags */
+  --color-amber-400: #ffd166;
+  --color-amber-500: #f5a623;
+  --color-amber-600: #d48210;
+  --color-amber-950: #2c1602;
+
+  /* Overriding all zinc levels with a beautiful, high-end warm Charcoal scale */
+  --color-zinc-50: #fafafc;
+  --color-zinc-100: #f4f4f7;
+  --color-zinc-200: #e2e2e9;
+  --color-zinc-300: #c1c1cf;
+  --color-zinc-400: #8c8ca1;
+  --color-zinc-500: #6a6a7e;
+  --color-zinc-600: #4f4f61;
+  --color-zinc-700: #3b3b4a;
+  --color-zinc-800: #23232b; /* Crisp Charcoal border */
+  --color-zinc-850: #191920; /* High-density Charcoal card */
+  --color-zinc-900: #101014; /* Deep luxury Charcoal panel */
+  --color-zinc-950: #08080a; /* True deep Obsidian Charcoal black */
+}
+
+/* Custom scrollbar to match high-density terminal look */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #09090b;
+}
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
+
+/* ADAPTIVE LIGHT THEME OVERRIDES */
+.theme-light {
+  background-color: #f8fafc !important;
+  color: #1e293b !important;
+}
+
+/* Base App Layout & Page Containers */
+.theme-light #axis-system,
+.theme-light .bg-\[\#060608\],
+.theme-light .bg-\[\#07070a\],
+.theme-light .bg-\[\#09090b\],
+.theme-light .bg-\[\#09090c\],
+.theme-light .bg-\[\#0a0a0c\],
+.theme-light .bg-\[\#0b0b0d\],
+.theme-light .bg-\[\#0c0c0e\],
+.theme-light .bg-\[\#010102\],
+.theme-light .bg-\[\#030305\],
+.theme-light .bg-black {
+  background-color: #f8fafc !important;
+  color: #1e293b !important;
+}
+
+/* Main Cards, Modals, Drawers & Content Panels */
+.theme-light .bg-zinc-950,
+.theme-light .bg-zinc-900,
+.theme-light .bg-zinc-850,
+.theme-light .bg-zinc-750,
+.theme-light .bg-zinc-950\/80,
+.theme-light .bg-zinc-950\/60,
+.theme-light .bg-zinc-950\/45,
+.theme-light .bg-zinc-950\/40,
+.theme-light .bg-zinc-950\/20,
+.theme-light .bg-zinc-900\/90,
+.theme-light .bg-zinc-900\/80,
+.theme-light .bg-zinc-900\/60,
+.theme-light .bg-zinc-900\/50,
+.theme-light .bg-zinc-900\/40,
+.theme-light .bg-zinc-900\/30,
+.theme-light .bg-zinc-900\/20,
+.theme-light .bg-zinc-900\/10 {
+  background-color: #ffffff !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.03), 0 1px 2px -1px rgba(0, 0, 0, 0.03) !important;
+}
+
+/* Secondary & Nested Background Blocks */
+.theme-light .bg-zinc-800,
+.theme-light .bg-zinc-800\/40,
+.theme-light .bg-zinc-700 {
+  background-color: #f1f5f9 !important;
+}
+
+/* Hover States in Light Mode */
+.theme-light .hover\:bg-zinc-900\/90:hover,
+.theme-light .hover\:bg-zinc-900\/80:hover,
+.theme-light .hover\:bg-zinc-900\/75:hover,
+.theme-light .hover\:bg-zinc-900\/60:hover,
+.theme-light .hover\:bg-zinc-900\/50:hover,
+.theme-light .hover\:bg-zinc-900\/30:hover,
+.theme-light .hover\:bg-zinc-900\/20:hover,
+.theme-light .hover\:bg-zinc-900:hover,
+.theme-light .hover\:bg-zinc-850:hover,
+.theme-light .hover\:bg-zinc-800:hover {
+  background-color: #f1f5f9 !important;
+}
+
+/* Header, Navigation & Sidebar */
+.theme-light header,
+.theme-light nav {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* Headings & High-Contrast Text */
+.theme-light .text-zinc-100,
+.theme-light .text-zinc-200,
+.theme-light .text-zinc-300,
+.theme-light .text-zinc-350,
+.theme-light .text-white,
+.theme-light h1,
+.theme-light h2,
+.theme-light h3,
+.theme-light h4,
+.theme-light h5,
+.theme-light h6 {
+  color: #0f172a !important;
+}
+
+/* Secondary & Muted Body Text */
+.theme-light .text-zinc-400,
+.theme-light .text-zinc-450,
+.theme-light .text-zinc-500 {
+  color: #475569 !important;
+}
+
+.theme-light .text-zinc-600,
+.theme-light .text-zinc-700 {
+  color: #64748b !important;
+}
+
+/* Crisp Light Borders */
+.theme-light .border-zinc-700,
+.theme-light .border-zinc-700\/50,
+.theme-light .border-zinc-750,
+.theme-light .border-zinc-800,
+.theme-light .border-zinc-800\/70,
+.theme-light .border-zinc-800\/80,
+.theme-light .border-zinc-850,
+.theme-light .border-zinc-850\/60,
+.theme-light .border-zinc-850\/80,
+.theme-light .border-zinc-880,
+.theme-light .border-zinc-900,
+.theme-light .border-zinc-900\/60,
+.theme-light .border-zinc-900\/80,
+.theme-light .border-zinc-950 {
+  border-color: #e2e8f0 !important;
+}
+
+/* Scrollbars in Light Mode */
+.theme-light ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+.theme-light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+.theme-light ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Form Controls in Light Mode */
+.theme-light input,
+.theme-light select,
+.theme-light textarea {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+.theme-light input::placeholder,
+.theme-light textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+.theme-light input:focus,
+.theme-light select:focus,
+.theme-light textarea:focus {
+  border-color: #c59257 !important;
+  box-shadow: 0 0 0 2px rgba(197, 146, 87, 0.2) !important;
+}
+
+/* Table Headers & Rows in Light Mode */
+.theme-light thead tr {
+  background-color: #f1f5f9 !important;
+  border-bottom-color: #e2e8f0 !important;
+  color: #334155 !important;
+}
+
+.theme-light tbody tr:hover {
+  background-color: #f8fafc !important;
+}
+
+/* Status Badges & Pills in Light Mode */
+/* Indigo / Gold status tags */
+.theme-light .bg-indigo-950,
+.theme-light .bg-indigo-950\/90,
+.theme-light .bg-indigo-950\/80,
+.theme-light .bg-indigo-950\/60,
+.theme-light .bg-indigo-950\/50,
+.theme-light .bg-indigo-950\/40,
+.theme-light .bg-indigo-950\/30,
+.theme-light .bg-indigo-950\/20,
+.theme-light .bg-indigo-950\/10,
+.theme-light .bg-indigo-900,
+.theme-light .bg-indigo-900\/40 {
+  background-color: #fef3c7 !important;
+  color: #92400e !important;
+  border-color: #fde68a !important;
+}
+
+/* Emerald / Green status tags */
+.theme-light .bg-emerald-950,
+.theme-light .bg-emerald-950\/90,
+.theme-light .bg-emerald-950\/80,
+.theme-light .bg-emerald-950\/60,
+.theme-light .bg-emerald-950\/50,
+.theme-light .bg-emerald-950\/40,
+.theme-light .bg-emerald-950\/30,
+.theme-light .bg-emerald-950\/20,
+.theme-light .bg-emerald-950\/10,
+.theme-light .bg-emerald-900,
+.theme-light .bg-emerald-900\/40 {
+  background-color: #ecfdf5 !important;
+  color: #047857 !important;
+  border-color: #a7f3d0 !important;
+}
+
+/* Amber / Yellow status tags */
+.theme-light .bg-amber-950,
+.theme-light .bg-amber-950\/80,
+.theme-light .bg-amber-950\/60,
+.theme-light .bg-amber-950\/50,
+.theme-light .bg-amber-950\/40,
+.theme-light .bg-amber-950\/30,
+.theme-light .bg-amber-950\/20,
+.theme-light .bg-amber-950\/10,
+.theme-light .bg-amber-900,
+.theme-light .bg-amber-900\/40 {
+  background-color: #fffbeb !important;
+  color: #b45309 !important;
+  border-color: #fef08a !important;
+}
+
+/* Rose / Red status tags */
+.theme-light .bg-rose-950,
+.theme-light .bg-rose-950\/90,
+.theme-light .bg-rose-950\/80,
+.theme-light .bg-rose-950\/60,
+.theme-light .bg-rose-950\/50,
+.theme-light .bg-rose-950\/40,
+.theme-light .bg-rose-950\/30,
+.theme-light .bg-rose-950\/20,
+.theme-light .bg-rose-950\/10,
+.theme-light .bg-rose-900,
+.theme-light .bg-rose-900\/40 {
+  background-color: #fff1f2 !important;
+  color: #be123c !important;
+  border-color: #fecdd3 !important;
+}
+
+/* Blue status tags */
+.theme-light .bg-blue-950,
+.theme-light .bg-blue-950\/90,
+.theme-light .bg-blue-950\/40,
+.theme-light .bg-blue-900 {
+  background-color: #eff6ff !important;
+  color: #1d4ed8 !important;
+  border-color: #bfdbfe !important;
+}
+
+/* Preserve Brand AXIS LAB Gold CTA Buttons in Light Mode */
+.theme-light .bg-\[\#c59257\],
+.theme-light .bg-\[\#b07e43\] {
+  background-color: #c59257 !important;
+  color: #09090b !important;
+}
+
+.theme-light .bg-\[\#c59257\]:hover,
+.theme-light .bg-\[\#b07e43\]:hover {
+  background-color: #b07e43 !important;
+}
+
+/* Deep dark textured black background matching AXIS LAB Dark Mode */
+body {
+  background-color: #060608 !important;
+}
+
+.theme-dark {
+  background-color: #060608 !important;
+}
+
+/* Styled text selections and glow */
+::selection {
+  background-color: #c59257;
+  color: #060608;
+}
+
+/* PRINT-FRIENDLY CSS RULES */
+@media print {
+  /* Hide sidebars, navbars, app headers, overlays outside the print modal */
+  body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+  }
+  header, nav, aside, footer, .no-print, .print\:hidden {
+    display: none !important;
+  }
+  /* Ensure printable elements fill the page cleanly */
+  .print\:bg-white {
+    background-color: #ffffff !important;
+  }
+  .print\:text-black {
+    color: #000000 !important;
+  }
+  .print\:border-black {
+    border-color: #000000 !important;
+  }
+  .print\:shadow-none {
+    box-shadow: none !important;
+  }
+}
+
