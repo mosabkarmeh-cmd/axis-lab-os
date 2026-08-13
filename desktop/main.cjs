@@ -3,11 +3,25 @@ const { autoUpdater } = require('electron-updater');
 const { spawn } = require('node:child_process');
 const path = require('node:path');
 const http = require('node:http');
+const fs = require('node:fs');
+const crypto = require('node:crypto');
 
 const PORT = Number(process.env.AXIS_PORT || 3210);
 let serverProcess;
 let mainWindow;
 
+function getDesktopJwtSecret() {
+  if (process.env.JWT_SECRET && process.env.JWT_SECRET.length >= 32) return process.env.JWT_SECRET;
+  const secretPath = path.join(app.getPath('userData'), 'jwt-secret');
+  try {
+    const existing = fs.readFileSync(secretPath, 'utf8').trim();
+    if (existing.length >= 32) return existing;
+  } catch {}
+  const generated = crypto.randomBytes(48).toString('hex');
+  fs.mkdirSync(path.dirname(secretPath), { recursive: true });
+  fs.writeFileSync(secretPath, generated, { encoding: 'utf8', mode: 0o600 });
+  return generated;
+}
 
 function setupAutoUpdater() {
   if (!app.isPackaged && process.env.AXIS_UPDATE_TEST !== '1') return;
@@ -112,7 +126,7 @@ function startServer() {
       SQLITE_WASM_PATH: app.isPackaged ? path.join(process.resourcesPath, 'sql-wasm.wasm') : path.join(projectRoot(), 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
       PORT: String(PORT),
       APP_URL: `http://127.0.0.1:${PORT}`,
-      JWT_SECRET: process.env.JWT_SECRET || 'AXIS-LAB-DESKTOP-PREVIEW-SECRET-CHANGE-ME-2026',
+      JWT_SECRET: getDesktopJwtSecret(),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,

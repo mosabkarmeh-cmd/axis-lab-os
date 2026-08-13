@@ -1,7 +1,7 @@
 appId: com.axislab.os
 productName: AXIS LAB OS
 copyright: Copyright © 2026 AXIS LAB
-artifactName: AXIS-LAB-OS-Setup-${version}.${ext}
+artifactName: AXIS-LAB-OS-Setup-${version}-AllUsers.${ext}
 files:
   - desktop/**/*
   - package.json
@@ -24,14 +24,9 @@ win:
   icon: assets/icon.ico
   target:
     - nsis
-publish:
-  provider: github
-  owner: mosabkarmeh-cmd
-  repo: axis-lab-os
-  releaseType: release
 nsis:
   oneClick: false
-  perMachine: false
+  perMachine: true
   allowElevation: true
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
@@ -41,3 +36,7 @@ nsis:
     - ar
     - en
   language: 1033
+publish:
+  provider: github
+  owner: mosabkarmeh-cmd
+  repo: axis-lab-os

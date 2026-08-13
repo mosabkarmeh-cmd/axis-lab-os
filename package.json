@@ -1,7 +1,7 @@
 {
-  "name": "react-example",
+  "name": "axis-lab-os",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "AXIS LAB OS - نظام تشغيل ورش القص والنقش بالليزر",
   "author": "AXIS LAB",
   "type": "module",
@@ -17,7 +17,9 @@
     "start:prod": "NODE_ENV=production node dist/server.cjs",
     "desktop:build": "npm run build",
     "desktop:preview": "npm run desktop:build && electron desktop/main.cjs",
-    "desktop:package:win": "npm run desktop:build && electron-builder --win nsis"
+    "desktop:package:win": "npm run desktop:build && electron-builder --win nsis --config electron-builder.yml",
+    "desktop:package:win:current": "npm run desktop:build && electron-builder --win nsis --config electron-builder.yml",
+    "desktop:package:win:all": "npm run desktop:build && electron-builder --win nsis --config electron-builder.all-users.yml"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
