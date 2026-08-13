@@ -11,6 +11,8 @@ permissions:
 jobs:
   release:
     runs-on: windows-latest
+    env:
+      NODE_OPTIONS: --disable-warning=DEP0040 --disable-warning=DEP0169
     steps:
       - name: Checkout
         uses: actions/checkout@v5
