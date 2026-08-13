@@ -1,4 +1,5 @@
 ﻿const { app, BrowserWindow, dialog, shell } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const { spawn } = require('node:child_process');
 const path = require('node:path');
 const http = require('node:http');
@@ -7,6 +8,59 @@ const PORT = Number(process.env.AXIS_PORT || 3210);
 let serverProcess;
 let mainWindow;
 
+
+function setupAutoUpdater() {
+  if (!app.isPackaged && process.env.AXIS_UPDATE_TEST !== '1') return;
+
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('error', (error) => {
+    console.error('[AXIS UPDATER]', error);
+  });
+
+  autoUpdater.on('update-available', async (info) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const result = await dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: 'ØªØ­Ø¯ÙŠØ« AXIS LAB OS',
+      message: `ÙŠØªÙˆÙØ± Ø¥ØµØ¯Ø§Ø± Ø¬Ø¯ÙŠØ¯: ${info.version}`,
+      detail: 'Ù‡Ù„ ØªØ±ÙŠØ¯ ØªÙ†Ø²ÙŠÙ„ Ø§Ù„ØªØ­Ø¯ÙŠØ« Ø§Ù„Ø¢Ù†ØŸ ÙŠÙ…ÙƒÙ†Ùƒ Ù…ØªØ§Ø¨Ø¹Ø© Ø§Ù„Ø¹Ù…Ù„ Ø£Ø«Ù†Ø§Ø¡ Ø§Ù„ØªÙ†Ø²ÙŠÙ„.',
+      buttons: ['ØªÙ†Ø²ÙŠÙ„ Ø§Ù„ØªØ­Ø¯ÙŠØ«', 'Ù„Ø§Ø­Ù‚Ù‹Ø§'],
+      defaultId: 0,
+      cancelId: 1,
+    });
+    if (result.response === 0) {
+      autoUpdater.downloadUpdate().catch((error) => console.error('[AXIS UPDATER DOWNLOAD]', error));
+    }
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    console.log('[AXIS UPDATER] Ø§Ù„ØªØ·Ø¨ÙŠÙ‚ Ù…Ø­Ø¯Ø«.');
+  });
+
+  autoUpdater.on('download-progress', (progress) => {
+    console.log(`[AXIS UPDATER] ${progress.percent.toFixed(1)}%`);
+  });
+
+  autoUpdater.on('update-downloaded', async (info) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const result = await dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: 'Ø§Ù„ØªØ­Ø¯ÙŠØ« Ø¬Ø§Ù‡Ø²',
+      message: `ØªÙ… ØªÙ†Ø²ÙŠÙ„ Ø§Ù„Ø¥ØµØ¯Ø§Ø± ${info.version} Ø¨Ù†Ø¬Ø§Ø­.`,
+      detail: 'Ø³ÙŠØªÙ… Ø­ÙØ¸ Ø¨ÙŠØ§Ù†Ø§Øª SQLite Ø«Ù… Ø¥Ø¹Ø§Ø¯Ø© ØªØ´ØºÙŠÙ„ Ø§Ù„ØªØ·Ø¨ÙŠÙ‚ Ù„ØªØ«Ø¨ÙŠØª Ø§Ù„ØªØ­Ø¯ÙŠØ«.',
+      buttons: ['Ø¥Ø¹Ø§Ø¯Ø© Ø§Ù„ØªØ´ØºÙŠÙ„ ÙˆØ§Ù„ØªØ«Ø¨ÙŠØª', 'Ù„Ø§Ø­Ù‚Ù‹Ø§'],
+      defaultId: 0,
+      cancelId: 1,
+    });
+    if (result.response === 0) autoUpdater.quitAndInstall(false, true);
+  });
+
+  setTimeout(() => {
+    autoUpdater.checkForUpdates().catch((error) => console.error('[AXIS UPDATER CHECK]', error));
+  }, 5000);
+}
 function projectRoot() {
   return app.isPackaged ? process.resourcesPath : path.resolve(__dirname, '..');
 }
@@ -93,6 +147,7 @@ app.whenReady().then(async () => {
   try {
     startServer();
     await createWindow();
+    setupAutoUpdater();
   } catch (error) {
     dialog.showErrorBox('AXIS LAB', error.message);
     app.quit();
@@ -104,4 +159,6 @@ app.on('before-quit', () => {
   app.isQuitting = true;
   if (serverProcess && !serverProcess.killed) serverProcess.kill();
 });
+
+
 
