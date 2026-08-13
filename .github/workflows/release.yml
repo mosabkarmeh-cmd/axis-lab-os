@@ -34,5 +34,7 @@ jobs:
         run: |
           $installer = Get-ChildItem -Path dist -Filter '*Setup*.exe' | Select-Object -First 1
           $blockmap = Get-ChildItem -Path dist -Filter '*.blockmap' | Select-Object -First 1
-          gh release create $env:GITHUB_REF_NAME $installer.FullName $blockmap.FullName --generate-notes --title "AXIS LAB OS $env:GITHUB_REF_NAME"
+          $latest = Get-ChildItem -Path dist -Filter 'latest*.yml' | Select-Object -First 1
+          if (-not $latest) { throw 'electron-builder did not produce latest*.yml; auto-update metadata is missing.' }
+          gh release create $env:GITHUB_REF_NAME $installer.FullName $blockmap.FullName $latest.FullName --generate-notes --title "AXIS LAB OS $env:GITHUB_REF_NAME"
 
