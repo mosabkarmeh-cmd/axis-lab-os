@@ -4,6 +4,7 @@ export interface User {
   fullName: string;
   role: 'admin' | 'employee' | 'accountant';
   isActive: boolean;
+  mustChangePassword?: boolean;
 }
 
 export interface Customer {

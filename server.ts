@@ -97,10 +97,11 @@ type UserRecord = {
   role: string;
   isActive: boolean;
   passwordHash: string;
+  mustChangePassword?: boolean;
 };
 
 function publicUser(user: UserRecord) {
-  return { id: user.id, email: user.email, fullName: user.fullName, role: user.role, isActive: user.isActive };
+  return { id: user.id, email: user.email, fullName: user.fullName, role: user.role, isActive: user.isActive, mustChangePassword: Boolean(user.mustChangePassword) };
 }
 
 function generateJWT(user: UserRecord): string {
@@ -128,7 +129,7 @@ function getRequestUser(req: any): UserRecord | null {
 
 // Memory database states
 const USERS: UserRecord[] = [
-  { id: "u-1", email: "admin@axislab.com", fullName: "المدير العام", role: "admin", isActive: true, passwordHash: process.env.DEMO_ADMIN_PASSWORD_HASH || "$2b$12$nJ3CuPp/O0ELfY6R3MK.0Ow8q2RyugDlaor4rluO3zfuC2vXRDVAS" },
+  { id: "u-1", email: "admin@axislab.com", fullName: "المدير العام", role: "admin", isActive: true, mustChangePassword: Boolean(process.env.BOOTSTRAP_ADMIN_PASSWORD), passwordHash: process.env.DEMO_ADMIN_PASSWORD_HASH || (process.env.BOOTSTRAP_ADMIN_PASSWORD ? bcrypt.hashSync(process.env.BOOTSTRAP_ADMIN_PASSWORD, 12) : "") },
   { id: "u-2", email: "employee@axislab.com", fullName: "فني تشغيل الليزر", role: "employee", isActive: true, passwordHash: process.env.DEMO_EMPLOYEE_PASSWORD_HASH || "$2b$12$XGLPkYO2vLHzuOJ43e5hT.Cs0eAdYYJV9kv2ugU6/HsULfNMj2OmS" },
   { id: "u-3", email: "accountant@axislab.com", fullName: "المحاسب المالي", role: "accountant", isActive: true, passwordHash: process.env.DEMO_ACCOUNTANT_PASSWORD_HASH || "$2b$12$Rf.WkE2UsywzfiEMzGwAPuD0./EG2RYQXdjj0t7PkNGvrxChu.Wbi" }
 ];
@@ -1225,7 +1226,7 @@ async function startServer() {
   // Central API boundary: only health and authentication bootstrap are public.
   // Every business endpoint must have a verified active user before its handler runs.
   app.use("/api", (req, res, next) => {
-    const publicPaths = new Set(["/health", "/auth/login", "/auth/register"]);
+    const publicPaths = new Set(["/health", "/auth/login", "/auth/register", "/auth/change-password"]);
     if (req.method === "OPTIONS" || publicPaths.has(req.path)) {
       next();
       return;
@@ -1233,6 +1234,10 @@ async function startServer() {
     const user = getRequestUser(req);
     if (!user) {
       res.status(401).json({ success: false, message: "يجب تسجيل الدخول للوصول إلى واجهة API" });
+      return;
+    }
+    if (user.mustChangePassword && req.path !== "/auth/change-password") {
+      res.status(428).json({ success: false, message: "يجب تغيير كلمة المرور المؤقتة قبل استخدام النظام" });
       return;
     }
     (req as any).user = user;
@@ -1392,6 +1397,27 @@ async function startServer() {
       token,
       user: publicUser(user)
     });
+  });
+
+  app.post("/api/auth/change-password", async (req, res) => {
+    const user = getRequestUser(req);
+    if (!user) {
+      res.status(401).json({ error: "يجب تسجيل الدخول" });
+      return;
+    }
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || typeof newPassword !== "string" || newPassword.length < 8) {
+      res.status(400).json({ error: "أدخل كلمة المرور الحالية وكلمة مرور جديدة من 8 أحرف على الأقل" });
+      return;
+    }
+    if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+      res.status(401).json({ error: "كلمة المرور الحالية غير صحيحة" });
+      return;
+    }
+    user.passwordHash = await bcrypt.hash(newPassword, 12);
+    user.mustChangePassword = false;
+    schedulePersist();
+    res.json({ success: true, user: publicUser(user) });
   });
 
   // API - Auth Register

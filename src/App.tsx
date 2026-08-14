@@ -137,7 +137,7 @@ export default function App() {
   }, [theme]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authEmail, setAuthEmail] = useState<string>("admin@axislab.com");
-  const [authPassword, setAuthPassword] = useState<string>("admin123");
+  const [authPassword, setAuthPassword] = useState<string>("");
   const [authFullName, setAuthFullName] = useState<string>("");
   const [authRole, setAuthRole] = useState<'admin' | 'employee' | 'accountant'>("employee");
   const [isRegisterMode, setIsRegisterMode] = useState<boolean>(false);
@@ -1111,6 +1111,30 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
       });
     }
   }, []);
+
+  useEffect(() => {
+    if (!currentUser?.mustChangePassword || !token) return;
+    const currentPassword = window.prompt("هذه كلمة مرور مؤقتة. أدخل كلمة المرور الحالية:");
+    const newPassword = currentPassword === null ? null : window.prompt("أدخل كلمة المرور الجديدة (8 أحرف على الأقل):");
+    if (!currentPassword || !newPassword) {
+      setAuthError("يجب تغيير كلمة المرور المؤقتة قبل استخدام النظام.");
+      return;
+    }
+    fetch("/api/auth/change-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    }).then(async (res) => {
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "تعذر تغيير كلمة المرور");
+      setCurrentUser(data.user);
+      setAuthError(null);
+      addTerminalLog("AUTH", "تم تغيير كلمة مرور المسؤول المؤقتة بنجاح.");
+    }).catch((error) => {
+      setAuthError(error.message);
+      addTerminalLog("ERROR", error.message);
+    });
+  }, [currentUser?.mustChangePassword, token]);
 
   // Enforce role-based view permissions dynamically
   useEffect(() => {
@@ -4468,14 +4492,14 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
                     <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider font-mono">
                       حسابات التجربة السريعة (Demo Accounts)
                     </span>
-                    <span className="text-[9px] text-[#c59257] font-mono">1-Click Login</span>
+                    <span className="text-[9px] text-[#c59257] font-mono">اختيار الحساب</span>
                   </div>
 
                   <div className="grid grid-cols-1 gap-2">
                     {/* Admin Preset */}
                     <button
                       type="button"
-                      onClick={() => setAuthPreset("admin", "admin@axislab.com", "admin123")}
+                      onClick={() => setAuthPreset("admin", "admin@axislab.com", "")}
                       className={`w-full p-2.5 rounded-xl border text-right transition-all flex items-center justify-between group cursor-pointer ${
                         activePreset === "admin"
                           ? "bg-amber-950/40 border-[#c59257]/60 text-zinc-100"
@@ -4502,7 +4526,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
                     {/* Laser Tech Preset */}
                     <button
                       type="button"
-                      onClick={() => setAuthPreset("employee", "employee@axislab.com", "emp123")}
+                      onClick={() => setAuthPreset("employee", "employee@axislab.com", "")}
                       className={`w-full p-2.5 rounded-xl border text-right transition-all flex items-center justify-between group cursor-pointer ${
                         activePreset === "employee"
                           ? "bg-emerald-950/40 border-emerald-500/60 text-zinc-100"
@@ -4529,7 +4553,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
                     {/* Finance Preset */}
                     <button
                       type="button"
-                      onClick={() => setAuthPreset("accountant", "accountant@axislab.com", "acc123")}
+                      onClick={() => setAuthPreset("accountant", "accountant@axislab.com", "")}
                       className={`w-full p-2.5 rounded-xl border text-right transition-all flex items-center justify-between group cursor-pointer ${
                         activePreset === "accountant"
                           ? "bg-amber-950/40 border-amber-500/60 text-zinc-100"

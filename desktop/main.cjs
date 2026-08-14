@@ -14,6 +14,20 @@ if (!gotSingleInstanceLock) {
 }
 let serverProcess;
 let mainWindow;
+let bootstrapPasswordCreated = false;
+
+function getBootstrapAdminPassword() {
+  const passwordPath = path.join(app.getPath('userData'), 'bootstrap-admin-password.txt');
+  try {
+    const existing = fs.readFileSync(passwordPath, 'utf8').trim();
+    if (existing.length >= 12) return existing;
+  } catch {}
+  const generated = crypto.randomBytes(12).toString('base64url');
+  fs.mkdirSync(path.dirname(passwordPath), { recursive: true });
+  fs.writeFileSync(passwordPath, generated, { encoding: 'utf8', mode: 0o600 });
+  bootstrapPasswordCreated = true;
+  return generated;
+}
 
 function getDesktopJwtSecret() {
   if (process.env.JWT_SECRET && process.env.JWT_SECRET.length >= 32) return process.env.JWT_SECRET;
@@ -133,6 +147,7 @@ function startServer() {
       APP_URL: `http://127.0.0.1:${PORT}`,
       SERVER_HOST: '127.0.0.1',
       ALLOW_PUBLIC_REGISTRATION: 'false',
+      BOOTSTRAP_ADMIN_PASSWORD: getBootstrapAdminPassword(),
       JWT_SECRET: getDesktopJwtSecret(),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -182,6 +197,15 @@ app.whenReady().then(async () => {
   try {
     startServer();
     await createWindow();
+    if (bootstrapPasswordCreated && mainWindow && !mainWindow.isDestroyed()) {
+      await dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'بيانات المسؤول لأول تشغيل',
+        message: 'تم إنشاء حساب المسؤول تلقائيًا.',
+        detail: 'البريد: admin@axislab.com\nكلمة المرور المؤقتة: ' + getBootstrapAdminPassword() + '\nاحفظها ثم غيّرها فورًا من الإعدادات. لن يتم توليد كلمة مرور جديدة بعد ذلك.',
+        buttons: ['فهمت، متابعة'],
+      });
+    }
     setupAutoUpdater();
   } catch (error) {
     dialog.showErrorBox('AXIS LAB', error.message);
