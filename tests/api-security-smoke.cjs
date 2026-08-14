@@ -104,6 +104,11 @@ const assert = (condition, message) => {
     });
     assert(payment.response.ok && payment.body.paidAmount === 25, `Payment write failed: ${JSON.stringify(payment.body)}`);
 
+    // Persistence is debounced by the server. Windows child-process termination
+    // is not guaranteed to deliver SIGTERM gracefully, so wait for the SQLite
+    // snapshot to be flushed before simulating a restart.
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    assert(fs.existsSync(env.AXIS_DATA_FILE), "SQLite file was not created before restart");
     await stop();
     start();
     await waitForHealth();
