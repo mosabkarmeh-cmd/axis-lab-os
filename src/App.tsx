@@ -4,6 +4,7 @@ import { useLocalStorage } from "./hooks/useLocalStorage";
 import { useOrderFilters } from "./hooks/useOrderFilters";
 import { useCurrencyCalculator } from "./hooks/useCurrencyCalculator";
 import { useProductionWorkspace } from "./hooks/useProductionWorkspace";
+import { useInventoryWorkspace } from "./hooks/useInventoryWorkspace";
 import { extractMaterialName } from "./lib/materials";
 import { getOrderStatusBadge, getPaymentStatusBadge } from "./components/StatusBadges";
 import { EXCHANGE_RATE_STORAGE_KEY, sanitizeExchangeRate, sypToUsd, usdToSyp } from "./lib/currency";
@@ -759,76 +760,23 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
   const [editOrderItems, setEditOrderItems] = useState<Array<{ name: string; qty: number; price: number; notes?: string }>>([]);
   const [editFocusedItemIdx, setEditFocusedItemIdx] = useState<number | null>(null);
 
-  // Materials and Inventory module states
-  const [materials, setMaterials] = useState<any[]>([]);
-  const [draggedMaterialId, setDraggedMaterialId] = useState<string | null>(null);
-  const [dragOverMaterialId, setDragOverMaterialId] = useState<string | null>(null);
-  const [materialCategories, setMaterialCategories] = useState<string[]>([]);
-  const [remnants, setRemnants] = useState<any[]>([]);
-  const [suppliers, setSuppliers] = useState<any[]>([]);
-  const [supplyOrders, setSupplyOrders] = useState<any[]>([]);
-  const [materialStats, setMaterialStats] = useState<any>({ totalMaterials: 0, totalValue: 0, lowStock: 0, outOfStock: 0 });
-  const [activeProductSubTab, setActiveProductSubTab] = useState<'products' | 'materials' | 'remnants' | 'suppliers' | 'supply_orders'>('materials');
-  const [supplyOrdersFilterStatus, setSupplyOrdersFilterStatus] = useState<'all' | 'pending' | 'completed' | 'cancelled'>('all');
-  const [supplyOrdersSearch, setSupplyOrdersSearch] = useState<string>('');
-  const [materialSortBy, setMaterialSortBy] = useState<'default' | 'most_used'>('default');
-  const [materialQualityFilter, setMaterialQualityFilter] = useState<'all' | 'inspected' | 'defective' | 'in_preparation'>('all');
-
-  // Smart Supply Order (Auto-replenish) modal states
-  const [showSmartSupplyModal, setShowSmartSupplyModal] = useState<boolean>(false);
-  const [smartSupplyItems, setSmartSupplyItems] = useState<{
-    materialId: string;
-    materialName: string;
-    category: string;
-    unit: string;
-    currentStock: number;
-    minimumStock: number;
-    suggestedQty: number;
-    unitPrice: number;
-    supplierId: string;
-    supplierName: string;
-    selected: boolean;
-  }[]>([]);
-  const [isSubmittingSmartSupply, setIsSubmittingSmartSupply] = useState<boolean>(false);
-
-  // Materials form / modal states
-  const [showAddMaterial, setShowAddMaterial] = useState<boolean>(false);
-  const [matName, setMatName] = useState<string>("");
-  const [matCategory, setMatCategory] = useState<string>("الأكريليك");
-  const [matSubCategory, setMatSubCategory] = useState<string>("");
-  const [matThickness, setMatThickness] = useState<string>("");
-  const [matColor, setMatColor] = useState<string>("");
-  const [matWidth, setMatWidth] = useState<string>("");
-  const [matHeight, setMatHeight] = useState<string>("");
-  const [matUnit, setMatUnit] = useState<string>("sheet");
-  const [matPrice, setMatPrice] = useState<string>("");
-  const [matMinStock, setMatMinStock] = useState<string>("");
-  const [matSupplierId, setMatSupplierId] = useState<string>("");
-  const [matNotes, setMatNotes] = useState<string>("");
-  const [matLocation, setMatLocation] = useState<string>("");
-  const [matQualityStatus, setMatQualityStatus] = useState<'inspected' | 'defective' | 'in_preparation'>('inspected');
-  const [editingMaterial, setEditingMaterial] = useState<any | null>(null);
-  const [isAiClassifying, setIsAiClassifying] = useState<boolean>(false);
-  const [aiClassificationResult, setAiClassificationResult] = useState<any | null>(null);
-
-  // Stock Adjustment modal states
-  const [showAdjustStock, setShowAdjustStock] = useState<any | null>(null); // holds material object
-  const [adjustQty, setAdjustQty] = useState<string>("");
-  const [adjustType, setAdjustType] = useState<'purchase' | 'consumption' | 'adjustment' | 'waste'>('purchase');
-  const [adjustReason, setAdjustReason] = useState<string>("");
-
-  // Supplier Price Comparison modal state
-  const [priceComparisonMaterial, setPriceComparisonMaterial] = useState<any | null>(null);
-  const [isCurrencyConverterOpen, setIsCurrencyConverterOpen] = useState<boolean>(false);
-
-  // Supplier dashboard states
-  const [selectedDashboardSupplierId, setSelectedDashboardSupplierId] = useState<string>("");
-  const [newSupplyMaterialId, setNewSupplyMaterialId] = useState<string>("");
-  const [newSupplyQty, setNewSupplyQty] = useState<string>("");
-  const [newSupplyPrice, setNewSupplyPrice] = useState<string>("");
-  const [newSupplyExpectedDate, setNewSupplyExpectedDate] = useState<string>("");
-  const [newSupplyNotes, setNewSupplyNotes] = useState<string>("");
-  const [isSubmittingSupplyOrder, setIsSubmittingSupplyOrder] = useState<boolean>(false);
+  // Inventory workspace state is isolated so materials, remnants and supplier workflows can move into InventoryPage safely.
+  const {
+    materials, setMaterials, draggedMaterialId, setDraggedMaterialId, dragOverMaterialId, setDragOverMaterialId,
+    materialCategories, setMaterialCategories, remnants, setRemnants, suppliers, setSuppliers, supplyOrders, setSupplyOrders,
+    materialStats, setMaterialStats, activeProductSubTab, setActiveProductSubTab, supplyOrdersFilterStatus, setSupplyOrdersFilterStatus,
+    supplyOrdersSearch, setSupplyOrdersSearch, materialSortBy, setMaterialSortBy, materialQualityFilter, setMaterialQualityFilter,
+    showSmartSupplyModal, setShowSmartSupplyModal, smartSupplyItems, setSmartSupplyItems, isSubmittingSmartSupply, setIsSubmittingSmartSupply,
+    showAddMaterial, setShowAddMaterial, matName, setMatName, matCategory, setMatCategory, matSubCategory, setMatSubCategory,
+    matThickness, setMatThickness, matColor, setMatColor, matWidth, setMatWidth, matHeight, setMatHeight, matUnit, setMatUnit,
+    matPrice, setMatPrice, matMinStock, setMatMinStock, matSupplierId, setMatSupplierId, matNotes, setMatNotes, matLocation, setMatLocation,
+    matQualityStatus, setMatQualityStatus, editingMaterial, setEditingMaterial, isAiClassifying, setIsAiClassifying,
+    aiClassificationResult, setAiClassificationResult, showAdjustStock, setShowAdjustStock, adjustQty, setAdjustQty,
+    adjustType, setAdjustType, adjustReason, setAdjustReason, priceComparisonMaterial, setPriceComparisonMaterial,
+    isCurrencyConverterOpen, setIsCurrencyConverterOpen, selectedDashboardSupplierId, setSelectedDashboardSupplierId,
+    newSupplyMaterialId, setNewSupplyMaterialId, newSupplyQty, setNewSupplyQty, newSupplyPrice, setNewSupplyPrice,
+    newSupplyExpectedDate, setNewSupplyExpectedDate, newSupplyNotes, setNewSupplyNotes, isSubmittingSupplyOrder, setIsSubmittingSupplyOrder,
+  } = useInventoryWorkspace();
 
   // Remnants form / modal states
   const [showAddRemnant, setShowAddRemnant] = useState<boolean>(false);
