@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { safeApiFetch } from "./lib/api";
 import { useLocalStorage } from "./hooks/useLocalStorage";
+import { extractMaterialName } from "./lib/materials";
 import {
   Shield,
   UserCheck,
@@ -1582,26 +1583,6 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
       (j.orderNumber && j.orderNumber === ord.orderNumber)
     );
 
-    const extractMaterialName = (it: any): string => {
-      if (it.material && typeof it.material === 'string' && it.material.trim()) return it.material.trim();
-      if (it.materialCategory && typeof it.materialCategory === 'string' && it.materialCategory.trim()) return it.materialCategory.trim();
-      const name = (it.productName || it.name || "").trim();
-      if (/أكريليك|اكريليك|acrylic/i.test(name)) {
-        const thicknessMatch = name.match(/(\d+(\.\d+)?)\s*(ملم|مم|mm)/i);
-        return thicknessMatch ? `أكريليك ${thicknessMatch[0]}` : "أكريليك";
-      }
-      if (/mdf|ام دي اف|أم دي إف/i.test(name)) {
-        const thicknessMatch = name.match(/(\d+(\.\d+)?)\s*(ملم|مم|mm)/i);
-        return thicknessMatch ? `خشب MDF ${thicknessMatch[0]}` : "خشب MDF";
-      }
-      if (/خشب|خشبي|زان|سويد|بلوط|معاكس|wood/i.test(name)) {
-        const thicknessMatch = name.match(/(\d+(\.\d+)?)\s*(ملم|مم|mm)/i);
-        return thicknessMatch ? `خشب ${thicknessMatch[0]}` : "خشب طبيعي/معاكس";
-      }
-      if (/جلد|leather/i.test(name)) return "جلود وقماش";
-      if (/صاج|حديد|معادن|ستانلس|stainless|metal/i.test(name)) return "معادن وستانلس";
-      return name || "مواد عامة";
-    };
 
     // If order has items, calculate completion progress for each part/item & material group
     if (items.length > 0) {
