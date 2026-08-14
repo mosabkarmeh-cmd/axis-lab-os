@@ -105,9 +105,15 @@ const assert = (condition, message) => {
 
     const payment = await request(`/api/orders/${orderId}/payments`, {
       method: "POST",
-      body: JSON.stringify({ amount: 25, paymentMethod: "cash", notes: "Persistence smoke test" }),
+      body: JSON.stringify({ amount: 25, paymentId: "smoke-order-payment-1", paymentMethod: "cash", notes: "Persistence smoke test" }),
     });
     assert(payment.response.ok && payment.body.paidAmount === 25, `Payment write failed: ${JSON.stringify(payment.body)}`);
+    const duplicateOrderPayment = await request(`/api/orders/${orderId}/payments`, { method: "POST", body: JSON.stringify({ amount: 25, paymentId: "smoke-order-payment-1" }) });
+    assert(duplicateOrderPayment.response.status === 409, "Duplicate order payment was not rejected");
+    const negativeOrderPayment = await request(`/api/orders/${orderId}/payments`, { method: "POST", body: JSON.stringify({ amount: -1 }) });
+    assert(negativeOrderPayment.response.status === 400, "Negative order payment was not rejected");
+    const excessiveOrderPayment = await request(`/api/orders/${orderId}/payments`, { method: "POST", body: JSON.stringify({ amount: 100 }) });
+    assert(excessiveOrderPayment.response.status === 400, "Excessive order payment was not rejected");
 
     // Persistence is debounced by the server. Windows child-process termination
     // is not guaranteed to deliver SIGTERM gracefully, so wait for the SQLite
@@ -126,6 +132,12 @@ const assert = (condition, message) => {
     const invoices = await request("/api/accounting/invoices");
     const restoredInvoice = invoices.body.invoices.find((item) => item.orderId === orderId);
     assert(restoredInvoice && restoredInvoice.paidAmount === 25, "Invoice/payment was not restored after restart");
+    const excessiveInvoicePayment = await request(`/api/accounting/invoices/${restoredInvoice.id}/payments`, { method: "POST", body: JSON.stringify({ amount: 100 }) });
+    assert(excessiveInvoicePayment.response.status === 400, "Excessive invoice payment was not rejected");
+    const invoicePayment = await request(`/api/accounting/invoices/${restoredInvoice.id}/payments`, { method: "POST", body: JSON.stringify({ amount: 25, paymentId: "smoke-invoice-payment-1", paymentMethod: "cash" }) });
+    assert(invoicePayment.response.ok && invoicePayment.body.invoice.paidAmount === 50, "Invoice payment ledger write failed");
+    const duplicateInvoicePayment = await request(`/api/accounting/invoices/${restoredInvoice.id}/payments`, { method: "POST", body: JSON.stringify({ amount: 25, paymentId: "smoke-invoice-payment-1" }) });
+    assert(duplicateInvoicePayment.response.status === 409, "Duplicate invoice payment was not rejected");
 
     const restoredRate = await request("/api/exchange-rate");
     assert(restoredRate.body.exchangeRate === 135, "Exchange rate was not restored after restart");

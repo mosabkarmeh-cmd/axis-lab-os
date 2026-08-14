@@ -2518,7 +2518,7 @@ async function startServer() {
 
   // API - Record Payment
   app.post("/api/orders/:id/payments", (req, res) => {
-    const { amount, notes, paymentMethod, changedById } = req.body;
+    const { amount, notes, paymentMethod, changedById, paymentId } = req.body;
     const order = ORDERS.find(o => o.id === req.params.id);
     if (!order) {
       res.status(404).json({ error: "الطلب غير موجود" });
@@ -2530,7 +2530,14 @@ async function startServer() {
       res.status(400).json({ error: "مبلغ الدفعة يجب أن يكون أكبر من الصفر" });
       return;
     }
-
+    if (payAmt > order.remaining + 0.01) {
+      res.status(400).json({ error: "مبلغ الدفعة يتجاوز المبلغ المتبقي" });
+      return;
+    }
+    if (paymentId && order.payments?.some((payment: any) => payment.id === String(paymentId))) {
+      res.status(409).json({ error: "هذه الدفعة مسجلة مسبقاً" });
+      return;
+    }
     order.paidAmount += payAmt;
     order.remaining = Math.max(0, order.totalPrice - order.paidAmount);
 
@@ -2541,7 +2548,7 @@ async function startServer() {
     const methodLabel = paymentMethod === 'transfer' ? 'تحويل بنكي' : paymentMethod === 'card' ? 'بطاقة / شيك' : 'نقدي كاش';
 
     const paymentRecord = {
-      id: "pay_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
+      id: paymentId ? String(paymentId) : "pay_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
       orderId: order.id,
       amountUSD: payAmt,
       amountSYP: Math.round(payAmt * SETTINGS.exchangeRate),
@@ -2558,8 +2565,9 @@ async function startServer() {
       matchingInv2.paidAmount = order.paidAmount;
       matchingInv2.remaining = order.remaining;
       matchingInv2.status = order.remaining === 0 ? "paid" : order.paidAmount > 0 ? "partially_paid" : "unpaid";
+      if (!matchingInv2.payments) matchingInv2.payments = [];
+      matchingInv2.payments.unshift({ ...paymentRecord, invoiceId: matchingInv2.id });
     }
-
     order.statusHistory.unshift({
       oldStatus: order.status,
       newStatus: order.status,
@@ -6998,7 +7006,7 @@ Role Guidelines:
 
   // Record Payment on Invoice
   app.post("/api/accounting/invoices/:id/payments", (req, res) => {
-    const { amount, notes } = req.body;
+    const { amount, notes, paymentMethod, changedById, paymentId } = req.body;
     const inv = INVOICES.find(i => i.id === req.params.id);
     if (!inv) {
       res.status(404).json({ success: false, message: "الفاتورة غير موجودة" });
@@ -7006,16 +7014,41 @@ Role Guidelines:
     }
 
     const payAmt = Number(amount) || 0;
+    if (payAmt <= 0) {
+      res.status(400).json({ success: false, message: "مبلغ الدفعة يجب أن يكون أكبر من الصفر" });
+      return;
+    }
+    if (payAmt > inv.remaining + 0.01) {
+      res.status(400).json({ success: false, message: "مبلغ الدفعة يتجاوز المبلغ المتبقي" });
+      return;
+    }
+    if (paymentId && inv.payments?.some((payment: any) => payment.id === String(paymentId))) {
+      res.status(409).json({ success: false, message: "هذه الدفعة مسجلة مسبقاً" });
+      return;
+    }
     inv.paidAmount += payAmt;
     inv.remaining = Math.max(0, inv.totalPrice - inv.paidAmount);
     inv.status = inv.remaining === 0 ? "paid" : inv.paidAmount > 0 ? "partially_paid" : "unpaid";
-
+    const invoicePayment = {
+      id: paymentId ? String(paymentId) : "pay_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
+      invoiceId: inv.id,
+      orderId: inv.orderId,
+      amountUSD: payAmt,
+      paymentMethod: paymentMethod || "cash",
+      notes: notes || "دفعة فاتورة",
+      recordedBy: changedById || "u-1",
+      createdAt: new Date().toISOString()
+    };
+    if (!inv.payments) inv.payments = [];
+    inv.payments.unshift(invoicePayment);
     // If linked to an order, sync the order payment
     if (inv.orderId) {
       const ord = ORDERS.find(o => o.id === inv.orderId);
       if (ord) {
         ord.paidAmount = inv.paidAmount;
         ord.remaining = inv.remaining;
+        if (!ord.payments) ord.payments = [];
+        if (!ord.payments.some((payment: any) => payment.id === invoicePayment.id)) ord.payments.unshift(invoicePayment);
         ord.statusHistory.unshift({
           oldStatus: ord.status,
           newStatus: ord.status,
