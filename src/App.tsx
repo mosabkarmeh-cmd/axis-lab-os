@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { safeApiFetch } from "./lib/api";
 import { useLocalStorage } from "./hooks/useLocalStorage";
+import { useOrderFilters } from "./hooks/useOrderFilters";
 import { extractMaterialName } from "./lib/materials";
 import { getOrderStatusBadge, getPaymentStatusBadge } from "./components/StatusBadges";
 import {
@@ -277,55 +278,17 @@ export default function App() {
     (orderFilterCustomer !== "all" ? 1 : 0) +
     (orderFilterStatus !== "all" ? 1 : 0);
 
-  const filteredOrders = React.useMemo(() => {
-    return orders.filter((ord) => {
-      // 1. Archiving tab filter
-      if (databaseTab === "active" && ord.isArchived) return false;
-      if (databaseTab === "archived" && !ord.isArchived) return false;
-
-      // 2. Search query (order number, customer name, notes)
-      if (orderFilterSearch.trim()) {
-        const q = orderFilterSearch.toLowerCase().trim();
-        const custName = customers.find(c => c.id === ord.customerId)?.name.toLowerCase() || "";
-        const matchesNum = ord.orderNumber.toLowerCase().includes(q);
-        const matchesCust = custName.includes(q);
-        const matchesNotes = ord.notes?.toLowerCase().includes(q) || false;
-        if (!matchesNum && !matchesCust && !matchesNotes) return false;
-      }
-
-      // 3. Priority filter
-      if (orderFilterPriority !== "all") {
-        if (ord.priority !== orderFilterPriority) return false;
-      }
-
-      // 4. Customer filter
-      if (orderFilterCustomer !== "all") {
-        if (ord.customerId !== orderFilterCustomer) return false;
-      }
-
-      // 5. Status filter
-      if (orderFilterStatus !== "all") {
-        if (ord.status !== orderFilterStatus) return false;
-      }
-
-      // 6. Date Range filter
-      if (orderFilterStartDate) {
-        const start = new Date(orderFilterStartDate);
-        start.setHours(0, 0, 0, 0);
-        const orderDate = new Date(ord.createdAt);
-        if (orderDate < start) return false;
-      }
-
-      if (orderFilterEndDate) {
-        const end = new Date(orderFilterEndDate);
-        end.setHours(23, 59, 59, 999);
-        const orderDate = new Date(ord.createdAt);
-        if (orderDate > end) return false;
-      }
-
-      return true;
-    });
-  }, [orders, databaseTab, orderFilterSearch, orderFilterPriority, orderFilterCustomer, orderFilterStatus, orderFilterStartDate, orderFilterEndDate, customers]);
+  const filteredOrders = useOrderFilters({
+    orders,
+    customers,
+    databaseTab,
+    search: orderFilterSearch,
+    startDate: orderFilterStartDate,
+    endDate: orderFilterEndDate,
+    priority: orderFilterPriority,
+    customer: orderFilterCustomer,
+    status: orderFilterStatus,
+  });
 
   const [exchangeRate, setExchangeRate] = useState<number>(() => {
     const saved = localStorage.getItem("axislab_exchange_rate");
