@@ -156,6 +156,27 @@ function syncNormalizedLocalEntities(sqlite: any) {
     }
   }
 }
+function assertFinancialStateInvariants() {
+  for (const invoice of INVOICES) {
+    const total = Number(invoice.totalPrice) || 0;
+    const paid = Number(invoice.paidAmount) || 0;
+    const remaining = Number(invoice.remaining) || 0;
+    if (invoice.status !== "credit_note" && Math.abs(remaining - Math.max(0, total - paid)) > 0.02) {
+      throw new Error(`Financial invariant failed for invoice ${invoice.id}: remaining mismatch`);
+    }
+    for (const item of invoice.items || []) {
+      const expected = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0) - (Number(item.discount) || 0) + (Number(item.tax) || 0);
+      if (Math.abs((Number(item.total) || 0) - expected) > 0.02) {
+        throw new Error(`Financial invariant failed for invoice item ${item.id || "unknown"}: total mismatch`);
+      }
+    }
+  }
+  for (const expense of EXPENSES) {
+    if (!Number.isFinite(Number(expense.amount)) || Number(expense.amount) < 0) {
+      throw new Error(`Financial invariant failed for expense ${expense.id}: amount must be non-negative`);
+    }
+  }
+}
 function syncNormalizedFinancialEntities(sqlite: any) {
   const now = new Date().toISOString();
   sqlite.run("DELETE FROM local_invoice_items");
@@ -1383,6 +1404,7 @@ async function persistStateNow() {
           sqlite.run("INSERT INTO app_state (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at", [key, JSON.stringify(value), now]);
         }
         syncNormalizedLocalEntities(sqlite);
+        assertFinancialStateInvariants();
         syncNormalizedFinancialEntities(sqlite);
         sqlite.run("UPDATE local_metadata SET value = ?, updated_at = ? WHERE key = 'schema_version'", [String(LOCAL_SCHEMA_VERSION), now]);
         sqlite.run("COMMIT");
