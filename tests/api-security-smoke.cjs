@@ -125,6 +125,15 @@ const assert = (condition, message) => {
     const restoredRate = await request("/api/exchange-rate");
     assert(restoredRate.body.exchangeRate === 135, "Exchange rate was not restored after restart");
 
+    const backup = await request("/api/backup", { method: "POST" });
+    assert(backup.response.ok && backup.body.backup?.sha256 && !backup.body.backup?.filePath, "Real SQLite backup metadata is invalid or leaks its local path");
+    const changedRate = await request("/api/exchange-rate", { method: "PUT", body: JSON.stringify({ exchangeRate: 200 }) });
+    assert(changedRate.response.ok && changedRate.body.exchangeRate === 200, "Could not change rate before restore");
+    const restore = await request(`/api/backup/restore/${backup.body.backup.id}`, { method: "POST" });
+    assert(restore.response.ok, `Backup restore failed: ${JSON.stringify(restore.body)}`);
+    const restoredAfterBackup = await request("/api/exchange-rate");
+    assert(restoredAfterBackup.body.exchangeRate === 135, "Backup restore did not restore the earlier exchange rate");
+
     console.log("api-security-and-financial-persistence-smoke: PASS");
   } finally {
     await stop();

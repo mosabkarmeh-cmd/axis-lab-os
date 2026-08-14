@@ -14,6 +14,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import fs from "fs";
+import { createHash } from "crypto";
 import https from "https";
 import multer from "multer";
 import ExcelJS from "exceljs";
@@ -23,6 +24,7 @@ import cors from "cors";
 import os from "os";
 import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import initSqlJs from "sql.js";
 
@@ -81,6 +83,39 @@ async function flushLocalSqlite() {
   const tempFile = `${LOCAL_DATA_FILE}.tmp`;
   await fs.promises.writeFile(tempFile, Buffer.from(bytes));
   await fs.promises.rename(tempFile, LOCAL_DATA_FILE);
+}
+
+function backupDirectory() {
+  return path.join(path.dirname(LOCAL_DATA_FILE), "backups");
+}
+
+function checksumFile(filePath: string) {
+  return new Promise<string>((resolve, reject) => {
+    const hash = createHash("sha256");
+    const stream = fs.createReadStream(filePath);
+    stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("error", reject);
+    stream.on("end", () => resolve(hash.digest("hex")));
+  });
+}
+
+async function createSqliteBackup(kind = "manual") {
+  if (!USE_SQLITE) return null;
+  await persistStateNow();
+  await fs.promises.mkdir(backupDirectory(), { recursive: true });
+  const id = `b_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const filePath = path.join(backupDirectory(), `${id}.sqlite`);
+  await fs.promises.copyFile(LOCAL_DATA_FILE, filePath);
+  const stat = await fs.promises.stat(filePath);
+  return {
+    id,
+    name: `${kind === "safety" ? "نسخة أمان قبل الاستعادة" : "نسخة احتياطية يدوية"} - ${new Date().toLocaleDateString("ar-EG")}`,
+    createdAt: new Date().toISOString(),
+    status: "completed",
+    filePath,
+    size: stat.size,
+    sha256: await checksumFile(filePath),
+  };
 }
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -7436,51 +7471,68 @@ Role Guidelines:
     }
   });
 
+  const publicBackup = (backup: any) => {
+    const { filePath, ...safeBackup } = backup;
+    return safeBackup;
+  };
   app.get("/api/backup", (req, res) => {
-    res.json({ success: true, backups: BACKUPS });
+    res.json({ success: true, backups: BACKUPS.map(publicBackup) });
   });
 
-  app.post("/api/backup", (req, res) => {
-    const backupId = "b_" + Date.now();
-    const newBackup = {
-      id: backupId,
-      name: `نسخة احتياطية يدوية - نظام كامل (${new Date().toLocaleDateString('ar-EG')})`,
-      createdAt: new Date().toISOString(),
-      status: "completed"
-    };
-    BACKUPS.unshift(newBackup);
-
-    // Log Activity
-    ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
-      userId: "u-1",
-      action: "CREATE_BACKUP",
-      entityType: "Backup",
-      entityId: backupId,
-      createdAt: new Date().toISOString()
-    });
-
-    res.json({ success: true, backup: newBackup });
+  app.post("/api/backup", async (req, res) => {
+    if (!USE_SQLITE) {
+      res.status(501).json({ success: false, message: "النسخ المحلي الفعلي متاح في وضع SQLite فقط." });
+      return;
+    }
+    try {
+      const newBackup = await createSqliteBackup("manual");
+      if (!newBackup) throw new Error("تعذر إنشاء نسخة SQLite");
+      BACKUPS.unshift(newBackup);
+      ACTIVITY_LOGS.unshift({
+        id: "log_" + Date.now(), userId: "u-1", action: "CREATE_BACKUP",
+        entityType: "Backup", entityId: newBackup.id, createdAt: new Date().toISOString()
+      });
+      schedulePersist();
+      res.json({ success: true, backup: publicBackup(newBackup) });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: `فشل إنشاء النسخة الاحتياطية: ${error.message}` });
+    }
   });
 
-  app.post("/api/backup/restore/:id", (req, res) => {
+  app.post("/api/backup/restore/:id", async (req, res) => {
+    if (!USE_SQLITE) {
+      res.status(501).json({ success: false, message: "استعادة SQLite المحلية متاحة في وضع SQLite فقط." });
+      return;
+    }
     const { id } = req.params;
     const backupObj = BACKUPS.find(b => b.id === id);
-    if (!backupObj) {
-      return res.status(404).json({ success: false, message: "لم يتم العثور على النسخة الاحتياطية المحددة." });
+    if (!backupObj || !backupObj.filePath || !backupObj.sha256) {
+      res.status(404).json({ success: false, message: "النسخة المحددة لا تحتوي على ملف SQLite صالح للاستعادة." });
+      return;
     }
-
-    // Log Activity
-    ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
-      userId: "u-1",
-      action: "RESTORE_BACKUP",
-      entityType: "Backup",
-      entityId: id,
-      createdAt: new Date().toISOString()
-    });
-
-    res.json({ success: true, message: "تمت استعادة البيانات بنجاح من النسخة الاحتياطية." });
+    try {
+      const actualChecksum = await checksumFile(backupObj.filePath);
+      if (actualChecksum !== backupObj.sha256) {
+        res.status(409).json({ success: false, message: "فشل التحقق من سلامة النسخة الاحتياطية؛ checksum غير مطابق." });
+        return;
+      }
+      const safetyBackup = await createSqliteBackup("safety");
+      if (safetyBackup) BACKUPS.unshift(safetyBackup);
+      const SQL = await initSqlJs({ locateFile: (file: string) => process.env.SQLITE_WASM_PATH || path.join(process.cwd(), "node_modules", "sql.js", "dist", file) });
+      localSqlite = new SQL.Database(fs.readFileSync(backupObj.filePath));
+      await loadPersistedState();
+      if (safetyBackup) BACKUPS.unshift(safetyBackup);
+      await refreshWarehouseCache();
+      ACTIVITY_LOGS.unshift({
+        id: "log_" + Date.now(), userId: "u-1", action: "RESTORE_BACKUP",
+        entityType: "Backup", entityId: id, createdAt: new Date().toISOString()
+      });
+      await flushLocalSqlite();
+      schedulePersist();
+      res.json({ success: true, message: "تم التحقق من النسخة واستعادتها. تم الاحتفاظ بنسخة أمان قبل الاستعادة." });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: `فشل استعادة النسخة الاحتياطية: ${error.message}` });
+    }
   });
 
   // ==================== FILES & DOCUMENTS API ====================

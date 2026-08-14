@@ -42,7 +42,20 @@ function getDesktopJwtSecret() {
   return generated;
 }
 
+function getInstallScope() {
+  if (!app.isPackaged) return 'current-user';
+  try {
+    return fs.readFileSync(path.join(process.resourcesPath, 'install-scope.txt'), 'utf8').trim() || 'current-user';
+  } catch {
+    return 'current-user';
+  }
+}
+
 function setupAutoUpdater() {
+  if (getInstallScope() === 'all-users') {
+    console.log('[AXIS UPDATER] All Users installation detected; automatic updates are disabled until a dedicated machine-wide update channel is available.');
+    return;
+  }
   if (!app.isPackaged && process.env.AXIS_UPDATE_TEST !== '1') return;
 
   autoUpdater.autoDownload = false;

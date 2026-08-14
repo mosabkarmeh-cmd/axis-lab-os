@@ -22,6 +22,8 @@ extraResources:
     to: sql-wasm.wasm
   - from: dist/logo.jpg
     to: dist/logo.jpg
+  - from: assets/install-scope-all-users.txt
+    to: install-scope.txt
 win:
   icon: assets/icon.ico
   target:
