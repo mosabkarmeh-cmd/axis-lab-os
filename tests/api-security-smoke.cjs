@@ -140,6 +140,23 @@ const assert = (condition, message) => {
     const calculatedInvoice = calculatedInvoices.body.invoices.find((item) => item.orderId === calculatedOrder.body.id);
     assert(calculatedInvoice && calculatedInvoice.subtotal === 100 && calculatedInvoice.totalPrice === 105, "Invoice tax/discount totals were not calculated correctly");
 
+    const creditNote = await request(`/api/accounting/invoices/${calculatedInvoice.id}/credit-note`, { method: "POST" });
+    assert(creditNote.response.ok && creditNote.body.creditInvoice?.status === "credit_note", `Credit note creation failed: ${JSON.stringify(creditNote.body)}`);
+    assert(creditNote.body.originalInvoice?.status === "cancelled", "Original invoice was not cancelled after credit note");
+
+    const expense = await request("/api/accounting/expenses", {
+      method: "POST",
+      body: JSON.stringify({ category: "maintenance", amount: 250, date: "2026-08-14", description: "Smoke expense", status: "paid" }),
+    });
+    assert(expense.response.ok && expense.body.expense?.amount === 250, `Expense creation failed: ${JSON.stringify(expense.body)}`);
+    const updatedExpense = await request(`/api/accounting/expenses/${expense.body.expense.id}`, {
+      method: "PUT",
+      body: JSON.stringify({ amount: 275, description: "Updated smoke expense" }),
+    });
+    assert(updatedExpense.response.ok && updatedExpense.body.expense.amount === 275, "Expense update failed");
+    const deletedExpense = await request(`/api/accounting/expenses/${expense.body.expense.id}`, { method: "DELETE" });
+    assert(deletedExpense.response.ok && deletedExpense.body.expense.id === expense.body.expense.id, "Expense deletion failed");
+
     const backup = await request("/api/backup", { method: "POST" });
     assert(backup.response.ok && backup.body.backup?.sha256 && !backup.body.backup?.filePath, "Real SQLite backup metadata is invalid or leaks its local path");
     const changedRate = await request("/api/exchange-rate", { method: "PUT", body: JSON.stringify({ exchangeRate: 200 }) });
