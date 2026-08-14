@@ -3,6 +3,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const jwt = require("jsonwebtoken");
+const initSqlJs = require("sql.js");
 
 const port = 3400 + Math.floor(Math.random() * 400);
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "axis-lab-smoke-"));
@@ -27,12 +28,16 @@ const env = {
 };
 
 let server;
+let serverLog = "";
 const start = () => {
+  serverLog = "";
   server = spawn(process.execPath, [path.resolve("dist/server.cjs")], {
     cwd: process.cwd(),
     env,
-    stdio: "ignore",
+    stdio: ["ignore", "pipe", "pipe"],
   });
+  server.stdout.on("data", (chunk) => { serverLog += chunk.toString(); });
+  server.stderr.on("data", (chunk) => { serverLog += chunk.toString(); });
 };
 const stop = () => new Promise((resolve) => {
   if (!server || server.killed) return resolve();
@@ -157,8 +162,18 @@ const assert = (condition, message) => {
     const deletedExpense = await request(`/api/accounting/expenses/${expense.body.expense.id}`, { method: "DELETE" });
     assert(deletedExpense.response.ok && deletedExpense.body.expense.id === expense.body.expense.id, "Expense deletion failed");
 
+    const SQL = await initSqlJs({ locateFile: (file) => path.resolve("node_modules/sql.js/dist", file) });
     const backup = await request("/api/backup", { method: "POST" });
     assert(backup.response.ok && backup.body.backup?.sha256 && !backup.body.backup?.filePath, "Real SQLite backup metadata is invalid or leaks its local path");
+    const backupFilesBeforeRestore = fs.readdirSync(path.join(tempDir, "backups")).filter((name) => name.endsWith(".sqlite"));
+    const backupContainsOrder = backupFilesBeforeRestore.some((name) => {
+      const backupDb = new SQL.Database(fs.readFileSync(path.join(tempDir, "backups", name)));
+      const rows = backupDb.exec("SELECT value FROM app_state WHERE key = 'ORDERS'");
+      const contains = rows.length > 0 && String(rows[0].values[0][0]).includes(orderId);
+      backupDb.close();
+      return contains;
+    });
+    assert(backupContainsOrder, `Manual backup did not contain the newly created order ${orderId}: ${JSON.stringify(backupFilesBeforeRestore)}`);
     const changedRate = await request("/api/exchange-rate", { method: "PUT", body: JSON.stringify({ exchangeRate: 200 }) });
     assert(changedRate.response.ok && changedRate.body.exchangeRate === 200, "Could not change rate before restore");
     const restore = await request(`/api/backup/restore/${backup.body.backup.id}`, { method: "POST" });
@@ -166,7 +181,32 @@ const assert = (condition, message) => {
     const restoredAfterBackup = await request("/api/exchange-rate");
     assert(restoredAfterBackup.body.exchangeRate === 135, "Backup restore did not restore the earlier exchange rate");
 
-    console.log("api-security-and-financial-persistence-smoke: PASS");
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    const database = new SQL.Database(fs.readFileSync(env.AXIS_DATA_FILE));
+    const stateRows = database.exec("SELECT key, value FROM app_state ORDER BY key");
+    assert(stateRows.length === 1 && stateRows[0].values.length >= 10, "SQLite app_state table is incomplete");
+    for (const [key, value] of stateRows[0].values) {
+      assert(typeof key === "string" && typeof value === "string", "SQLite state row has invalid types");
+      JSON.parse(value);
+    }
+    database.close();
+
+    await stop();
+    fs.writeFileSync(env.AXIS_DATA_FILE, Buffer.from("corrupt sqlite bytes"));
+    start();
+    await waitForHealth();
+    const recoveredOrders = await request("/api/orders");
+    const recoveryCandidates = fs.readdirSync(path.join(tempDir, "backups")).filter((name) => name.endsWith(".sqlite")).map((name) => {
+      const candidateDb = new SQL.Database(fs.readFileSync(path.join(tempDir, "backups", name)));
+      const rows = candidateDb.exec("SELECT value FROM app_state WHERE key = 'ORDERS'");
+      const hasOrder = rows.length > 0 && String(rows[0].values[0][0]).includes(orderId);
+      candidateDb.close();
+      return { name, hasOrder };
+    });
+    assert(recoveredOrders.response.ok && recoveredOrders.body.some((item) => item.id === orderId), `SQLite did not recover the order from a valid backup after corruption: orderId=${orderId}, orders=${JSON.stringify(recoveredOrders.body)}, candidates=${JSON.stringify(recoveryCandidates)}, serverLog=${serverLog}`);
+    assert(fs.readdirSync(tempDir).some((name) => name.startsWith("axis-data.sqlite.corrupt-")), "Corrupt SQLite file was not preserved");
+
+    console.log("api-security-and-financial-persistence-smoke: PASS (persistence, integrity, restore, corruption recovery)");
   } finally {
     await stop();
     fs.rmSync(tempDir, { recursive: true, force: true });

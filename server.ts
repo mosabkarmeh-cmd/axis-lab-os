@@ -58,9 +58,56 @@ async function initLocalSqlite() {
   const SQL = await initSqlJs({
     locateFile: (file: string) => process.env.SQLITE_WASM_PATH || path.join(process.cwd(), "node_modules", "sql.js", "dist", file),
   });
-  const bytes = fs.existsSync(LOCAL_DATA_FILE) ? fs.readFileSync(LOCAL_DATA_FILE) : undefined;
-  localSqlite = bytes ? new SQL.Database(bytes) : new SQL.Database();
-  localSqlite.run("CREATE TABLE IF NOT EXISTS app_state (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL, updated_at TEXT NOT NULL)");
+  const openDatabase = (candidateBytes?: Uint8Array) => {
+    let database: any = null;
+    try {
+      database = candidateBytes ? new SQL.Database(candidateBytes) : new SQL.Database();
+      database.run("CREATE TABLE IF NOT EXISTS app_state (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL, updated_at TEXT NOT NULL)");
+      return database;
+    } catch (error) {
+      try { database?.close(); } catch {}
+      throw error;
+    }
+  };
+  const hasCurrentFile = fs.existsSync(LOCAL_DATA_FILE);
+  let bytes = hasCurrentFile ? fs.readFileSync(LOCAL_DATA_FILE) : undefined;
+  let recoveredFrom: string | null = null;
+  try {
+    localSqlite = openDatabase(bytes);
+  } catch (error) {
+    const corruptPath = `${LOCAL_DATA_FILE}.corrupt-${Date.now()}`;
+    if (hasCurrentFile) {
+      try {
+        fs.renameSync(LOCAL_DATA_FILE, corruptPath);
+        console.error(`[SQLITE] Current database was corrupt and was preserved at ${corruptPath}:`, error);
+      } catch (renameError) {
+        console.error("[SQLITE] Could not preserve the corrupt database:", renameError);
+      }
+    }
+    localSqlite = null;
+    const backupDir = backupDirectory();
+    if (fs.existsSync(backupDir)) {
+      const candidates = fs.readdirSync(backupDir)
+        .filter((name) => name.endsWith(".sqlite"))
+        .map((name) => path.join(backupDir, name))
+        .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+      for (const candidate of candidates) {
+        try {
+          bytes = fs.readFileSync(candidate);
+          localSqlite = openDatabase(bytes);
+          recoveredFrom = candidate;
+          console.error(`[SQLITE] Recovered database from backup ${candidate}`);
+          break;
+        } catch {
+          localSqlite = null;
+        }
+      }
+    }
+    if (!localSqlite) {
+      bytes = undefined;
+      localSqlite = openDatabase();
+    }
+  }
   if (!bytes && fs.existsSync(LOCAL_LEGACY_DATA_FILE)) {
     try {
       const legacy = JSON.parse(fs.readFileSync(LOCAL_LEGACY_DATA_FILE, "utf8"));
@@ -72,6 +119,7 @@ async function initLocalSqlite() {
       console.error("[SQLITE] Legacy JSON migration failed:", error);
     }
   }
+  if (recoveredFrom) await flushLocalSqlite();
   return localSqlite;
 }
 
@@ -1190,11 +1238,12 @@ async function loadPersistedState(): Promise<number> {
 let persistTimer: NodeJS.Timeout | null = null;
 let persistInFlight = false;
 let persistAgainAfter = false;
-
+let persistWaiters: Array<() => void> = [];
 async function persistStateNow() {
   if (!USE_POSTGRES && !USE_SQLITE) return;
   if (persistInFlight) {
     persistAgainAfter = true;
+    await new Promise<void>((resolve) => persistWaiters.push(resolve));
     return;
   }
   persistInFlight = true;
@@ -1223,15 +1272,18 @@ async function persistStateNow() {
     }
   } catch (err) {
     console.error("[STATE] Failed to persist app state to database:", err);
-  } finally {
+    } finally {
     persistInFlight = false;
     if (persistAgainAfter) {
       persistAgainAfter = false;
-      schedulePersist();
+      void persistStateNow();
+    } else {
+      const waiters = persistWaiters;
+      persistWaiters = [];
+      waiters.forEach((resolve) => resolve());
     }
   }
 }
-
 function schedulePersist() {
   if (persistTimer) clearTimeout(persistTimer);
   persistTimer = setTimeout(persistStateNow, 400);
@@ -7516,7 +7568,6 @@ Role Guidelines:
         return;
       }
       const safetyBackup = await createSqliteBackup("safety");
-      if (safetyBackup) BACKUPS.unshift(safetyBackup);
       const SQL = await initSqlJs({ locateFile: (file: string) => process.env.SQLITE_WASM_PATH || path.join(process.cwd(), "node_modules", "sql.js", "dist", file) });
       localSqlite = new SQL.Database(fs.readFileSync(backupObj.filePath));
       await loadPersistedState();
