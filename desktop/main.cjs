@@ -152,6 +152,7 @@ function startServer() {
     env: {
       ...process.env,
       NODE_ENV: 'production',
+      ELECTRON_RUN_AS_NODE: app.isPackaged ? '1' : undefined,
       NODE_PATH: app.isPackaged
         ? path.join(process.resourcesPath, 'app.asar', 'node_modules')
         : path.join(projectRoot(), 'node_modules'),
