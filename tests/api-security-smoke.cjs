@@ -136,6 +136,7 @@ const assert = (condition, message) => {
     assert(excessiveInvoicePayment.response.status === 400, "Excessive invoice payment was not rejected");
     const invoicePayment = await request(`/api/accounting/invoices/${restoredInvoice.id}/payments`, { method: "POST", body: JSON.stringify({ amount: 25, paymentId: "smoke-invoice-payment-1", paymentMethod: "cash" }) });
     assert(invoicePayment.response.ok && invoicePayment.body.invoice.paidAmount === 50, "Invoice payment ledger write failed");
+    assert(invoicePayment.body.invoice.payments?.some((payment) => payment.id === "smoke-invoice-payment-1"), `Invoice payment was not appended to the in-memory ledger: ${JSON.stringify(invoicePayment.body.invoice)}`);
     const duplicateInvoicePayment = await request(`/api/accounting/invoices/${restoredInvoice.id}/payments`, { method: "POST", body: JSON.stringify({ amount: 25, paymentId: "smoke-invoice-payment-1" }) });
     assert(duplicateInvoicePayment.response.status === 409, "Duplicate invoice payment was not rejected");
 
@@ -186,6 +187,18 @@ const assert = (condition, message) => {
       return contains;
     });
     assert(backupContainsOrder, `Manual backup did not contain the newly created order ${orderId}: ${JSON.stringify(backupFilesBeforeRestore)}`);
+    let backupInvoiceState = [];
+    const backupContainsFinancialLedger = backupFilesBeforeRestore.some((name) => {
+      const backupDb = new SQL.Database(fs.readFileSync(path.join(tempDir, "backups", name)));
+      const invoiceCount = Number(backupDb.exec("SELECT COUNT(*) FROM local_invoices")[0].values[0][0]);
+      const invoiceStateRows = backupDb.exec("SELECT id, paid_amount, remaining, payload FROM local_invoices WHERE id = ?", [restoredInvoice.id]);
+      if (invoiceStateRows.length) backupInvoiceState.push({ name, row: invoiceStateRows[0].values });
+      const paymentCount = Number(backupDb.exec("SELECT COUNT(*) FROM local_payments")[0].values[0][0]);
+      const expenseCount = Number(backupDb.exec("SELECT COUNT(*) FROM local_expenses")[0].values[0][0]);
+      backupDb.close();
+      return invoiceCount > 0 && paymentCount > 0 && expenseCount > 0;
+    });
+    assert(backupContainsFinancialLedger, "Manual backup did not contain the normalized financial ledger");
     const changedRate = await request("/api/exchange-rate", { method: "PUT", body: JSON.stringify({ exchangeRate: 200 }) });
     assert(changedRate.response.ok && changedRate.body.exchangeRate === 200, "Could not change rate before restore");
     const restore = await request(`/api/backup/restore/${backup.body.backup.id}`, { method: "POST" });
@@ -231,6 +244,8 @@ const assert = (condition, message) => {
       return { name, hasOrder };
     });
     assert(recoveredOrders.response.ok && recoveredOrders.body.some((item) => item.id === orderId), `SQLite did not recover the order from a valid backup after corruption: orderId=${orderId}, orders=${JSON.stringify(recoveredOrders.body)}, candidates=${JSON.stringify(recoveryCandidates)}, serverLog=${serverLog}`);
+    const recoveredInvoices = await request("/api/accounting/invoices");
+    assert(recoveredInvoices.response.ok && recoveredInvoices.body.invoices.some((item) => item.id === restoredInvoice.id && item.paidAmount === 50), `SQLite did not recover the financial invoice ledger after corruption: target=${restoredInvoice.id}, invoices=${JSON.stringify(recoveredInvoices.body.invoices)}, backupInvoiceState=${JSON.stringify(backupInvoiceState)}, serverLog=${serverLog}`);
     assert(fs.readdirSync(tempDir).some((name) => name.startsWith("axis-data.sqlite.corrupt-")), "Corrupt SQLite file was not preserved");
 
     console.log("api-security-and-financial-persistence-smoke: PASS (persistence, integrity, restore, corruption recovery, normalized entities)");

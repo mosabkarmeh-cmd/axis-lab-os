@@ -2539,7 +2539,7 @@ async function startServer() {
   });
 
   // API - Record Payment
-  app.post("/api/orders/:id/payments", (req, res) => {
+  app.post("/api/orders/:id/payments", async (req, res) => {
     const { amount, notes, paymentMethod, changedById, paymentId } = req.body;
     const order = ORDERS.find(o => o.id === req.params.id);
     if (!order) {
@@ -2609,9 +2609,9 @@ async function startServer() {
       createdAt: new Date().toISOString()
     });
 
+    await persistStateNow();
     res.json(order);
   });
-
   // API - Delete Payment Installment
   app.delete("/api/orders/:orderId/payments/:paymentId", (req, res) => {
     const { orderId, paymentId } = req.params;
@@ -7027,7 +7027,7 @@ Role Guidelines:
   });
 
   // Record Payment on Invoice
-  app.post("/api/accounting/invoices/:id/payments", (req, res) => {
+  app.post("/api/accounting/invoices/:id/payments", async (req, res) => {
     const { amount, notes, paymentMethod, changedById, paymentId } = req.body;
     const inv = INVOICES.find(i => i.id === req.params.id);
     if (!inv) {
@@ -7090,9 +7090,9 @@ Role Guidelines:
       createdAt: new Date().toISOString()
     });
 
+    await persistStateNow();
     res.json({ success: true, invoice: inv });
   });
-
   // Get Single Invoice Details
   app.get("/api/accounting/invoices/:id", (req, res) => {
     const inv = INVOICES.find(i => i.id === req.params.id);
@@ -7720,6 +7720,7 @@ Role Guidelines:
       return;
     }
     try {
+      await persistStateNow();
       const newBackup = await createSqliteBackup("manual");
       if (!newBackup) throw new Error("تعذر إنشاء نسخة SQLite");
       BACKUPS.unshift(newBackup);
@@ -7751,6 +7752,7 @@ Role Guidelines:
         res.status(409).json({ success: false, message: "فشل التحقق من سلامة النسخة الاحتياطية؛ checksum غير مطابق." });
         return;
       }
+      await persistStateNow();
       const safetyBackup = await createSqliteBackup("safety");
       const SQL = await initSqlJs({ locateFile: (file: string) => process.env.SQLITE_WASM_PATH || path.join(process.cwd(), "node_modules", "sql.js", "dist", file) });
       localSqlite = new SQL.Database(fs.readFileSync(backupObj.filePath));
