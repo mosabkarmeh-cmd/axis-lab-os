@@ -1,0 +1,89 @@
+name: Windows Installer QA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  installer-qa:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      NODE_OPTIONS: --disable-warning=DEP0040 --disable-warning=DEP0169
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund --loglevel=error
+
+      - name: Validate and test backend
+        run: npm run test:smoke
+
+      - name: Build Current User installer
+        run: npm run desktop:package:win:current -- --publish never
+
+      - name: Build All Users installer
+        run: npm run desktop:package:win:all -- --publish never
+
+      - name: Install and launch Current User installer
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem -Path dist -Filter '*Setup*.exe' | Select-Object -First 1
+          if (-not $setup) { throw 'Current User Setup.exe was not produced.' }
+          $target = Join-Path $env:RUNNER_TEMP 'axis-lab-current-user'
+          Start-Process -FilePath $setup.FullName -ArgumentList '/S', "/D=$target" -Wait
+          $app = Join-Path $target 'AXIS LAB OS.exe'
+          if (-not (Test-Path $app)) { throw "Current User application was not installed: $app" }
+          $process = Start-Process -FilePath $app -PassThru
+          try {
+            $deadline = (Get-Date).AddMinutes(2)
+            $healthy = $false
+            while ((Get-Date) -lt $deadline) {
+              try {
+                $response = Invoke-WebRequest -Uri 'http://127.0.0.1:3210/api/health' -UseBasicParsing -TimeoutSec 3
+                if ($response.StatusCode -eq 200 -and $response.Content -match '"database":"sqlite"') { $healthy = $true; break }
+              } catch { }
+              Start-Sleep -Seconds 2
+            }
+            if (-not $healthy) { throw 'Current User installed application did not expose a healthy SQLite API.' }
+            Write-Host 'Current User installer and runtime: PASS'
+          } finally {
+            Get-Process -Name 'AXIS LAB OS' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+            if (-not $process.HasExited) { $process.Kill() }
+          }
+
+      - name: Install and launch All Users installer
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem -Path dist-all-users -Filter '*AllUsers*.exe' -Recurse | Select-Object -First 1
+          if (-not $setup) { throw 'All Users Setup.exe was not produced.' }
+          $target = Join-Path $env:RUNNER_TEMP 'axis-lab-all-users'
+          Start-Process -FilePath $setup.FullName -ArgumentList '/S', "/D=$target" -Wait
+          $app = Join-Path $target 'AXIS LAB OS.exe'
+          if (-not (Test-Path $app)) { throw "All Users application was not installed: $app" }
+          $process = Start-Process -FilePath $app -PassThru
+          try {
+            $deadline = (Get-Date).AddMinutes(2)
+            $healthy = $false
+            while ((Get-Date) -lt $deadline) {
+              try {
+                $response = Invoke-WebRequest -Uri 'http://127.0.0.1:3210/api/health' -UseBasicParsing -TimeoutSec 3
+                if ($response.StatusCode -eq 200 -and $response.Content -match '"database":"sqlite"') { $healthy = $true; break }
+              } catch { }
+              Start-Sleep -Seconds 2
+            }
+            if (-not $healthy) { throw 'All Users installed application did not expose a healthy SQLite API.' }
+            Write-Host 'All Users installer and runtime: PASS'
+          } finally {
+            Get-Process -Name 'AXIS LAB OS' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+            if (-not $process.HasExited) { $process.Kill() }
+          }
