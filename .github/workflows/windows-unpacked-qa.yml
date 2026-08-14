@@ -39,7 +39,9 @@ jobs:
         run: |
           $app = Join-Path $env:GITHUB_WORKSPACE 'dist\win-unpacked\AXIS LAB OS.exe'
           if (-not (Test-Path $app)) { throw "Unpacked application not found: $app" }
-          $process = Start-Process -FilePath $app -PassThru
+          $stdout = Join-Path $env:RUNNER_TEMP 'axis-lab-electron.stdout.log'
+          $stderr = Join-Path $env:RUNNER_TEMP 'axis-lab-electron.stderr.log'
+          $process = Start-Process -FilePath $app -WorkingDirectory (Split-Path $app) -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
           try {
             $deadline = (Get-Date).AddMinutes(2)
             $healthy = $false
@@ -54,6 +56,12 @@ jobs:
               Start-Sleep -Seconds 2
             }
             if (-not $healthy) {
+              Write-Host '--- Electron stdout ---'
+              if (Test-Path $stdout) { Get-Content $stdout }
+              Write-Host '--- Electron stderr ---'
+              if (Test-Path $stderr) { Get-Content $stderr }
+              Write-Host '--- Matching processes ---'
+              Get-Process | Where-Object { $_.ProcessName -match 'AXIS|electron' } | Format-Table Id,ProcessName,Path -AutoSize
               throw 'The unpacked Electron application did not expose a healthy local SQLite API within two minutes.'
             }
             Write-Host 'Unpacked Windows application health check: PASS'
