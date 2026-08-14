@@ -31,16 +31,23 @@ jobs:
       - name: Build Current User installer
         run: npm run desktop:package:win:current -- --publish never
 
+      - name: Preserve Current User installer
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem -Path dist -Filter '*Setup*.exe' | Select-Object -First 1
+          if (-not $setup) { throw 'Current User Setup.exe was not produced.' }
+          Copy-Item $setup.FullName (Join-Path $env:RUNNER_TEMP 'axis-lab-current-user-setup.exe')
+
       - name: Build All Users installer
         run: npm run desktop:package:win:all -- --publish never
 
       - name: Install and launch Current User installer
         shell: pwsh
         run: |
-          $setup = Get-ChildItem -Path dist -Filter '*Setup*.exe' | Select-Object -First 1
-          if (-not $setup) { throw 'Current User Setup.exe was not produced.' }
+          $setup = Join-Path $env:RUNNER_TEMP 'axis-lab-current-user-setup.exe'
+          if (-not (Test-Path $setup)) { throw "Current User Setup.exe was not preserved: $setup" }
           $target = Join-Path $env:RUNNER_TEMP 'axis-lab-current-user'
-          Start-Process -FilePath $setup.FullName -ArgumentList '/S', "/D=$target" -Wait
+          Start-Process -FilePath $setup -ArgumentList '/S', "/D=$target" -Wait
           $app = Join-Path $target 'AXIS LAB OS.exe'
           if (-not (Test-Path $app)) { throw "Current User application was not installed: $app" }
           $process = Start-Process -FilePath $app -PassThru
