@@ -213,7 +213,7 @@ const assert = (condition, message) => {
     assert(recoveredOrders.response.ok && recoveredOrders.body.some((item) => item.id === orderId), `SQLite did not recover the order from a valid backup after corruption: orderId=${orderId}, orders=${JSON.stringify(recoveredOrders.body)}, candidates=${JSON.stringify(recoveryCandidates)}, serverLog=${serverLog}`);
     assert(fs.readdirSync(tempDir).some((name) => name.startsWith("axis-data.sqlite.corrupt-")), "Corrupt SQLite file was not preserved");
 
-    console.log("api-security-and-financial-persistence-smoke: PASS (persistence, integrity, restore, corruption recovery)");
+    console.log("api-security-and-financial-persistence-smoke: PASS (persistence, integrity, restore, corruption recovery, normalized entities)");
   } finally {
     await stop();
     fs.rmSync(tempDir, { recursive: true, force: true });

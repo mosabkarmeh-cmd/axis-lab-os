@@ -21,7 +21,8 @@
     "desktop:package:win": "npm run desktop:build && electron-builder --win nsis --config electron-builder.yml",
     "desktop:package:win:current": "npm run desktop:build && electron-builder --win nsis --config electron-builder.yml",
     "desktop:package:win:all": "npm run desktop:build && electron-builder --win nsis --config electron-builder.all-users.yml",
-    "test:coverage": "npm run build && node tests/api-coverage-smoke.cjs"
+    "test:coverage": "npm run build && node tests/api-coverage-smoke.cjs",
+    "test:sqlite-migration": "npm run build && node tests/sqlite-migration-smoke.cjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

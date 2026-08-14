@@ -1217,6 +1217,7 @@ async function loadPersistedState(): Promise<number> {
       const values = rows.length ? rows[0].values : [];
       let restored = 0;
       const snapshotKeys = new Set(values.map(([key]) => String(key)));
+      const snapshotValues = new Map(values.map(([key, rawValue]) => [String(key), String(rawValue)]));
       for (const [key, rawValue] of values) {
         const target = LOCAL_PERSISTED_COLLECTIONS[String(key)];
         if (!target || NORMALIZED_LOCAL_COLLECTIONS.includes(String(key) as typeof NORMALIZED_LOCAL_COLLECTIONS[number])) continue;
@@ -1234,20 +1235,27 @@ async function loadPersistedState(): Promise<number> {
         const target = LOCAL_PERSISTED_COLLECTIONS[collection];
         const entityRows = sqlite.exec("SELECT payload FROM local_entities WHERE collection = ? ORDER BY entity_id", [collection]);
         const entityValues = entityRows.length ? entityRows[0].values : [];
-        if (entityValues.length > 0) {
+        if (snapshotKeys.has(collection)) {
+          const legacyValue = JSON.parse(String(snapshotValues.get(collection) || "[]"));
+          if (Array.isArray(legacyValue)) {
+            target.length = 0;
+            target.push(...legacyValue);
+          }
+          migrated = true;
+        } else if (entityValues.length > 0) {
           target.length = 0;
           target.push(...entityValues.map(([payload]) => JSON.parse(String(payload))));
           restored++;
-        } else if (snapshotKeys.has(collection)) {
-          syncNormalizedLocalEntities(sqlite);
-          migrated = true;
         }
         if (snapshotKeys.has(collection)) {
           sqlite.run("DELETE FROM app_state WHERE key = ?", [collection]);
           migrated = true;
         }
       }
-      if (migrated) await flushLocalSqlite();
+      if (migrated) {
+        syncNormalizedLocalEntities(sqlite);
+        await flushLocalSqlite();
+      }
       return restored;
     }
     if (!USE_POSTGRES) return 0;
