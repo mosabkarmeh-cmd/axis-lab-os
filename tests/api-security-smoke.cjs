@@ -125,6 +125,21 @@ const assert = (condition, message) => {
     const restoredRate = await request("/api/exchange-rate");
     assert(restoredRate.body.exchangeRate === 135, "Exchange rate was not restored after restart");
 
+    const calculatedOrder = await request("/api/orders", {
+      method: "POST",
+      body: JSON.stringify({
+        customerId: "c-1",
+        items: [{ productName: "Tax and discount test", quantity: 2, unitPrice: 50 }],
+        taxPercent: 10,
+        discount: 5,
+        priority: "normal",
+      }),
+    });
+    assert(calculatedOrder.response.ok && calculatedOrder.body.totalPrice === 105, `Tax/discount calculation failed: ${JSON.stringify(calculatedOrder.body)}`);
+    const calculatedInvoices = await request("/api/accounting/invoices");
+    const calculatedInvoice = calculatedInvoices.body.invoices.find((item) => item.orderId === calculatedOrder.body.id);
+    assert(calculatedInvoice && calculatedInvoice.subtotal === 100 && calculatedInvoice.totalPrice === 105, "Invoice tax/discount totals were not calculated correctly");
+
     const backup = await request("/api/backup", { method: "POST" });
     assert(backup.response.ok && backup.body.backup?.sha256 && !backup.body.backup?.filePath, "Real SQLite backup metadata is invalid or leaks its local path");
     const changedRate = await request("/api/exchange-rate", { method: "PUT", body: JSON.stringify({ exchangeRate: 200 }) });
