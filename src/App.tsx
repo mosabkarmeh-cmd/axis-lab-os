@@ -4,6 +4,7 @@ import { useLocalStorage } from "./hooks/useLocalStorage";
 import { useOrderFilters } from "./hooks/useOrderFilters";
 import { extractMaterialName } from "./lib/materials";
 import { getOrderStatusBadge, getPaymentStatusBadge } from "./components/StatusBadges";
+import { EXCHANGE_RATE_STORAGE_KEY, sanitizeExchangeRate, sypToUsd, usdToSyp } from "./lib/currency";
 import {
   Shield,
   UserCheck,
@@ -291,29 +292,18 @@ export default function App() {
   });
 
   const [exchangeRate, setExchangeRate] = useState<number>(() => {
-    const saved = localStorage.getItem("axislab_exchange_rate");
-    if (saved) {
-      const parsed = parseFloat(saved);
-      if (parsed >= 1000) {
-        const newRate = Number((parsed / 100).toFixed(2));
-        localStorage.setItem("axislab_exchange_rate", newRate.toString());
-        return newRate;
-      }
-      return parsed;
-    }
-    return 145; // 145 ليرة سورية جديدة لكل دولار (حذف صفرين)
+    const saved = localStorage.getItem(EXCHANGE_RATE_STORAGE_KEY);
+    return sanitizeExchangeRate(saved, 145);
   });
 
   const [calcUsd, setCalcUsd] = useState<string>("100");
   const [calcSyp, setCalcSyp] = useState<string>(() => {
-    const rate = localStorage.getItem("axislab_exchange_rate");
-    const numRate = rate ? parseFloat(rate) : 145;
-    const effectiveRate = numRate >= 1000 ? numRate / 100 : numRate;
-    return (100 * effectiveRate).toString();
+    const rate = sanitizeExchangeRate(localStorage.getItem(EXCHANGE_RATE_STORAGE_KEY), 145);
+    return usdToSyp(100, rate).toString();
   });
 
   useEffect(() => {
-    localStorage.setItem("axislab_exchange_rate", exchangeRate.toString());
+    localStorage.setItem(EXCHANGE_RATE_STORAGE_KEY, exchangeRate.toString());
   }, [exchangeRate]);
 
   // Server is the source of truth: on load, pull whatever rate the workshop owner
@@ -334,7 +324,7 @@ export default function App() {
     setCalcUsd(val);
     const num = parseFloat(val);
     if (!isNaN(num)) {
-      setCalcSyp(Math.round(num * exchangeRate).toString());
+      setCalcSyp(usdToSyp(num, exchangeRate).toString());
     } else {
       setCalcSyp("");
     }
@@ -344,7 +334,7 @@ export default function App() {
     setCalcSyp(val);
     const num = parseFloat(val);
     if (!isNaN(num) && exchangeRate > 0) {
-      setCalcUsd((num / exchangeRate).toFixed(2));
+      setCalcUsd(sypToUsd(num, exchangeRate).toFixed(2));
     } else {
       setCalcUsd("");
     }
@@ -352,7 +342,7 @@ export default function App() {
 
   const updateRate = (newRate: number) => {
     setExchangeRate(newRate);
-    localStorage.setItem("axislab_exchange_rate", newRate.toString());
+    localStorage.setItem(EXCHANGE_RATE_STORAGE_KEY, sanitizeExchangeRate(newRate, exchangeRate).toString());
     window.dispatchEvent(new Event("storage"));
 
     // Push to the backend so PDFs, payment records, and pricing suggestions all
@@ -366,7 +356,7 @@ export default function App() {
     // Refresh calculator values
     const numUsd = parseFloat(calcUsd);
     if (!isNaN(numUsd)) {
-      setCalcSyp(Math.round(numUsd * newRate).toString());
+      setCalcSyp(usdToSyp(numUsd, newRate).toString());
     }
   };
 
