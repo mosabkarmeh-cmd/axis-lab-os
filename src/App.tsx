@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { safeApiFetch } from "./lib/api";
 import { useLocalStorage } from "./hooks/useLocalStorage";
 import { useOrderFilters } from "./hooks/useOrderFilters";
+import { useCurrencyCalculator } from "./hooks/useCurrencyCalculator";
 import { extractMaterialName } from "./lib/materials";
 import { getOrderStatusBadge, getPaymentStatusBadge } from "./components/StatusBadges";
 import { EXCHANGE_RATE_STORAGE_KEY, sanitizeExchangeRate, sypToUsd, usdToSyp } from "./lib/currency";
@@ -296,11 +297,7 @@ export default function App() {
     return sanitizeExchangeRate(saved, 145);
   });
 
-  const [calcUsd, setCalcUsd] = useState<string>("100");
-  const [calcSyp, setCalcSyp] = useState<string>(() => {
-    const rate = sanitizeExchangeRate(localStorage.getItem(EXCHANGE_RATE_STORAGE_KEY), 145);
-    return usdToSyp(100, rate).toString();
-  });
+  const { calcUsd, calcSyp, handleUsdChange, handleSypChange, refreshFromUsd } = useCurrencyCalculator(exchangeRate);
 
   useEffect(() => {
     localStorage.setItem(EXCHANGE_RATE_STORAGE_KEY, exchangeRate.toString());
@@ -320,26 +317,6 @@ export default function App() {
       .catch(() => {});
   }, []);
 
-  const handleUsdChange = (val: string) => {
-    setCalcUsd(val);
-    const num = parseFloat(val);
-    if (!isNaN(num)) {
-      setCalcSyp(usdToSyp(num, exchangeRate).toString());
-    } else {
-      setCalcSyp("");
-    }
-  };
-
-  const handleSypChange = (val: string) => {
-    setCalcSyp(val);
-    const num = parseFloat(val);
-    if (!isNaN(num) && exchangeRate > 0) {
-      setCalcUsd(sypToUsd(num, exchangeRate).toFixed(2));
-    } else {
-      setCalcUsd("");
-    }
-  };
-
   const updateRate = (newRate: number) => {
     setExchangeRate(newRate);
     localStorage.setItem(EXCHANGE_RATE_STORAGE_KEY, sanitizeExchangeRate(newRate, exchangeRate).toString());
@@ -356,7 +333,7 @@ export default function App() {
     // Refresh calculator values
     const numUsd = parseFloat(calcUsd);
     if (!isNaN(numUsd)) {
-      setCalcSyp(usdToSyp(numUsd, newRate).toString());
+      refreshFromUsd(calcUsd, newRate);
     }
   };
 
