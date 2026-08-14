@@ -51,7 +51,7 @@ const USE_POSTGRES = DB_MODE === "postgres" || (DB_MODE === "auto" && Boolean(pr
 const USE_SQLITE = DB_MODE === "sqlite";
 const LOCAL_DATA_FILE = process.env.AXIS_DATA_FILE || path.join(os.homedir(), "AppData", "Roaming", "AXIS LAB OS", "axis-data.sqlite");
 const LOCAL_LEGACY_DATA_FILE = process.env.AXIS_LEGACY_DATA_FILE || path.join(os.homedir(), "AppData", "Roaming", "Electron", "axis-data.json");
-const LOCAL_SCHEMA_VERSION = 4;
+const LOCAL_SCHEMA_VERSION = 5;
 const NORMALIZED_LOCAL_COLLECTIONS = ["CUSTOMERS", "PRODUCTS", "MATERIALS", "INVENTORY", "SUPPLIERS", "MACHINES", "ACTIVITY_LOGS", "NOTIFICATIONS", "PRODUCTION_JOBS"] as const;
 const NORMALIZED_FINANCIAL_COLLECTIONS = ["INVOICES", "EXPENSES"] as const;
 let localSqlite: any = null;
@@ -68,6 +68,8 @@ async function initLocalSqlite() {
       database.run("PRAGMA foreign_keys = ON");
       database.run("CREATE TABLE IF NOT EXISTS app_state (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL, updated_at TEXT NOT NULL)");
       database.run("CREATE TABLE IF NOT EXISTS local_entities (collection TEXT NOT NULL, entity_id TEXT NOT NULL, payload TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (collection, entity_id))");
+      database.run("CREATE INDEX IF NOT EXISTS idx_local_entities_collection_updated ON local_entities (collection, updated_at)");
+      database.run("CREATE INDEX IF NOT EXISTS idx_local_entities_entity ON local_entities (entity_id)");
       database.run("CREATE TABLE IF NOT EXISTS local_metadata (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL, updated_at TEXT NOT NULL)");
       database.run("CREATE TABLE IF NOT EXISTS local_invoices (id TEXT PRIMARY KEY NOT NULL, invoice_number TEXT NOT NULL, order_id TEXT, customer_id TEXT NOT NULL, issue_date TEXT NOT NULL, due_date TEXT NOT NULL, total_price REAL NOT NULL, subtotal REAL, tax_percent REAL, discount REAL, paid_amount REAL NOT NULL, remaining REAL NOT NULL, status TEXT NOT NULL, notes TEXT, payload TEXT NOT NULL, updated_at TEXT NOT NULL)");
       database.run("CREATE TABLE IF NOT EXISTS local_invoice_items (id TEXT PRIMARY KEY NOT NULL, invoice_id TEXT NOT NULL, product_name TEXT NOT NULL, quantity REAL NOT NULL, unit_price REAL NOT NULL, discount REAL NOT NULL, tax REAL NOT NULL, total REAL NOT NULL, created_at TEXT NOT NULL, payload TEXT NOT NULL, FOREIGN KEY (invoice_id) REFERENCES local_invoices(id) ON DELETE CASCADE)");
@@ -141,7 +143,13 @@ async function flushLocalSqlite() {
   await fs.promises.mkdir(path.dirname(LOCAL_DATA_FILE), { recursive: true });
   const bytes = localSqlite.export();
   const tempFile = `${LOCAL_DATA_FILE}.tmp`;
-  await fs.promises.writeFile(tempFile, Buffer.from(bytes));
+  const handle = await fs.promises.open(tempFile, "w");
+  try {
+    await handle.writeFile(Buffer.from(bytes));
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
   await fs.promises.rename(tempFile, LOCAL_DATA_FILE);
 }
 
@@ -2156,7 +2164,7 @@ async function startServer() {
   });
 
   // API - Create Order
-  app.post("/api/orders", (req, res) => {
+  app.post("/api/orders", async (req, res) => {
     const { customerId, notes, priority, items, totalPrice, paidAmount, createdById, deliveryDateExpected, taxPercent, discount } = req.body;
     if (!customerId || !items || items.length === 0) {
       res.status(400).json({ error: "الرجاء اختيار العميل وإضافة عنصر واحد على الأقل للطلب" });
@@ -2255,9 +2263,15 @@ async function startServer() {
       createdAt: new Date().toISOString()
     });
 
+        try {
+      await persistStateNow();
+    } catch (error: any) {
+      console.error("[ORDERS] Failed to persist newly created order:", error);
+      res.status(500).json({ error: "تعذر حفظ الطلب في قاعدة البيانات المحلية" });
+      return;
+    }
     res.json(newOrder);
   });
-
   // API - Update Order (Edit details)
   app.put("/api/orders/:id", (req, res) => {
     const { notes, priority, items, paidAmount, customerId, deliveryDateExpected, taxPercent, discount } = req.body;

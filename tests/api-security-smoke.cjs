@@ -213,7 +213,7 @@ const assert = (condition, message) => {
     const legacyNormalizedKeys = stateRows[0].values.filter(([key]) => ["CUSTOMERS", "PRODUCTS", "MATERIALS", "INVENTORY", "SUPPLIERS", "MACHINES", "EXPENSES"].includes(String(key)));
     assert(legacyNormalizedKeys.length === 0, `Normalized collections still duplicated in app_state: ${JSON.stringify(legacyNormalizedKeys.map(([key]) => key))}`);
     const schemaRows = database.exec("SELECT value FROM local_metadata WHERE key = 'schema_version'");
-    assert(schemaRows.length === 1 && String(schemaRows[0].values[0][0]) === "4", "SQLite local schema version is not current");
+    assert(schemaRows.length === 1 && String(schemaRows[0].values[0][0]) === "5", "SQLite local schema version is not current");
     const entityRows = database.exec("SELECT collection, COUNT(*) AS count FROM local_entities GROUP BY collection ORDER BY collection");
     assert(entityRows.length === 1 && entityRows[0].values.length >= 9, "Normalized local entity tables are incomplete");
     const operationalCollections = new Set(entityRows[0].values.map(([collection]) => String(collection)));
