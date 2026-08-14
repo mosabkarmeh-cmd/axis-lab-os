@@ -109,7 +109,7 @@ import {
 import Markdown from "react-markdown";
 import { User, Customer, Order, OrderItem, ActivityLog, CodeFile, GCodeResult, Product, Machine, ProductionJob } from "./types";
 import { VIRTUAL_FILES } from "./virtualFiles";
-import AccountingView from "./components/AccountingView";
+import AccountingPage from "./components/AccountingPage";
 import ReportsView from "./components/ReportsView";
 import SettingsView from "./components/SettingsView";
 import DashboardCharts from "./components/DashboardCharts";
@@ -9276,25 +9276,15 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
                   transition={pageTransition}
                   className="flex-1 overflow-y-auto p-6 bg-zinc-950/20"
                 >
-                  {currentUser?.role === "employee" ? (
-                    <div className="flex flex-col justify-center items-center text-center p-12 min-h-[400px]">
-                      <Lock className="w-16 h-16 text-rose-500 mb-4" />
-                      <h3 className="text-lg font-bold text-zinc-100">قسم الحسابات والمالية محمي</h3>
-                      <p className="text-sm text-zinc-500 mt-2 max-w-md leading-relaxed">
-                        غير مصرح لصلاحيات الموظف (Employee) بالاطلاع على الحسابات أو الكشوفات المالية أو تحرير الفواتير. يرجى مراجعة المسؤول.
-                      </p>
-                    </div>
-                  ) : (
-                    <AccountingView 
-                      customers={customers} 
-                      onRefreshOrders={fetchOrders} 
-                      currentUserRole={currentUser?.role}
-                      initialTab={accountingTab}
-                      companySettings={companySettings}
-                    />
-                  )}
+                  <AccountingPage
+                    customers={customers}
+                    onRefreshOrders={fetchOrders}
+                    currentUserRole={currentUser?.role}
+                    initialTab={accountingTab}
+                    companySettings={companySettings}
+                  />
                 </motion.div>
-               )}
+              )}
 
               {/* SETTINGS & BACKUP VIEW */}
               {activeView === "settings" && (
