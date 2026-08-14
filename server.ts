@@ -130,8 +130,8 @@ function getRequestUser(req: any): UserRecord | null {
 // Memory database states
 const USERS: UserRecord[] = [
   { id: "u-1", email: "admin@axislab.com", fullName: "المدير العام", role: "admin", isActive: true, mustChangePassword: Boolean(process.env.BOOTSTRAP_ADMIN_PASSWORD), passwordHash: process.env.DEMO_ADMIN_PASSWORD_HASH || (process.env.BOOTSTRAP_ADMIN_PASSWORD ? bcrypt.hashSync(process.env.BOOTSTRAP_ADMIN_PASSWORD, 12) : "") },
-  { id: "u-2", email: "employee@axislab.com", fullName: "فني تشغيل الليزر", role: "employee", isActive: true, passwordHash: process.env.DEMO_EMPLOYEE_PASSWORD_HASH || "$2b$12$XGLPkYO2vLHzuOJ43e5hT.Cs0eAdYYJV9kv2ugU6/HsULfNMj2OmS" },
-  { id: "u-3", email: "accountant@axislab.com", fullName: "المحاسب المالي", role: "accountant", isActive: true, passwordHash: process.env.DEMO_ACCOUNTANT_PASSWORD_HASH || "$2b$12$Rf.WkE2UsywzfiEMzGwAPuD0./EG2RYQXdjj0t7PkNGvrxChu.Wbi" }
+  { id: "u-2", email: "employee@axislab.com", fullName: "فني تشغيل الليزر", role: "employee", isActive: Boolean(process.env.DEMO_EMPLOYEE_PASSWORD_HASH), passwordHash: process.env.DEMO_EMPLOYEE_PASSWORD_HASH || "" },
+  { id: "u-3", email: "accountant@axislab.com", fullName: "المحاسب المالي", role: "accountant", isActive: Boolean(process.env.DEMO_ACCOUNTANT_PASSWORD_HASH), passwordHash: process.env.DEMO_ACCOUNTANT_PASSWORD_HASH || "" }
 ];
 
 const FILES: any[] = [
