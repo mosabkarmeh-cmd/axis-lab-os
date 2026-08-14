@@ -1,4 +1,5 @@
-export const DEFAULT_EXCHANGE_RATE = 145;
+// Demo default on the new Syrian pound scale; the Settings screen can change it.
+export const DEFAULT_EXCHANGE_RATE = 135;
 export const EXCHANGE_RATE_STORAGE_KEY = "axislab_exchange_rate";
 
 export function sanitizeExchangeRate(value: unknown, fallback = DEFAULT_EXCHANGE_RATE): number {

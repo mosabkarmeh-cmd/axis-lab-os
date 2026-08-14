@@ -664,9 +664,9 @@ const SETTINGS = {
   // Single source of truth for the USD -> SYP exchange rate. Every place in the
   // backend that converts currency (payments, PDFs, AI pricing suggestions, share
   // messages) must read this value - never hardcode a rate anywhere else.
-  // NOTE: 145 is on the *new* Syrian pound scale (post-redenomination, two zeros
-  // removed) to match the frontend default - not the old 14500/15000 scale.
-  exchangeRate: 145,
+  // NOTE: 135 is the current demo value on the new Syrian pound scale
+  // (post-redenomination). It is a default only and can be changed from Settings.
+  exchangeRate: 135,
   company: {
     name: "مجمع المحور والورش الذكية - AxisLab ERP",
     address: "عمان، الأردن - شارع مكة",
