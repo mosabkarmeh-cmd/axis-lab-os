@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { safeApiFetch } from "./lib/api";
+import { useLocalStorage } from "./hooks/useLocalStorage";
 import {
   Shield,
   UserCheck,
@@ -131,11 +132,7 @@ const USERS = [
 export default function App() {
   // Authentication states
   const [token, setToken] = useState<string | null>(null);
-  const [theme, setTheme] = useState<"dark" | "light">(() => (localStorage.getItem("axislab_theme") as "dark" | "light") || "dark");
-
-  useEffect(() => {
-    localStorage.setItem("axislab_theme", theme);
-  }, [theme]);
+  const [theme, setTheme] = useLocalStorage<"dark" | "light">("axislab_theme", "dark");
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authEmail, setAuthEmail] = useState<string>("admin@axislab.com");
   const [authPassword, setAuthPassword] = useState<string>("");
@@ -150,12 +147,8 @@ export default function App() {
   const [inspectToken, setInspectToken] = useState<any>(null);
 
   // Developer logs and JWT inspect panel visibility states (Hidden by default to keep the UI clean)
-  const [showTerminalLogs, setShowTerminalLogs] = useState<boolean>(() => {
-    return localStorage.getItem("axis_show_terminal_logs") === "true";
-  });
-  const [showJwtHud, setShowJwtHud] = useState<boolean>(() => {
-    return localStorage.getItem("axis_show_jwt_hud") === "true";
-  });
+  const [showTerminalLogs, setShowTerminalLogs] = useLocalStorage<boolean>("axis_show_terminal_logs", false);
+  const [showJwtHud, setShowJwtHud] = useLocalStorage<boolean>("axis_show_jwt_hud", false);
 
   // Application main navigation
   // "dashboard" | "database" | "gcode" | "explorer"
@@ -163,17 +156,8 @@ export default function App() {
   const [accountingTab, setAccountingTab] = useState<"dashboard" | "reports" | "invoices" | "expenses" | "customers_balances">("dashboard");
 
   // Collapsible Sidebar & Navigation States
-  const [isSidebarExpanded, setIsSidebarExpanded] = useState<boolean>(() => {
-    const saved = localStorage.getItem("axislab_sidebar_expanded");
-    return saved !== "false"; // default to true
-  });
-
-  const toggleSidebar = () => {
-    setIsSidebarExpanded(prev => {
-      localStorage.setItem("axislab_sidebar_expanded", String(!prev));
-      return !prev;
-    });
-  };
+  const [isSidebarExpanded, setIsSidebarExpanded] = useLocalStorage<boolean>("axislab_sidebar_expanded", true);
+  const toggleSidebar = () => setIsSidebarExpanded((previous) => !previous);
 
   // Interactive Notification states
   const [isNotificationsOpen, setIsNotificationsOpen] = useState<boolean>(false);
