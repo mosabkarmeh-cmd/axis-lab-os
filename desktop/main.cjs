@@ -7,6 +7,11 @@ const fs = require('node:fs');
 const crypto = require('node:crypto');
 
 const PORT = Number(process.env.AXIS_PORT || 3210);
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+  process.exit(0);
+}
 let serverProcess;
 let mainWindow;
 
@@ -126,6 +131,8 @@ function startServer() {
       SQLITE_WASM_PATH: app.isPackaged ? path.join(process.resourcesPath, 'sql-wasm.wasm') : path.join(projectRoot(), 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
       PORT: String(PORT),
       APP_URL: `http://127.0.0.1:${PORT}`,
+      SERVER_HOST: '127.0.0.1',
+      ALLOW_PUBLIC_REGISTRATION: 'false',
       JWT_SECRET: getDesktopJwtSecret(),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -164,6 +171,12 @@ async function createWindow() {
     return { action: 'deny' };
   });
 }
+
+app.on('second-instance', () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.focus();
+});
 
 app.whenReady().then(async () => {
   try {

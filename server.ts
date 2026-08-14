@@ -1212,8 +1212,32 @@ async function startServer() {
     origin: process.env.NODE_ENV === "production" ? allowedOrigin : true,
     credentials: true,
   }));
+  app.disable("x-powered-by");
+  app.use((req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("Referrer-Policy", "no-referrer");
+    next();
+  });
   app.use(express.json());
   app.use(cookieParser());
+
+  // Central API boundary: only health and authentication bootstrap are public.
+  // Every business endpoint must have a verified active user before its handler runs.
+  app.use("/api", (req, res, next) => {
+    const publicPaths = new Set(["/health", "/auth/login", "/auth/register"]);
+    if (req.method === "OPTIONS" || publicPaths.has(req.path)) {
+      next();
+      return;
+    }
+    const user = getRequestUser(req);
+    if (!user) {
+      res.status(401).json({ success: false, message: "يجب تسجيل الدخول للوصول إلى واجهة API" });
+      return;
+    }
+    (req as any).user = user;
+    next();
+  });
 
   // Restore all in-memory business data (orders, users, invoices, ...) from the
   // last snapshot saved in Postgres, if any. On a brand-new database this finds
@@ -1373,11 +1397,22 @@ async function startServer() {
   // API - Auth Register
   app.post("/api/auth/register", async (req, res) => {
     const { email, password, fullName, role } = req.body;
-    if (!email || !password || !fullName || !role) {
+        if (!email || !password || !fullName || !role) {
       res.status(400).json({ error: "جميع الحقول مطلوبة لإتمام التسجيل" });
       return;
     }
-
+    if (process.env.ALLOW_PUBLIC_REGISTRATION !== "true") {
+      res.status(403).json({ error: "التسجيل العام مغلق. يضيف مدير النظام المستخدمين من داخل الإعدادات." });
+      return;
+    }
+    if (password.length < 8) {
+      res.status(400).json({ error: "يجب أن تتكون كلمة المرور من 8 أحرف على الأقل" });
+      return;
+    }
+    if (!["employee", "accountant"].includes(role)) {
+      res.status(400).json({ error: "الدور المطلوب غير صالح" });
+      return;
+    }
     if (role === "admin") {
       res.status(403).json({ error: "غير مسموح بإنشاء حساب مدير (Admin) من النافذة الخارجية لدواعي أمان النظام. يتم إضافة المدراء فقط من داخل لوحة التحكم." });
       return;
@@ -8574,8 +8609,9 @@ Role Guidelines:
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
+  const HOST = process.env.SERVER_HOST || "127.0.0.1";
+  app.listen(PORT, HOST, () => {
+    console.log(`Server running on http://${HOST}:${PORT}`);
   });
 
   // Flush any pending state save on a normal shutdown (Ctrl+C, systemd stop, etc.)

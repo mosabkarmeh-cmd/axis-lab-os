@@ -26,6 +26,10 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund --loglevel=error
 
+      - name: Validate TypeScript
+        run: npm run lint
+      - name: Run security smoke test
+        run: npm run test:smoke
       - name: Build Windows installer (Current User)
         run: npm run desktop:package:win:current -- --publish never
 
