@@ -8,7 +8,10 @@ files:
   - desktop/**/*
   - package.json
   - assets/icon.ico
-  - node_modules/sql.js/**/*
+  - node_modules/**/*
+  - '!node_modules/.cache/**'
+  - '!node_modules/**/test/**'
+  - '!node_modules/**/tests/**'
 extraResources:
   - from: dist/server.cjs
     to: server.cjs

@@ -152,6 +152,9 @@ function startServer() {
     env: {
       ...process.env,
       NODE_ENV: 'production',
+      NODE_PATH: app.isPackaged
+        ? path.join(process.resourcesPath, 'app.asar', 'node_modules')
+        : path.join(projectRoot(), 'node_modules'),
       DB_MODE: 'sqlite',
       AXIS_DATA_FILE: path.join(app.getPath('userData'), 'axis-data.sqlite'),
       AXIS_LEGACY_DATA_FILE: path.join(app.getPath('userData'), 'axis-data.json'),
