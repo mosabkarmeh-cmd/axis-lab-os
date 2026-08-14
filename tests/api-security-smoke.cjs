@@ -188,9 +188,17 @@ const assert = (condition, message) => {
     const legacyNormalizedKeys = stateRows[0].values.filter(([key]) => ["CUSTOMERS", "PRODUCTS", "MATERIALS", "INVENTORY", "SUPPLIERS", "MACHINES", "EXPENSES"].includes(String(key)));
     assert(legacyNormalizedKeys.length === 0, `Normalized collections still duplicated in app_state: ${JSON.stringify(legacyNormalizedKeys.map(([key]) => key))}`);
     const schemaRows = database.exec("SELECT value FROM local_metadata WHERE key = 'schema_version'");
-    assert(schemaRows.length === 1 && String(schemaRows[0].values[0][0]) === "2", "SQLite local schema version is not current");
+    assert(schemaRows.length === 1 && String(schemaRows[0].values[0][0]) === "3", "SQLite local schema version is not current");
     const entityRows = database.exec("SELECT collection, COUNT(*) AS count FROM local_entities GROUP BY collection ORDER BY collection");
-    assert(entityRows.length === 1 && entityRows[0].values.length >= 7, "Normalized local entity tables are incomplete");
+    assert(entityRows.length === 1 && entityRows[0].values.length >= 6, "Normalized local entity tables are incomplete");
+    const financialTables = ["local_invoices", "local_invoice_items", "local_invoice_history", "local_payments", "local_expenses"];
+    for (const table of financialTables) {
+      const tableRows = database.exec(`SELECT COUNT(*) FROM ${table}`);
+      assert(tableRows.length === 1 && Number(tableRows[0].values[0][0]) >= 0, `SQLite financial table is unreadable: ${table}`);
+    }
+    const invoiceCount = Number(database.exec("SELECT COUNT(*) FROM local_invoices")[0].values[0][0]);
+    const expenseCount = Number(database.exec("SELECT COUNT(*) FROM local_expenses")[0].values[0][0]);
+    assert(invoiceCount > 0 && expenseCount > 0, "SQLite financial tables were not populated from the current state");
     assert(entityRows[0].values.every(([collection, count]) => String(collection).length > 0 && Number(count) > 0), "Normalized local entity collection contains invalid rows");
     for (const [key, value] of stateRows[0].values) {
       assert(typeof key === "string" && typeof value === "string", "SQLite state row has invalid types");

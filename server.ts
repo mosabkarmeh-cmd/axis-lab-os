@@ -51,8 +51,9 @@ const USE_POSTGRES = DB_MODE === "postgres" || (DB_MODE === "auto" && Boolean(pr
 const USE_SQLITE = DB_MODE === "sqlite";
 const LOCAL_DATA_FILE = process.env.AXIS_DATA_FILE || path.join(os.homedir(), "AppData", "Roaming", "AXIS LAB OS", "axis-data.sqlite");
 const LOCAL_LEGACY_DATA_FILE = process.env.AXIS_LEGACY_DATA_FILE || path.join(os.homedir(), "AppData", "Roaming", "Electron", "axis-data.json");
-const LOCAL_SCHEMA_VERSION = 2;
-const NORMALIZED_LOCAL_COLLECTIONS = ["CUSTOMERS", "PRODUCTS", "MATERIALS", "INVENTORY", "SUPPLIERS", "MACHINES", "EXPENSES"] as const;
+const LOCAL_SCHEMA_VERSION = 3;
+const NORMALIZED_LOCAL_COLLECTIONS = ["CUSTOMERS", "PRODUCTS", "MATERIALS", "INVENTORY", "SUPPLIERS", "MACHINES"] as const;
+const NORMALIZED_FINANCIAL_COLLECTIONS = ["INVOICES", "EXPENSES"] as const;
 let localSqlite: any = null;
 
 async function initLocalSqlite() {
@@ -68,6 +69,11 @@ async function initLocalSqlite() {
       database.run("CREATE TABLE IF NOT EXISTS app_state (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL, updated_at TEXT NOT NULL)");
       database.run("CREATE TABLE IF NOT EXISTS local_entities (collection TEXT NOT NULL, entity_id TEXT NOT NULL, payload TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (collection, entity_id))");
       database.run("CREATE TABLE IF NOT EXISTS local_metadata (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL, updated_at TEXT NOT NULL)");
+      database.run("CREATE TABLE IF NOT EXISTS local_invoices (id TEXT PRIMARY KEY NOT NULL, invoice_number TEXT NOT NULL, order_id TEXT, customer_id TEXT NOT NULL, issue_date TEXT NOT NULL, due_date TEXT NOT NULL, total_price REAL NOT NULL, subtotal REAL, tax_percent REAL, discount REAL, paid_amount REAL NOT NULL, remaining REAL NOT NULL, status TEXT NOT NULL, notes TEXT, payload TEXT NOT NULL, updated_at TEXT NOT NULL)");
+      database.run("CREATE TABLE IF NOT EXISTS local_invoice_items (id TEXT PRIMARY KEY NOT NULL, invoice_id TEXT NOT NULL, product_name TEXT NOT NULL, quantity REAL NOT NULL, unit_price REAL NOT NULL, discount REAL NOT NULL, tax REAL NOT NULL, total REAL NOT NULL, created_at TEXT NOT NULL, payload TEXT NOT NULL, FOREIGN KEY (invoice_id) REFERENCES local_invoices(id) ON DELETE CASCADE)");
+      database.run("CREATE TABLE IF NOT EXISTS local_invoice_history (id TEXT PRIMARY KEY NOT NULL, invoice_id TEXT NOT NULL, action TEXT NOT NULL, created_at TEXT NOT NULL, payload TEXT NOT NULL, FOREIGN KEY (invoice_id) REFERENCES local_invoices(id) ON DELETE CASCADE)");
+      database.run("CREATE TABLE IF NOT EXISTS local_payments (id TEXT PRIMARY KEY NOT NULL, order_id TEXT, invoice_id TEXT, amount REAL NOT NULL, method TEXT NOT NULL, reference TEXT, date TEXT NOT NULL, notes TEXT, payload TEXT NOT NULL, updated_at TEXT NOT NULL)");
+      database.run("CREATE TABLE IF NOT EXISTS local_expenses (id TEXT PRIMARY KEY NOT NULL, category TEXT NOT NULL, amount REAL NOT NULL, date TEXT NOT NULL, status TEXT NOT NULL, payload TEXT NOT NULL, updated_at TEXT NOT NULL)");
       database.run("INSERT OR IGNORE INTO local_metadata (key, value, updated_at) VALUES ('schema_version', ?, ?)", [String(LOCAL_SCHEMA_VERSION), new Date().toISOString()]);
       database.run("UPDATE local_metadata SET value = ?, updated_at = ? WHERE key = 'schema_version' AND CAST(value AS INTEGER) < ?", [String(LOCAL_SCHEMA_VERSION), new Date().toISOString(), LOCAL_SCHEMA_VERSION]);
       return database;
@@ -148,6 +154,49 @@ function syncNormalizedLocalEntities(sqlite: any) {
       const entityId = String(value?.id || value?.key || `${collection.toLowerCase()}-${Math.random().toString(36).slice(2)}`);
       sqlite.run("INSERT INTO local_entities (collection, entity_id, payload, updated_at) VALUES (?, ?, ?, ?)", [collection, entityId, JSON.stringify(value), now]);
     }
+  }
+}
+function syncNormalizedFinancialEntities(sqlite: any) {
+  const now = new Date().toISOString();
+  sqlite.run("DELETE FROM local_invoice_items");
+  sqlite.run("DELETE FROM local_invoice_history");
+  sqlite.run("DELETE FROM local_payments");
+  sqlite.run("DELETE FROM local_invoices");
+  sqlite.run("DELETE FROM local_expenses");
+  for (const invoice of INVOICES) {
+    const invoiceId = String(invoice.id);
+    sqlite.run("INSERT INTO local_invoices (id, invoice_number, order_id, customer_id, issue_date, due_date, total_price, subtotal, tax_percent, discount, paid_amount, remaining, status, notes, payload, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+      invoiceId, String(invoice.invoiceNumber || invoiceId), invoice.orderId ? String(invoice.orderId) : null, String(invoice.customerId || ""), String(invoice.issueDate || now), String(invoice.dueDate || invoice.issueDate || now), Number(invoice.totalPrice) || 0, invoice.subtotal == null ? null : Number(invoice.subtotal), invoice.taxPercent == null ? null : Number(invoice.taxPercent), invoice.discount == null ? null : Number(invoice.discount), Number(invoice.paidAmount) || 0, Number(invoice.remaining) || 0, String(invoice.status || "unpaid"), invoice.notes || null, JSON.stringify(invoice), now,
+    ]);
+    for (const item of invoice.items || []) {
+      sqlite.run("INSERT INTO local_invoice_items (id, invoice_id, product_name, quantity, unit_price, discount, tax, total, created_at, payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+        String(item.id || `${invoiceId}-item-${Math.random().toString(36).slice(2)}`), invoiceId, String(item.productName || ""), Number(item.quantity) || 0, Number(item.unitPrice) || 0, Number(item.discount) || 0, Number(item.tax) || 0, Number(item.total) || 0, String(item.createdAt || now), JSON.stringify(item),
+      ]);
+    }
+    for (const history of invoice.history || []) {
+      sqlite.run("INSERT INTO local_invoice_history (id, invoice_id, action, created_at, payload) VALUES (?, ?, ?, ?, ?)", [String(history.id || `${invoiceId}-history-${Math.random().toString(36).slice(2)}`), invoiceId, String(history.action || "updated"), String(history.createdAt || now), JSON.stringify(history)]);
+    }
+  }
+  const paymentRows = new Map<string, any>();
+  for (const invoice of INVOICES) {
+    for (const payment of invoice.payments || []) {
+      const id = String(payment.id || `${invoice.id}-${payment.createdAt || payment.date || Math.random()}`);
+      paymentRows.set(id, { ...payment, id, invoiceId: invoice.id, orderId: invoice.orderId });
+    }
+  }
+  for (const order of ORDERS) {
+    for (const payment of order.payments || []) {
+      const id = String(payment.id || `${order.id}-${payment.createdAt || payment.date || Math.random()}`);
+      if (!paymentRows.has(id)) paymentRows.set(id, { ...payment, id, orderId: order.id });
+    }
+  }
+  for (const payment of paymentRows.values()) {
+    sqlite.run("INSERT INTO local_payments (id, order_id, invoice_id, amount, method, reference, date, notes, payload, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+      String(payment.id), payment.orderId ? String(payment.orderId) : null, payment.invoiceId ? String(payment.invoiceId) : null, Number(payment.amountUSD ?? payment.amount) || 0, String(payment.paymentMethod || payment.method || "cash"), payment.reference || null, String(payment.date || payment.createdAt || now), payment.notes || null, JSON.stringify(payment), now,
+    ]);
+  }
+  for (const expense of EXPENSES) {
+    sqlite.run("INSERT INTO local_expenses (id, category, amount, date, status, payload, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)", [String(expense.id), String(expense.category || "عام"), Number(expense.amount) || 0, String(expense.date || now), String(expense.status || "paid"), JSON.stringify(expense), now]);
   }
 }
 function backupDirectory() {
@@ -1220,7 +1269,7 @@ async function loadPersistedState(): Promise<number> {
       const snapshotValues = new Map(values.map(([key, rawValue]) => [String(key), String(rawValue)]));
       for (const [key, rawValue] of values) {
         const target = LOCAL_PERSISTED_COLLECTIONS[String(key)];
-        if (!target || NORMALIZED_LOCAL_COLLECTIONS.includes(String(key) as typeof NORMALIZED_LOCAL_COLLECTIONS[number])) continue;
+        if (!target || NORMALIZED_LOCAL_COLLECTIONS.includes(String(key) as typeof NORMALIZED_LOCAL_COLLECTIONS[number]) || NORMALIZED_FINANCIAL_COLLECTIONS.includes(String(key) as typeof NORMALIZED_FINANCIAL_COLLECTIONS[number])) continue;
         const value = JSON.parse(String(rawValue));
         if (Array.isArray(target) && Array.isArray(value)) {
           target.length = 0;
@@ -1252,8 +1301,38 @@ async function loadPersistedState(): Promise<number> {
           migrated = true;
         }
       }
-      if (migrated) {
-        syncNormalizedLocalEntities(sqlite);
+      let financialMigrated = false;
+      const invoiceRows = sqlite.exec("SELECT payload FROM local_invoices ORDER BY updated_at, id");
+      if (snapshotKeys.has("INVOICES")) {
+        const legacyInvoices = JSON.parse(String(snapshotValues.get("INVOICES") || "[]"));
+        if (Array.isArray(legacyInvoices)) {
+          INVOICES.length = 0;
+          INVOICES.push(...legacyInvoices);
+        }
+        sqlite.run("DELETE FROM app_state WHERE key = ?", ["INVOICES"]);
+        financialMigrated = true;
+      } else if (invoiceRows.length && invoiceRows[0].values.length > 0) {
+        INVOICES.length = 0;
+        INVOICES.push(...invoiceRows[0].values.map(([payload]) => JSON.parse(String(payload))));
+        restored++;
+      }
+      const expenseRows = sqlite.exec("SELECT payload FROM local_expenses ORDER BY updated_at, id");
+      if (snapshotKeys.has("EXPENSES")) {
+        const legacyExpenses = JSON.parse(String(snapshotValues.get("EXPENSES") || "[]"));
+        if (Array.isArray(legacyExpenses)) {
+          EXPENSES.length = 0;
+          EXPENSES.push(...legacyExpenses);
+        }
+        sqlite.run("DELETE FROM app_state WHERE key = ?", ["EXPENSES"]);
+        financialMigrated = true;
+      } else if (expenseRows.length && expenseRows[0].values.length > 0) {
+        EXPENSES.length = 0;
+        EXPENSES.push(...expenseRows[0].values.map(([payload]) => JSON.parse(String(payload))));
+        restored++;
+      }
+      if (migrated || financialMigrated) {
+        if (migrated) syncNormalizedLocalEntities(sqlite);
+        if (financialMigrated) syncNormalizedFinancialEntities(sqlite);
         await flushLocalSqlite();
       }
       return restored;
@@ -1300,10 +1379,11 @@ async function persistStateNow() {
       sqlite.run("BEGIN TRANSACTION");
       try {
         for (const [key, value] of Object.entries(LOCAL_PERSISTED_COLLECTIONS)) {
-          if (NORMALIZED_LOCAL_COLLECTIONS.includes(key as typeof NORMALIZED_LOCAL_COLLECTIONS[number])) continue;
+          if (NORMALIZED_LOCAL_COLLECTIONS.includes(key as typeof NORMALIZED_LOCAL_COLLECTIONS[number]) || NORMALIZED_FINANCIAL_COLLECTIONS.includes(key as typeof NORMALIZED_FINANCIAL_COLLECTIONS[number])) continue;
           sqlite.run("INSERT INTO app_state (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at", [key, JSON.stringify(value), now]);
         }
         syncNormalizedLocalEntities(sqlite);
+        syncNormalizedFinancialEntities(sqlite);
         sqlite.run("UPDATE local_metadata SET value = ?, updated_at = ? WHERE key = 'schema_version'", [String(LOCAL_SCHEMA_VERSION), now]);
         sqlite.run("COMMIT");
       } catch (error) {
