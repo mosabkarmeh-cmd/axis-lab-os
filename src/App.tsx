@@ -3,6 +3,7 @@ import { safeApiFetch } from "./lib/api";
 import { useLocalStorage } from "./hooks/useLocalStorage";
 import { useOrderFilters } from "./hooks/useOrderFilters";
 import { useCurrencyCalculator } from "./hooks/useCurrencyCalculator";
+import { useProductionWorkspace } from "./hooks/useProductionWorkspace";
 import { extractMaterialName } from "./lib/materials";
 import { getOrderStatusBadge, getPaymentStatusBadge } from "./components/StatusBadges";
 import { EXCHANGE_RATE_STORAGE_KEY, sanitizeExchangeRate, sypToUsd, usdToSyp } from "./lib/currency";
@@ -435,46 +436,18 @@ export default function App() {
     return data;
   };
 
-  // Production (Jobs & Machines) States
-  const [machines, setMachines] = useState<Machine[]>([]);
-  const [productionJobs, setProductionJobs] = useState<ProductionJob[]>([]);
-  const [isLoadingProduction, setIsLoadingProduction] = useState<boolean>(false);
-  const [showAddJob, setShowAddJob] = useState<boolean>(false);
-  const [showAddMachine, setShowAddMachine] = useState<boolean>(false);
-  const [activeProductionSubTab, setActiveProductionSubTab] = useState<'console' | 'calibration'>('console');
-  const [newMachineName, setNewMachineName] = useState<string>("");
-  const [newMachineType, setNewMachineType] = useState<string>("laser_co2");
-  const [newMachineHours, setNewMachineHours] = useState<string>("0");
-  const [machineSearchQuery, setMachineSearchQuery] = useState<string>("");
-  const [machineStatusFilter, setMachineStatusFilter] = useState<'all' | 'idle' | 'running' | 'maintenance' | 'offline'>('all');
-  const [machineLayout, setMachineLayout] = useState<'grid' | 'list'>(() => {
-    const saved = localStorage.getItem("axislab_machine_layout");
-    return saved === "list" || saved === "grid" ? saved : "grid";
-  });
-
-  useEffect(() => {
-    localStorage.setItem("axislab_machine_layout", machineLayout);
-  }, [machineLayout]);
-
-  // New Job Form State
-  const [newJobItemName, setNewJobItemName] = useState<string>("");
-  const [newJobMaterialId, setNewJobMaterialId] = useState<string>("");
-  const [newJobLaserPower, setNewJobLaserPower] = useState<number>(80);
-  const [newJobLaserSpeed, setNewJobLaserSpeed] = useState<number>(30);
-  const [newJobEstTime, setNewJobEstTime] = useState<number>(90);
-  const [newJobOrderId, setNewJobOrderId] = useState<string>("");
-
-  // Simulated cutting visualization state
-  const [activeRunningJob, setActiveRunningJob] = useState<ProductionJob | null>(null);
-  const [liveLogLines, setLiveLogLines] = useState<string[]>([]);
-  const [laserX, setLaserX] = useState<number>(0);
-  const [laserY, setLaserY] = useState<number>(0);
-
-  // Remnant registration upon completion popup state
-  const [showRemnantRegister, setShowRemnantRegister] = useState<ProductionJob | null>(null);
-  const [jobRemWidth, setJobRemWidth] = useState<string>("");
-  const [jobRemHeight, setJobRemHeight] = useState<string>("");
-  const [jobRemLocation, setJobRemLocation] = useState<string>("");
+    // Production workspace state is isolated so production handlers and pages can be moved independently.
+  const {
+    machines, setMachines, productionJobs, setProductionJobs, isLoadingProduction, setIsLoadingProduction,
+    showAddJob, setShowAddJob, showAddMachine, setShowAddMachine, activeProductionSubTab, setActiveProductionSubTab,
+    newMachineName, setNewMachineName, newMachineType, setNewMachineType, newMachineHours, setNewMachineHours,
+    machineSearchQuery, setMachineSearchQuery, machineStatusFilter, setMachineStatusFilter, machineLayout, setMachineLayout,
+    newJobItemName, setNewJobItemName, newJobMaterialId, setNewJobMaterialId, newJobLaserPower, setNewJobLaserPower,
+    newJobLaserSpeed, setNewJobLaserSpeed, newJobEstTime, setNewJobEstTime, newJobOrderId, setNewJobOrderId,
+    activeRunningJob, setActiveRunningJob, liveLogLines, setLiveLogLines, laserX, setLaserX, laserY, setLaserY,
+    showRemnantRegister, setShowRemnantRegister, jobRemWidth, setJobRemWidth, jobRemHeight, setJobRemHeight,
+    jobRemLocation, setJobRemLocation,
+  } = useProductionWorkspace();
   const [terminalLogs, setTerminalLogs] = useState<Array<{ time: string; type: string; msg: string }>>([
     { time: "11:22:01", type: "SYSTEM", msg: "AXIS LAB bootstrap engine initialized." },
     { time: "11:22:05", type: "DB", msg: "Prisma Database Client initialized in memory." },
