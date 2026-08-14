@@ -51,6 +51,8 @@ const USE_POSTGRES = DB_MODE === "postgres" || (DB_MODE === "auto" && Boolean(pr
 const USE_SQLITE = DB_MODE === "sqlite";
 const LOCAL_DATA_FILE = process.env.AXIS_DATA_FILE || path.join(os.homedir(), "AppData", "Roaming", "AXIS LAB OS", "axis-data.sqlite");
 const LOCAL_LEGACY_DATA_FILE = process.env.AXIS_LEGACY_DATA_FILE || path.join(os.homedir(), "AppData", "Roaming", "Electron", "axis-data.json");
+const LOCAL_SCHEMA_VERSION = 2;
+const NORMALIZED_LOCAL_COLLECTIONS = ["CUSTOMERS", "PRODUCTS", "MATERIALS", "INVENTORY", "SUPPLIERS", "MACHINES", "EXPENSES"] as const;
 let localSqlite: any = null;
 
 async function initLocalSqlite() {
@@ -62,7 +64,12 @@ async function initLocalSqlite() {
     let database: any = null;
     try {
       database = candidateBytes ? new SQL.Database(candidateBytes) : new SQL.Database();
+      database.run("PRAGMA foreign_keys = ON");
       database.run("CREATE TABLE IF NOT EXISTS app_state (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL, updated_at TEXT NOT NULL)");
+      database.run("CREATE TABLE IF NOT EXISTS local_entities (collection TEXT NOT NULL, entity_id TEXT NOT NULL, payload TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (collection, entity_id))");
+      database.run("CREATE TABLE IF NOT EXISTS local_metadata (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL, updated_at TEXT NOT NULL)");
+      database.run("INSERT OR IGNORE INTO local_metadata (key, value, updated_at) VALUES ('schema_version', ?, ?)", [String(LOCAL_SCHEMA_VERSION), new Date().toISOString()]);
+      database.run("UPDATE local_metadata SET value = ?, updated_at = ? WHERE key = 'schema_version' AND CAST(value AS INTEGER) < ?", [String(LOCAL_SCHEMA_VERSION), new Date().toISOString(), LOCAL_SCHEMA_VERSION]);
       return database;
     } catch (error) {
       try { database?.close(); } catch {}
@@ -132,6 +139,17 @@ async function flushLocalSqlite() {
   await fs.promises.rename(tempFile, LOCAL_DATA_FILE);
 }
 
+function syncNormalizedLocalEntities(sqlite: any) {
+  const now = new Date().toISOString();
+  for (const collection of NORMALIZED_LOCAL_COLLECTIONS) {
+    const values = LOCAL_PERSISTED_COLLECTIONS[collection] || [];
+    sqlite.run("DELETE FROM local_entities WHERE collection = ?", [collection]);
+    for (const value of values) {
+      const entityId = String(value?.id || value?.key || `${collection.toLowerCase()}-${Math.random().toString(36).slice(2)}`);
+      sqlite.run("INSERT INTO local_entities (collection, entity_id, payload, updated_at) VALUES (?, ?, ?, ?)", [collection, entityId, JSON.stringify(value), now]);
+    }
+  }
+}
 function backupDirectory() {
   return path.join(path.dirname(LOCAL_DATA_FILE), "backups");
 }
@@ -1198,9 +1216,10 @@ async function loadPersistedState(): Promise<number> {
       const rows = sqlite.exec("SELECT key, value FROM app_state");
       const values = rows.length ? rows[0].values : [];
       let restored = 0;
+      const snapshotKeys = new Set(values.map(([key]) => String(key)));
       for (const [key, rawValue] of values) {
         const target = LOCAL_PERSISTED_COLLECTIONS[String(key)];
-        if (!target) continue;
+        if (!target || NORMALIZED_LOCAL_COLLECTIONS.includes(String(key) as typeof NORMALIZED_LOCAL_COLLECTIONS[number])) continue;
         const value = JSON.parse(String(rawValue));
         if (Array.isArray(target) && Array.isArray(value)) {
           target.length = 0;
@@ -1210,6 +1229,25 @@ async function loadPersistedState(): Promise<number> {
         }
         restored++;
       }
+      let migrated = false;
+      for (const collection of NORMALIZED_LOCAL_COLLECTIONS) {
+        const target = LOCAL_PERSISTED_COLLECTIONS[collection];
+        const entityRows = sqlite.exec("SELECT payload FROM local_entities WHERE collection = ? ORDER BY entity_id", [collection]);
+        const entityValues = entityRows.length ? entityRows[0].values : [];
+        if (entityValues.length > 0) {
+          target.length = 0;
+          target.push(...entityValues.map(([payload]) => JSON.parse(String(payload))));
+          restored++;
+        } else if (snapshotKeys.has(collection)) {
+          syncNormalizedLocalEntities(sqlite);
+          migrated = true;
+        }
+        if (snapshotKeys.has(collection)) {
+          sqlite.run("DELETE FROM app_state WHERE key = ?", [collection]);
+          migrated = true;
+        }
+      }
+      if (migrated) await flushLocalSqlite();
       return restored;
     }
     if (!USE_POSTGRES) return 0;
@@ -1254,8 +1292,11 @@ async function persistStateNow() {
       sqlite.run("BEGIN TRANSACTION");
       try {
         for (const [key, value] of Object.entries(LOCAL_PERSISTED_COLLECTIONS)) {
+          if (NORMALIZED_LOCAL_COLLECTIONS.includes(key as typeof NORMALIZED_LOCAL_COLLECTIONS[number])) continue;
           sqlite.run("INSERT INTO app_state (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at", [key, JSON.stringify(value), now]);
         }
+        syncNormalizedLocalEntities(sqlite);
+        sqlite.run("UPDATE local_metadata SET value = ?, updated_at = ? WHERE key = 'schema_version'", [String(LOCAL_SCHEMA_VERSION), now]);
         sqlite.run("COMMIT");
       } catch (error) {
         sqlite.run("ROLLBACK");

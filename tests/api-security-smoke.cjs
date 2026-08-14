@@ -185,6 +185,13 @@ const assert = (condition, message) => {
     const database = new SQL.Database(fs.readFileSync(env.AXIS_DATA_FILE));
     const stateRows = database.exec("SELECT key, value FROM app_state ORDER BY key");
     assert(stateRows.length === 1 && stateRows[0].values.length >= 10, "SQLite app_state table is incomplete");
+    const legacyNormalizedKeys = stateRows[0].values.filter(([key]) => ["CUSTOMERS", "PRODUCTS", "MATERIALS", "INVENTORY", "SUPPLIERS", "MACHINES", "EXPENSES"].includes(String(key)));
+    assert(legacyNormalizedKeys.length === 0, `Normalized collections still duplicated in app_state: ${JSON.stringify(legacyNormalizedKeys.map(([key]) => key))}`);
+    const schemaRows = database.exec("SELECT value FROM local_metadata WHERE key = 'schema_version'");
+    assert(schemaRows.length === 1 && String(schemaRows[0].values[0][0]) === "2", "SQLite local schema version is not current");
+    const entityRows = database.exec("SELECT collection, COUNT(*) AS count FROM local_entities GROUP BY collection ORDER BY collection");
+    assert(entityRows.length === 1 && entityRows[0].values.length >= 7, "Normalized local entity tables are incomplete");
+    assert(entityRows[0].values.every(([collection, count]) => String(collection).length > 0 && Number(count) > 0), "Normalized local entity collection contains invalid rows");
     for (const [key, value] of stateRows[0].values) {
       assert(typeof key === "string" && typeof value === "string", "SQLite state row has invalid types");
       JSON.parse(value);

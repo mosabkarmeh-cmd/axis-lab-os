@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { safeApiFetch } from "./lib/api";
 import {
   Shield,
   UserCheck,
@@ -1177,20 +1178,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     }
   }, [token]);
 
-  // Database Fetchers
-  // Database Fetchers Helper
-  const safeApiFetch = async (url: string, options?: RequestInit) => {
-    try {
-      const res = await fetch(url, options);
-      if (!res.ok) return null;
-      const contentType = res.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) return null;
-      return await res.json();
-    } catch {
-      return null;
-    }
-  };
-
+  // Database fetchers use the shared safe API client from src/lib/api.ts.
   const fetchMachines = async () => {
     const data = await safeApiFetch("/api/production/machines");
     if (data && data.success) setMachines(data.machines);
