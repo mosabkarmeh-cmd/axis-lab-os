@@ -27,6 +27,7 @@ import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import initSqlJs from "sql.js";
 import { materialPriceUSD } from "./src/lib/materials.ts";
+import { sypToUsd } from "./src/lib/currency.ts";
 
 import customersRouter from "./src/server/routes/customers.ts";
 import productsRouter from "./src/server/routes/products.ts";
@@ -2307,14 +2308,15 @@ async function startServer() {
       customerId: newOrder.customerId,
       issueDate: new Date().toISOString(),
       dueDate: newOrder.deliveryDateExpected || new Date().toISOString(),
-      totalPrice: newOrder.totalPrice,
-      subtotal: itemsSubtotal,
+      totalPrice: sypToUsd(newOrder.totalPrice, SETTINGS.exchangeRate),
+      subtotal: sypToUsd(itemsSubtotal, SETTINGS.exchangeRate),
       taxPercent: taxRate,
-      discount: discountAmt,
-      paidAmount: newOrder.paidAmount,
-      remaining: newOrder.remaining,
+      discount: sypToUsd(discountAmt, SETTINGS.exchangeRate),
+      paidAmount: sypToUsd(newOrder.paidAmount, SETTINGS.exchangeRate),
+      remaining: sypToUsd(newOrder.remaining, SETTINGS.exchangeRate),
       status: newOrder.remaining === 0 ? "paid" : newOrder.paidAmount > 0 ? "partially_paid" : "unpaid",
-      items: invoiceItems,
+      currency: "USD",
+      items: invoiceItems.map((item: any) => ({ ...item, unitPrice: sypToUsd(item.unitPrice, SETTINGS.exchangeRate), total: sypToUsd(item.total, SETTINGS.exchangeRate) })),
       history: [
         {
           id: `invhist-${Date.now()}`,
@@ -2637,12 +2639,13 @@ async function startServer() {
       return;
     }
 
-    const payAmt = Number(amount) || 0;
-    if (payAmt <= 0) {
+    const payAmtUSD = Number(amount) || 0;
+    const payAmtSYP = Math.round(payAmtUSD * SETTINGS.exchangeRate);
+    if (payAmtUSD <= 0) {
       res.status(400).json({ error: "مبلغ الدفعة يجب أن يكون أكبر من الصفر" });
       return;
     }
-    if (payAmt > order.remaining + 0.01) {
+    if (payAmtSYP > order.remaining + 1) {
       res.status(400).json({ error: "مبلغ الدفعة يتجاوز المبلغ المتبقي" });
       return;
     }
@@ -2650,7 +2653,7 @@ async function startServer() {
       res.status(409).json({ error: "هذه الدفعة مسجلة مسبقاً" });
       return;
     }
-    order.paidAmount += payAmt;
+    order.paidAmount += payAmtSYP;
     order.remaining = Math.max(0, order.totalPrice - order.paidAmount);
 
     if (!order.payments) {
@@ -2662,8 +2665,8 @@ async function startServer() {
     const paymentRecord = {
       id: paymentId ? String(paymentId) : "pay_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
       orderId: order.id,
-      amountUSD: payAmt,
-      amountSYP: Math.round(payAmt * SETTINGS.exchangeRate),
+      amountUSD: payAmtUSD,
+      amountSYP: payAmtSYP,
       paymentMethod: paymentMethod || "cash",
       notes: notes || "دفعة مقبوضة للطلب",
       recordedBy: changedById || "u-1",
@@ -2671,24 +2674,24 @@ async function startServer() {
     };
     order.payments.unshift(paymentRecord);
 
-    // Sync matching Invoice
+    // Sync matching Invoice. Orders are stored in SYP; invoices are stored in USD.
     const matchingInv2 = INVOICES.find(inv => inv.orderId === order.id);
     if (matchingInv2) {
-      matchingInv2.paidAmount = order.paidAmount;
-      matchingInv2.remaining = order.remaining;
-      matchingInv2.status = order.remaining === 0 ? "paid" : order.paidAmount > 0 ? "partially_paid" : "unpaid";
+      matchingInv2.paidAmount = Math.min(matchingInv2.totalPrice, (matchingInv2.paidAmount || 0) + payAmtUSD);
+      matchingInv2.remaining = Math.max(0, matchingInv2.totalPrice - matchingInv2.paidAmount);
+      matchingInv2.status = matchingInv2.remaining === 0 ? "paid" : matchingInv2.paidAmount > 0 ? "partially_paid" : "unpaid";
       if (!matchingInv2.payments) matchingInv2.payments = [];
       matchingInv2.payments.unshift({ ...paymentRecord, invoiceId: matchingInv2.id });
     }
     order.statusHistory.unshift({
       oldStatus: order.status,
       newStatus: order.status,
-      notes: `تم تسديد دفعة مالية بقيمة $${payAmt.toFixed(2)} (${methodLabel}). ${notes || ""}`,
+      notes: `تم تسديد دفعة مالية بقيمة $${payAmtUSD.toFixed(2)} (${methodLabel}). ${notes || ""}`,
       changedAt: new Date().toISOString()
     });
 
     // Log Activity
-    const payDetails = `تسديد دفعة مالية بقيمة $${payAmt.toFixed(2)} (${methodLabel}) | المتبقي الجديد: $${order.remaining.toFixed(2)}`;
+    const payDetails = `تسديد دفعة مالية بقيمة $${payAmtUSD.toFixed(2)} (${methodLabel}) | المتبقي الجديد: ${order.remaining.toLocaleString()} ل.س`;
     ACTIVITY_LOGS.unshift({
       id: "log_" + Date.now(),
       userId: changedById || "u-1",
@@ -7538,7 +7541,8 @@ Role Guidelines:
   app.get("/api/reports/analytics", (req, res) => {
     // 1. Sales & Orders
     const totalOrdersCount = ORDERS.length;
-    const totalOrdersValue = ORDERS.reduce((sum, ord) => sum + (ord.totalPrice || 0), 0);
+    const orderValueUSD = (order: any) => sypToUsd(order.totalPrice, SETTINGS.exchangeRate);
+    const totalOrdersValue = ORDERS.reduce((sum, ord) => sum + orderValueUSD(ord), 0);
     const avgOrderValue = totalOrdersCount > 0 ? (totalOrdersValue / totalOrdersCount) : 0;
     
     const ordersByStatus: Record<string, number> = {};
@@ -7549,7 +7553,7 @@ Role Guidelines:
     // Top Customers by spending
     const customerSpending: Record<string, number> = {};
     ORDERS.forEach(ord => {
-      customerSpending[ord.customerId] = (customerSpending[ord.customerId] || 0) + (ord.totalPrice || 0);
+      customerSpending[ord.customerId] = (customerSpending[ord.customerId] || 0) + orderValueUSD(ord);
     });
     
     const topCustomers = Object.entries(customerSpending).map(([id, totalSpent]) => {

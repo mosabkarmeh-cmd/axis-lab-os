@@ -94,8 +94,8 @@ const assert = (condition, message) => {
       method: "POST",
       body: JSON.stringify({
         customerId: "c-1",
-        items: [{ productName: "Smoke laser panel", quantity: 1, unitPrice: 100 }],
-        totalPrice: 100,
+        items: [{ productName: "Smoke laser panel", quantity: 1, unitPrice: 13500 }],
+        totalPrice: 13500,
         paidAmount: 0,
         priority: "normal",
       }),
@@ -107,7 +107,7 @@ const assert = (condition, message) => {
       method: "POST",
       body: JSON.stringify({ amount: 25, paymentId: "smoke-order-payment-1", paymentMethod: "cash", notes: "Persistence smoke test" }),
     });
-    assert(payment.response.ok && payment.body.paidAmount === 25, `Payment write failed: ${JSON.stringify(payment.body)}`);
+    assert(payment.response.ok && payment.body.paidAmount === 3375 && payment.body.remaining === 10125, `Payment write failed: ${JSON.stringify(payment.body)}`);
     const duplicateOrderPayment = await request(`/api/orders/${orderId}/payments`, { method: "POST", body: JSON.stringify({ amount: 25, paymentId: "smoke-order-payment-1" }) });
     assert(duplicateOrderPayment.response.status === 409, "Duplicate order payment was not rejected");
     const negativeOrderPayment = await request(`/api/orders/${orderId}/payments`, { method: "POST", body: JSON.stringify({ amount: -1 }) });
@@ -127,11 +127,11 @@ const assert = (condition, message) => {
     const orders = await request("/api/orders");
     const restoredOrder = orders.body.find((item) => item.id === orderId);
     assert(restoredOrder, "Order was not restored after restart");
-    assert(restoredOrder.paidAmount === 25 && restoredOrder.remaining === 75, "Payment totals were not restored correctly");
+    assert(restoredOrder.paidAmount === 3375 && restoredOrder.remaining === 10125, "Payment totals were not restored correctly");
 
     const invoices = await request("/api/accounting/invoices");
     const restoredInvoice = invoices.body.invoices.find((item) => item.orderId === orderId);
-    assert(restoredInvoice && restoredInvoice.paidAmount === 25, "Invoice/payment was not restored after restart");
+    assert(restoredInvoice && restoredInvoice.totalPrice === 100 && restoredInvoice.paidAmount === 25 && restoredInvoice.remaining === 75, "Invoice/payment was not restored after restart");
     const excessiveInvoicePayment = await request(`/api/accounting/invoices/${restoredInvoice.id}/payments`, { method: "POST", body: JSON.stringify({ amount: 100 }) });
     assert(excessiveInvoicePayment.response.status === 400, "Excessive invoice payment was not rejected");
     const invoicePayment = await request(`/api/accounting/invoices/${restoredInvoice.id}/payments`, { method: "POST", body: JSON.stringify({ amount: 25, paymentId: "smoke-invoice-payment-1", paymentMethod: "cash" }) });
@@ -156,7 +156,7 @@ const assert = (condition, message) => {
     assert(calculatedOrder.response.ok && calculatedOrder.body.totalPrice === 105, `Tax/discount calculation failed: ${JSON.stringify(calculatedOrder.body)}`);
     const calculatedInvoices = await request("/api/accounting/invoices");
     const calculatedInvoice = calculatedInvoices.body.invoices.find((item) => item.orderId === calculatedOrder.body.id);
-    assert(calculatedInvoice && calculatedInvoice.subtotal === 100 && calculatedInvoice.totalPrice === 105, "Invoice tax/discount totals were not calculated correctly");
+    assert(calculatedInvoice && Math.abs(calculatedInvoice.subtotal - (100 / 135)) < 0.0001 && Math.abs(calculatedInvoice.totalPrice - (105 / 135)) < 0.0001, "Invoice tax/discount totals were not calculated correctly");
 
     const creditNote = await request(`/api/accounting/invoices/${calculatedInvoice.id}/credit-note`, { method: "POST" });
     assert(creditNote.response.ok && creditNote.body.creditInvoice?.status === "credit_note", `Credit note creation failed: ${JSON.stringify(creditNote.body)}`);
