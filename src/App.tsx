@@ -113,8 +113,6 @@ import Markdown from "react-markdown";
 import { User, Customer, Order, OrderItem, ActivityLog, CodeFile, GCodeResult, Product, Machine, ProductionJob } from "./types";
 import { VIRTUAL_FILES } from "./virtualFiles";
 import AccountingPage from "./components/AccountingPage";
-import ReportsView from "./components/ReportsView";
-import SettingsView from "./components/SettingsView";
 import { AxisLabLogo, AxisLabLogoFull } from "./components/AxisLabLogo";
 import { FileUploader } from "./components/FileUploader";
 import ProductionPage from "./components/ProductionPage";
@@ -123,8 +121,10 @@ import DatabasePage from "./components/DatabasePage";
 import AIHubPage from "./components/AIHubPage";
 import GlobalDialogs from "./components/GlobalDialogs";
 import InventoryPage from "./components/InventoryPage";
+import ReportsPage from "./components/ReportsPage";
+import SettingsPage from "./components/SettingsPage";
+import HelpPage from "./components/HelpPage";
 import SupplierPriceComparisonModal from "./components/SupplierPriceComparisonModal";
-import HelpCenter from "./components/HelpCenter";
 import HelpModal from "./components/HelpModal";
 import HelpTooltip from "./components/HelpTooltip";
 import AddOrderModal from "./components/AddOrderModal";
@@ -4932,87 +4932,26 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
 
               {/* SETTINGS & BACKUP VIEW */}
               {activeView === "settings" && (
-                <motion.div
-                  key="settings"
-                  variants={pageVariants}
-                  initial="initial"
-                  animate="animate"
-                  exit="exit"
-                  transition={pageTransition}
-                  className="flex-1 overflow-y-auto p-6 bg-[#0c0c0e]"
-                >
-                  {currentUser?.role !== "admin" ? (
-                    <div className="flex flex-col justify-center items-center text-center p-12 min-h-[400px]">
-                      <Lock className="w-16 h-16 text-[#c59257] mb-4" />
-                      <h3 className="text-lg font-bold text-zinc-100">إعدادات النظام محمية</h3>
-                      <p className="text-sm text-zinc-500 mt-2 max-w-md leading-relaxed">
-                        لوحة التحكم وإعدادات النظام الحساسة متاحة فقط لمدير النظام (Admin).
-                      </p>
-                    </div>
-                  ) : (
-                    <SettingsView
-                      showTerminalLogs={showTerminalLogs}
-                      setShowTerminalLogs={(val) => {
-                        setShowTerminalLogs(val);
-                        localStorage.setItem("axis_show_terminal_logs", String(val));
-                      }}
-                      showJwtHud={showJwtHud}
-                      setShowJwtHud={(val) => {
-                        setShowJwtHud(val);
-                        localStorage.setItem("axis_show_jwt_hud", String(val));
-                      }}
-                      virtualFiles={virtualFiles}
-                      selectedFileId={selectedFileId}
-                      setSelectedFileId={setSelectedFileId}
-                    />
-                  )}
-                </motion.div>
+                currentUser?.role !== "admin" ? (
+                  <div className="flex flex-col justify-center items-center text-center p-12 min-h-[400px]">
+                    <Lock className="w-16 h-16 text-[#c59257] mb-4" />
+                    <h3 className="text-lg font-bold text-zinc-100">إعدادات النظام محمية</h3>
+                    <p className="text-sm text-zinc-500 mt-2 max-w-md leading-relaxed">لوحة التحكم وإعدادات النظام الحساسة متاحة فقط لمدير النظام (Admin).</p>
+                  </div>
+                ) : (
+                  <SettingsPage {...{ showTerminalLogs, setShowTerminalLogs, showJwtHud, setShowJwtHud, virtualFiles, selectedFileId, setSelectedFileId, pageVariants, pageTransition }} />
+                )
               )}
-
               {/* 🤖 AXIS LAB AI HUB - INTELLIGENT AI COMPANION & DEEPBRAIN WORKSPACE */}
               {activeView === "ai_hub" && (
                 <AIHubPage
                   {...{ activeAiTab, activeView, aiMemoryLayers, aiSearchQuery, aiSearchResults, calcAutoWaste, calcCutLengthCm, calcElectricityRate, calcEngraveAreaCm2, calcLaserPowerWatts, calcLengthCm, calcMachineId, calcMatId, calcOperatorRate, calcQuantity, calcResult, calcSetupFeeUSD, calcTargetProfitMargin, calcThicknessMm, calcTubeCostUSD, calcTubeLifespanHours, calcWasteOverridePercent, calcWidthCm, calcWorkType, chatInput, chatMessages, currentUser, machines, materials, fastResponseMode, fetchAiMemory, handleAiSearch, handleRunFastCalculator, handleRunFastParser, handleSelectCalcMachine, handleSelectCalcMaterial, handleSendChatMessage, isCalculatingFast, isLoadingAiMemory, isParsingFast, isSearchingAi, isSendingChatMessage, lastResponseLatencyMs, orders, pageTransition, pageVariants, parserInputText, parserResult, selectedMemoryLayer, setActiveAiTab, setAiSearchQuery, setCalcAutoWaste, setCalcCutLengthCm, setCalcElectricityRate, setCalcEngraveAreaCm2, setCalcLaserPowerWatts, setCalcLengthCm, setCalcOperatorRate, setCalcQuantity, setCalcSetupFeeUSD, setCalcTargetProfitMargin, setCalcThicknessMm, setCalcTubeCostUSD, setCalcTubeLifespanHours, setCalcWasteOverridePercent, setCalcWidthCm, setCalcWorkType, setChatInput, setFastResponseMode, setParserInputText, setSelectedMemoryLayer, setShowAddOrder, terminalLogs }}
                 />
               )}              {activeView === "reports" && (
-                <motion.div
-                  key="reports"
-                  variants={pageVariants}
-                  initial="initial"
-                  animate="animate"
-                  exit="exit"
-                  transition={pageTransition}
-                  className="flex-1 overflow-y-auto p-6 bg-zinc-950/20"
-                >
-                  {currentUser?.role === "employee" ? (
-                    <div className="flex flex-col justify-center items-center text-center p-12 min-h-[400px]">
-                      <Lock className="w-16 h-16 text-rose-500 mb-4" />
-                      <h3 className="text-lg font-bold text-zinc-100">قسم التقارير والتحليلات محمي</h3>
-                      <p className="text-sm text-zinc-500 mt-2 max-w-md leading-relaxed">
-                        غير مصرح لصلاحيات الموظف (Employee) بالاطلاع على التقارير أو كشوفات الأرباح والتحليلات التاريخية. يرجى مراجعة المسؤول.
-                      </p>
-                    </div>
-                  ) : (
-                    <ReportsView />
-                  )}
-                </motion.div>
+                <ReportsPage isEmployee={currentUser?.role === "employee"} pageVariants={pageVariants} pageTransition={pageTransition} />
               )}
-
-
-
-              {/* INTERACTIVE HELP SYSTEM & TRAINING PORTAL */}
               {activeView === "help" && (
-                <motion.div
-                  key="help"
-                  variants={pageVariants}
-                  initial="initial"
-                  animate="animate"
-                  exit="exit"
-                  transition={pageTransition}
-                  className="flex-1 overflow-y-auto p-6 bg-[#0c0c0e]"
-                >
-                  <HelpCenter />
-                </motion.div>
+                <HelpPage pageVariants={pageVariants} pageTransition={pageTransition} />
               )}
             </AnimatePresence>
           </div>
