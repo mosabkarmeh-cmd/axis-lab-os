@@ -157,9 +157,19 @@ function syncNormalizedLocalEntities(sqlite: any) {
   const now = new Date().toISOString();
   for (const collection of NORMALIZED_LOCAL_COLLECTIONS) {
     const values = LOCAL_PERSISTED_COLLECTIONS[collection] || [];
+    const usedEntityIds = new Set<string>();
     sqlite.run("DELETE FROM local_entities WHERE collection = ?", [collection]);
     for (const value of values) {
-      const entityId = String(value?.id || value?.key || `${collection.toLowerCase()}-${Math.random().toString(36).slice(2)}`);
+      const baseEntityId = String(value?.id || value?.key || `${collection.toLowerCase()}-${Math.random().toString(36).slice(2)}`);
+      let entityId = baseEntityId;
+      let duplicateIndex = 1;
+      while (usedEntityIds.has(entityId)) {
+        entityId = `${baseEntityId}~${duplicateIndex++}`;
+      }
+      if (entityId !== baseEntityId) {
+        console.warn(`[STATE] Duplicate ${collection} entity id ${baseEntityId}; persisted with storage key ${entityId}`);
+      }
+      usedEntityIds.add(entityId);
       sqlite.run("INSERT INTO local_entities (collection, entity_id, payload, updated_at) VALUES (?, ?, ?, ?)", [collection, entityId, JSON.stringify(value), now]);
     }
   }
@@ -192,18 +202,34 @@ function syncNormalizedFinancialEntities(sqlite: any) {
   sqlite.run("DELETE FROM local_payments");
   sqlite.run("DELETE FROM local_invoices");
   sqlite.run("DELETE FROM local_expenses");
+  const usedInvoiceIds = new Set<string>();
+  const usedInvoiceItemIds = new Set<string>();
+  const usedInvoiceHistoryIds = new Set<string>();
+  const usedExpenseIds = new Set<string>();
   for (const invoice of INVOICES) {
     const invoiceId = String(invoice.id);
+    if (usedInvoiceIds.has(invoiceId)) continue;
+    usedInvoiceIds.add(invoiceId);
     sqlite.run("INSERT INTO local_invoices (id, invoice_number, order_id, customer_id, issue_date, due_date, total_price, subtotal, tax_percent, discount, paid_amount, remaining, status, notes, payload, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
       invoiceId, String(invoice.invoiceNumber || invoiceId), invoice.orderId ? String(invoice.orderId) : null, String(invoice.customerId || ""), String(invoice.issueDate || now), String(invoice.dueDate || invoice.issueDate || now), Number(invoice.totalPrice) || 0, invoice.subtotal == null ? null : Number(invoice.subtotal), invoice.taxPercent == null ? null : Number(invoice.taxPercent), invoice.discount == null ? null : Number(invoice.discount), Number(invoice.paidAmount) || 0, Number(invoice.remaining) || 0, String(invoice.status || "unpaid"), invoice.notes || null, JSON.stringify(invoice), now,
     ]);
     for (const item of invoice.items || []) {
+      const baseItemId = String(item.id || `${invoiceId}-item-${Math.random().toString(36).slice(2)}`);
+      let itemId = baseItemId;
+      let itemSuffix = 1;
+      while (usedInvoiceItemIds.has(itemId)) itemId = `${baseItemId}~${itemSuffix++}`;
+      usedInvoiceItemIds.add(itemId);
       sqlite.run("INSERT INTO local_invoice_items (id, invoice_id, product_name, quantity, unit_price, discount, tax, total, created_at, payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
-        String(item.id || `${invoiceId}-item-${Math.random().toString(36).slice(2)}`), invoiceId, String(item.productName || ""), Number(item.quantity) || 0, Number(item.unitPrice) || 0, Number(item.discount) || 0, Number(item.tax) || 0, Number(item.total) || 0, String(item.createdAt || now), JSON.stringify(item),
+        itemId, invoiceId, String(item.productName || ""), Number(item.quantity) || 0, Number(item.unitPrice) || 0, Number(item.discount) || 0, Number(item.tax) || 0, Number(item.total) || 0, String(item.createdAt || now), JSON.stringify(item),
       ]);
     }
     for (const history of invoice.history || []) {
-      sqlite.run("INSERT INTO local_invoice_history (id, invoice_id, action, created_at, payload) VALUES (?, ?, ?, ?, ?)", [String(history.id || `${invoiceId}-history-${Math.random().toString(36).slice(2)}`), invoiceId, String(history.action || "updated"), String(history.createdAt || now), JSON.stringify(history)]);
+      const baseHistoryId = String(history.id || `${invoiceId}-history-${Math.random().toString(36).slice(2)}`);
+      let historyId = baseHistoryId;
+      let historySuffix = 1;
+      while (usedInvoiceHistoryIds.has(historyId)) historyId = `${baseHistoryId}~${historySuffix++}`;
+      usedInvoiceHistoryIds.add(historyId);
+      sqlite.run("INSERT INTO local_invoice_history (id, invoice_id, action, created_at, payload) VALUES (?, ?, ?, ?, ?)", [historyId, invoiceId, String(history.action || "updated"), String(history.createdAt || now), JSON.stringify(history)]);
     }
   }
   const paymentRows = new Map<string, any>();
@@ -225,7 +251,10 @@ function syncNormalizedFinancialEntities(sqlite: any) {
     ]);
   }
   for (const expense of EXPENSES) {
-    sqlite.run("INSERT INTO local_expenses (id, category, amount, date, status, payload, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)", [String(expense.id), String(expense.category || "عام"), Number(expense.amount) || 0, String(expense.date || now), String(expense.status || "paid"), JSON.stringify(expense), now]);
+    const expenseId = String(expense.id);
+    if (usedExpenseIds.has(expenseId)) continue;
+    usedExpenseIds.add(expenseId);
+    sqlite.run("INSERT INTO local_expenses (id, category, amount, date, status, payload, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)", [expenseId, String(expense.category || "عام"), Number(expense.amount) || 0, String(expense.date || now), String(expense.status || "paid"), JSON.stringify(expense), now]);
   }
 }
 function backupDirectory() {
