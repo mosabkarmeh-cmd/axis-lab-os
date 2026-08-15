@@ -488,12 +488,36 @@ const ACTIVITY_LOGS: Array<{ id: string; userId: string; action: string; entityT
 ];
 
 const MATERIALS = [
-  { id: "m-1", name: "لوح أكريليك شفاف 3 ملم", category: "الأكريليك", subCategory: "acrylic", thickness: 3, color: "transparent", width: 1220, height: 2440, unit: "sheet", pricePerUnit: 362500, minimumStock: 10, supplierId: "s-1", notes: "ألواح كورية ممتازة حماية ورقية", status: "active", qualityStatus: "inspected" },
-  { id: "m-2", name: "لوح أكريليك أسود 5 ملم", category: "الأكريليك", subCategory: "acrylic", thickness: 5, color: "black", width: 1220, height: 2440, unit: "sheet", pricePerUnit: 652500, minimumStock: 8, supplierId: "s-1", notes: "مقاوم للخدوش ومثالي للحروف البارزة", status: "active", qualityStatus: "inspected" },
-  { id: "m-3", name: "لوح خشب زان طبيعي 4 ملم", category: "الأخشاب", subCategory: "wood", thickness: 4, color: "natural", width: 600, height: 1200, unit: "sheet", pricePerUnit: 290000, minimumStock: 15, supplierId: "s-2", notes: "وجهين مصقولين بجودة عالية", status: "active", qualityStatus: "in_preparation" },
-  { id: "m-4", name: "لوح خشب مضغوط MDF 6 ملم", category: "الأخشاب", subCategory: "wood", thickness: 6, color: "brown", width: 1220, height: 2440, unit: "sheet", pricePerUnit: 174000, minimumStock: 20, supplierId: "s-2", notes: "صناعة رومانية ممتاز للحفر", status: "active", qualityStatus: "defective" },
-  { id: "m-5", name: "جلد طبيعي مرن 2 ملم", category: "الجلود", subCategory: "leather", thickness: 2, color: "tan", width: 1000, height: 1000, unit: "piece", pricePerUnit: 507500, minimumStock: 5, supplierId: "s-3", notes: "جلد بقر طبيعي مدبوغ نباتياً", status: "active", qualityStatus: "inspected" }
+  { id: "m-1", name: "لوح أكريليك شفاف 3 ملم", category: "الأكريليك", subCategory: "acrylic", thickness: 3, color: "transparent", width: 1220, height: 2440, unit: "sheet", pricePerUnit: 10, minimumStock: 10, supplierId: "s-1", notes: "ألواح كورية ممتازة حماية ورقية", status: "active", qualityStatus: "inspected" },
+  { id: "m-2", name: "لوح أكريليك أسود 5 ملم", category: "الأكريليك", subCategory: "acrylic", thickness: 5, color: "black", width: 1220, height: 2440, unit: "sheet", pricePerUnit: 45, minimumStock: 8, supplierId: "s-1", notes: "مقاوم للخدوش ومثالي للحروف البارزة", status: "active", qualityStatus: "inspected" },
+  { id: "m-3", name: "لوح خشب زان طبيعي 4 ملم", category: "الأخشاب", subCategory: "wood", thickness: 4, color: "natural", width: 600, height: 1200, unit: "sheet", pricePerUnit: 20, minimumStock: 15, supplierId: "s-2", notes: "وجهين مصقولين بجودة عالية", status: "active", qualityStatus: "in_preparation" },
+  { id: "m-4", name: "لوح خشب مضغوط MDF 6 ملم", category: "الأخشاب", subCategory: "wood", thickness: 6, color: "brown", width: 1220, height: 2440, unit: "sheet", pricePerUnit: 12, minimumStock: 20, supplierId: "s-2", notes: "صناعة رومانية ممتاز للحفر", status: "active", qualityStatus: "defective" },
+  { id: "m-5", name: "جلد طبيعي مرن 2 ملم", category: "الجلود", subCategory: "leather", thickness: 2, color: "tan", width: 1000, height: 1000, unit: "piece", pricePerUnit: 35, minimumStock: 5, supplierId: "s-3", notes: "جلد بقر طبيعي مدبوغ نباتياً", status: "active", qualityStatus: "inspected" }
 ];
+
+const LEGACY_MATERIAL_PRICES_USD: Record<string, number> = {
+  "m-1": 10,
+  "m-2": 45,
+  "m-3": 20,
+  "m-4": 12,
+  "m-5": 35,
+};
+const LEGACY_MATERIAL_PRICES_SYP: Record<string, number> = {
+  "m-1": 362500,
+  "m-2": 652500,
+  "m-3": 290000,
+  "m-4": 174000,
+  "m-5": 507500,
+};
+function normalizeLegacyMaterialPrices() {
+  for (const material of MATERIALS) {
+    const oldValue = LEGACY_MATERIAL_PRICES_SYP[material.id];
+    const targetUsd = LEGACY_MATERIAL_PRICES_USD[material.id];
+    if (oldValue !== undefined && targetUsd !== undefined && Number(material.pricePerUnit) === oldValue) {
+      material.pricePerUnit = targetUsd;
+    }
+  }
+}
 
 const INVENTORY = [
   { id: "inv-1", materialId: "m-1", quantity: 45, reservedQuantity: 12, availableQuantity: 33, location: "مستودع أ - رف 1" },
@@ -1544,6 +1568,7 @@ async function startServer() {
   // last snapshot saved in Postgres, if any. On a brand-new database this finds
   // nothing and the app just keeps the hardcoded seed data (also true on first boot).
   const restoredCount = await loadPersistedState();
+  normalizeLegacyMaterialPrices();
   console.log(`[STATE] Mode=${DB_MODE}; restored ${restoredCount} collections from ${USE_SQLITE ? LOCAL_DATA_FILE : "database"}.`);
   // Make sure a fresh local store/database immediately has a snapshot saved.
   if (USE_POSTGRES || USE_SQLITE) schedulePersist();

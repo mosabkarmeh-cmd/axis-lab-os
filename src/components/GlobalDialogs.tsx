@@ -3120,24 +3120,25 @@ export default function GlobalDialogs(props: Record<string, any>) {
                 {/* Price & Min Stock */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-zinc-400 block mb-1">سعر شراء اللوح/الوحدة (ل.س - الأساس)</label>
+                    <label className="text-zinc-400 block mb-1">سعر شراء اللوح/الوحدة بالدولار (USD)</label>
                     <input
                       type="number"
-                      step="1000"
-                      value={editingMaterial ? materialPriceSYP(editingMaterial.pricePerUnit, exchangeRate) : matPrice}
+                      step="0.01"
+                      min="0"
+                      value={editingMaterial ? materialPriceUSD(editingMaterial.pricePerUnit, exchangeRate) : matPrice}
                       onChange={(e) => {
-                        const valueSYP = e.target.value ? parseFloat(e.target.value) : 0;
+                        const valueUSD = e.target.value ? parseFloat(e.target.value) : 0;
                         if (editingMaterial) {
-                          setEditingMaterial({ ...editingMaterial, pricePerUnit: valueSYP > 0 ? valueSYP / exchangeRate : 0 });
+                          setEditingMaterial({ ...editingMaterial, pricePerUnit: valueUSD });
                         } else {
                           setMatPrice(e.target.value);
                         }
                       }}
-                      placeholder="مثال: 362500"
+                      placeholder="مثال: 10"
                       className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-zinc-200 text-right font-mono focus:outline-none focus:border-[#c59257]"
                     />
                     <div className="text-[10px] text-zinc-400 font-mono text-left">
-                      ≈ $ {(editingMaterial ? materialPriceUSD(editingMaterial.pricePerUnit, exchangeRate) : (Number(matPrice) || 0) / exchangeRate).toFixed(2)} USD
+                      ≈ {(editingMaterial ? materialPriceSYP(editingMaterial.pricePerUnit, exchangeRate) : (Number(matPrice) || 0) * exchangeRate).toLocaleString()} ل.س عند سعر صرف {exchangeRate}
                     </div>
                   </div>
                   <div className="space-y-1">
