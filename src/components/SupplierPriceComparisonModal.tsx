@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { DEFAULT_EXCHANGE_RATE } from "../lib/currency";
+import { materialPriceUSD } from "../lib/materials";
 import {
   GitCompare,
   DollarSign,
@@ -110,7 +111,7 @@ export default function SupplierPriceComparisonModal({
 
   const generateDefaultQuotes = () => {
     if (!material) return;
-    const basePrice = Number(material.pricePerUnit) || 25;
+    const basePrice = materialPriceUSD(material.pricePerUnit, exchangeRate) || 25;
     const primarySupName = material.supplier?.name || "الشركة الوطنية للاكريليك";
 
     const defaultList: SupplierQuote[] = [

@@ -2,6 +2,7 @@ import { motion } from "motion/react";
 import { AlertTriangle, ArrowLeft, Check, CheckCircle2, Copy, DollarSign, Download, FileCode, FolderOpen, GitCompare, GripVertical, History, Info, Layers, Play, Plus, RefreshCw, Scissors, Search, Sparkles, Truck, XCircle, Zap } from "lucide-react";
 import MaterialCostCharts from "./MaterialCostCharts";
 import VectorCompilerUploader from "./VectorCompilerUploader";
+import { materialPriceSYP, materialPriceUSD } from "../lib/materials";
 
 export default function InventoryPage(props: Record<string, any>) {
   const {
@@ -781,10 +782,8 @@ export default function InventoryPage(props: Record<string, any>) {
                                       {/* Unit Cost Column */}
                                       <td className="p-3 text-center font-mono">
                                         {(() => {
-                                          const priceVal = Number(m.pricePerUnit) || 0;
-                                          const isSYP = priceVal >= 10000 || priceVal === 0;
-                                          const sypPrice = isSYP ? Math.round(priceVal) : Math.round(priceVal * exchangeRate);
-                                          const usdPrice = isSYP ? (priceVal / exchangeRate) : priceVal;
+                                          const usdPrice = materialPriceUSD(m.pricePerUnit, exchangeRate);
+                                          const sypPrice = materialPriceSYP(m.pricePerUnit, exchangeRate);
 
                                           return (
                                             <div className="flex flex-col items-center justify-center gap-0.5">
@@ -805,10 +804,8 @@ export default function InventoryPage(props: Record<string, any>) {
                                       {/* Effective Cost per m2 Column */}
                                       <td className="p-3 text-center font-mono bg-amber-950/10 border-x border-amber-900/20">
                                         {(() => {
-                                          const priceVal = Number(m.pricePerUnit) || 0;
-                                          const isSYP = priceVal >= 10000 || priceVal === 0;
-                                          const sypPrice = isSYP ? Math.round(priceVal) : Math.round(priceVal * exchangeRate);
-                                          const usdPrice = isSYP ? (priceVal / exchangeRate) : priceVal;
+                                          const usdPrice = materialPriceUSD(m.pricePerUnit, exchangeRate);
+                                          const sypPrice = materialPriceSYP(m.pricePerUnit, exchangeRate);
 
                                           const widthM = m.width ? Number(m.width) / 1000 : 0;
                                           const heightM = m.height ? Number(m.height) / 1000 : 0;

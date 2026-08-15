@@ -6,7 +6,7 @@ import { useCurrencyCalculator } from "./hooks/useCurrencyCalculator";
 import { useProductionWorkspace } from "./hooks/useProductionWorkspace";
 import { useInventoryWorkspace } from "./hooks/useInventoryWorkspace";
 import { useAccountingActions } from "./hooks/useAccountingActions";
-import { extractMaterialName } from "./lib/materials";
+import { extractMaterialName, materialPriceUSD } from "./lib/materials";
 import { getOrderStatusBadge, getPaymentStatusBadge } from "./components/StatusBadges";
 import { DEFAULT_EXCHANGE_RATE, EXCHANGE_RATE_STORAGE_KEY, sanitizeExchangeRate, sypToUsd, usdToSyp } from "./lib/currency";
 import {
@@ -2681,7 +2681,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
           width: matWidth ? parseFloat(matWidth) : null,
           height: matHeight ? parseFloat(matHeight) : null,
           unit: matUnit,
-          pricePerUnit: matPrice ? parseFloat(matPrice) : 0,
+          pricePerUnit: matPrice ? materialPriceUSD(parseFloat(matPrice), exchangeRate) : 0,
           minimumStock: matMinStock ? parseFloat(matMinStock) : 0,
           supplierId: matSupplierId || null,
           notes: matNotes,
@@ -2757,7 +2757,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
           width: editingMaterial.width,
           height: editingMaterial.height,
           unit: editingMaterial.unit,
-          pricePerUnit: editingMaterial.pricePerUnit,
+          pricePerUnit: materialPriceUSD(editingMaterial.pricePerUnit, exchangeRate),
           minimumStock: editingMaterial.minimumStock,
           supplierId: editingMaterial.supplierId,
           notes: editingMaterial.notes,

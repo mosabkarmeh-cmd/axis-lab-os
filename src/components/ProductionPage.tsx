@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Activity, Cpu, LayoutGrid, List, Plus, Search, Wrench, X } from "lucide-react";
 import MachineCalibration from "./MachineCalibration";
 import ProductionJobView from "./ProductionJobView";
+import { materialPriceUSD } from "../lib/materials";
 
 export default function ProductionPage(props: Record<string, any>) {
   const {
@@ -169,7 +170,7 @@ export default function ProductionPage(props: Record<string, any>) {
                                     <option value="">-- اختر الخامة من المخزن --</option>
                                     {materials.map((m) => (
                                       <option key={m.id} value={m.id}>
-                                        {m.name} (${m.pricePerUnit || 15}/لوح)
+                                        {m.name} (${materialPriceUSD(m.pricePerUnit, exchangeRate).toFixed(2)}/لوح)
                                       </option>
                                     ))}
                                   </select>
@@ -239,14 +240,14 @@ export default function ProductionPage(props: Record<string, any>) {
                                     <div className="border-r border-zinc-850 pr-4">
                                       <span className="text-[10px] text-zinc-500 block">تكلفة الخامة المستهلكة:</span>
                                       <span className="font-bold text-amber-400 font-mono">
-                                        ${(((materials.find(m => m.id === newJobMaterialId)?.pricePerUnit || 15)) * 0.15).toFixed(2)} ({Math.round(((materials.find(m => m.id === newJobMaterialId)?.pricePerUnit || 15) * 0.15) * exchangeRate).toLocaleString()} ل.س)
+                                        ${(materialPriceUSD(materials.find(m => m.id === newJobMaterialId)?.pricePerUnit ?? 15, exchangeRate) * 0.15).toFixed(2)} ({Math.round(materialPriceUSD(materials.find(m => m.id === newJobMaterialId)?.pricePerUnit ?? 15, exchangeRate) * 0.15 * exchangeRate).toLocaleString()} ل.س)
                                       </span>
                                     </div>
                                   </div>
                                   <div>
                                     <span className="text-[10px] text-zinc-400 block font-bold">إجمالي التكلفة المباشرة المتوقعة:</span>
                                     <span className="font-extrabold text-[#c59257] text-sm font-mono">
-                                      ${(((newJobEstTime / 60) * 0.25) + ((materials.find(m => m.id === newJobMaterialId)?.pricePerUnit || 15) * 0.15)).toFixed(2)}
+                                      ${(((newJobEstTime / 60) * 0.25) + (materialPriceUSD(materials.find(m => m.id === newJobMaterialId)?.pricePerUnit ?? 15, exchangeRate) * 0.15)).toFixed(2)}
                                     </span>
                                   </div>
                                 </div>

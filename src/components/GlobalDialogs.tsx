@@ -7,6 +7,7 @@ import { FileUploader } from "./FileUploader";
 import HelpCenter from "./HelpCenter";
 import HelpModal from "./HelpModal";
 import SupplierPriceComparisonModal from "./SupplierPriceComparisonModal";
+import { materialPriceSYP, materialPriceUSD } from "../lib/materials";
 
 const { Activity, AlertTriangle, Calculator, Check, CheckCircle2, Clock, Coins, Command, Copy, DollarSign, Edit3, ExternalLink, FileDown, FileText, FolderOpen, HelpCircle, Info, Instagram, Layers, Mail, MessageCircle, Play, Plus, PlusCircle, Printer, QrCode, Receipt, RefreshCw, Scissors, Search, Share2, Shield, ShieldAlert, ShieldCheck, Sparkles, Trash2, Truck, Users, Wrench, X, Zap } = Lucide as any;
 
@@ -3123,10 +3124,11 @@ export default function GlobalDialogs(props: Record<string, any>) {
                     <input
                       type="number"
                       step="1000"
-                      value={editingMaterial ? (editingMaterial.pricePerUnit ?? "") : matPrice}
+                      value={editingMaterial ? materialPriceSYP(editingMaterial.pricePerUnit, exchangeRate) : matPrice}
                       onChange={(e) => {
+                        const valueSYP = e.target.value ? parseFloat(e.target.value) : 0;
                         if (editingMaterial) {
-                          setEditingMaterial({ ...editingMaterial, pricePerUnit: e.target.value ? parseFloat(e.target.value) : 0 });
+                          setEditingMaterial({ ...editingMaterial, pricePerUnit: valueSYP > 0 ? valueSYP / exchangeRate : 0 });
                         } else {
                           setMatPrice(e.target.value);
                         }
@@ -3135,7 +3137,7 @@ export default function GlobalDialogs(props: Record<string, any>) {
                       className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-zinc-200 text-right font-mono focus:outline-none focus:border-[#c59257]"
                     />
                     <div className="text-[10px] text-zinc-400 font-mono text-left">
-                      ≈ $ {((Number(editingMaterial ? editingMaterial.pricePerUnit : matPrice) || 0) / exchangeRate).toFixed(2)} USD
+                      ≈ $ {(editingMaterial ? materialPriceUSD(editingMaterial.pricePerUnit, exchangeRate) : (Number(matPrice) || 0) / exchangeRate).toFixed(2)} USD
                     </div>
                   </div>
                   <div className="space-y-1">
