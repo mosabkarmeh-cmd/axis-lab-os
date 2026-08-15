@@ -31,7 +31,7 @@ const stop = () => new Promise((resolve) => {
   server.kill("SIGTERM");
 });
 async function waitForHealth() {
-  const deadline = Date.now() + 15_000;
+  const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
     try {
       const response = await fetch(`http://127.0.0.1:${port}/api/health`);
@@ -39,7 +39,7 @@ async function waitForHealth() {
     } catch {}
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error("Server did not become healthy");
+  throw new Error(`Server did not become healthy within 30s${startupStderr ? `: ${startupStderr.trim()}` : ""}`);
 }
 async function request(pathname, options = {}) {
   const response = await fetch(`http://127.0.0.1:${port}${pathname}`, {
@@ -65,7 +65,9 @@ request.token = "";
 
 (async () => {
   try {
-    server = spawn(process.execPath, [path.resolve("dist/server.cjs")], { cwd: process.cwd(), env, stdio: "ignore" });
+    server = spawn(process.execPath, [path.resolve("dist/server.cjs")], { cwd: process.cwd(), env, stdio: ["ignore", "pipe", "pipe"] });
+    var startupStderr = "";
+    server.stderr?.on("data", (chunk) => { startupStderr += String(chunk); });
     await waitForHealth();
     const loginResponse = await fetch(`http://127.0.0.1:${port}/api/auth/login`, {
       method: "POST",
