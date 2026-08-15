@@ -26,6 +26,7 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import initSqlJs from "sql.js";
+import { materialPriceUSD } from "./src/lib/materials.ts";
 
 import customersRouter from "./src/server/routes/customers.ts";
 import productsRouter from "./src/server/routes/products.ts";
@@ -7586,7 +7587,7 @@ Role Guidelines:
         minimumStock: minStock,
         unit: m.unit,
         isLowStock,
-        stockValue: stockQty * (m.pricePerUnit || 0)
+        stockValue: stockQty * materialPriceUSD(m.pricePerUnit, SETTINGS.exchangeRate)
       };
     });
 
