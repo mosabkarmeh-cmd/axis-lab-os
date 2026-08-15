@@ -5,7 +5,7 @@ export const EXCHANGE_RATE_STORAGE_KEY = "axislab_exchange_rate";
 export function sanitizeExchangeRate(value: unknown, fallback = DEFAULT_EXCHANGE_RATE): number {
   const parsed = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
-  return parsed >= 1000 ? Number((parsed / 100).toFixed(2)) : parsed;
+  return parsed;
 }
 
 export function usdToSyp(usd: number, exchangeRate: number): number {

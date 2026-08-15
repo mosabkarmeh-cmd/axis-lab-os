@@ -44,29 +44,32 @@ export const CurrencyConverterModal: React.FC<CurrencyConverterModalProps> = ({
     return localStorage.getItem("axislab_exchange_rate_updated_at") || "اليوم، " + new Date().toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
   });
 
-  // Sync rateInput when exchangeRate prop changes
+  // Sync local fields only when the committed rate changes.
   useEffect(() => {
     setRateInput(exchangeRate.toString());
     const usd = parseFloat(usdVal);
-    if (!isNaN(usd)) {
-      setSypVal(Math.round(usd * exchangeRate).toString());
-    }
+    if (!isNaN(usd)) setSypVal(Math.round(usd * exchangeRate).toString());
   }, [exchangeRate]);
 
   if (!isOpen) return null;
 
+  const commitRate = (value: string) => {
+    const num = Number(value);
+    if (!Number.isFinite(num) || num <= 0) return;
+    const normalized = String(num);
+    setRateInput(normalized);
+    onUpdateRate(num);
+    saveUpdateTimestamp();
+    const usd = parseFloat(usdVal);
+    if (!isNaN(usd)) setSypVal(Math.round(usd * num).toString());
+  };
+
   const handleRateInputChange = (val: string) => {
     setRateInput(val);
-    const num = parseFloat(val);
-    if (!isNaN(num) && num > 0) {
-      onUpdateRate(num);
-      saveUpdateTimestamp();
-      
-      // update SYP based on USD
-      const usd = parseFloat(usdVal);
-      if (!isNaN(usd)) {
-        setSypVal(Math.round(usd * num).toString());
-      }
+    const num = Number(val);
+    const usd = parseFloat(usdVal);
+    if (Number.isFinite(num) && num > 0 && !isNaN(usd)) {
+      setSypVal(Math.round(usd * num).toString());
     }
   };
 
@@ -200,6 +203,13 @@ export const CurrencyConverterModal: React.FC<CurrencyConverterModalProps> = ({
                       type="number"
                       value={rateInput}
                       onChange={(e) => handleRateInputChange(e.target.value)}
+                      onBlur={() => commitRate(rateInput)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          commitRate(rateInput);
+                        }
+                      }}
                       placeholder="أدخل سعر الصرف..."
                       className="w-full bg-zinc-950 border border-[#c59257]/50 rounded-xl py-2.5 px-3 pl-28 text-base font-mono font-bold text-[#c59257] text-left focus:border-[#c59257] focus:ring-1 focus:ring-[#c59257] focus:outline-none shadow-inner"
                     />

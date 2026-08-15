@@ -8,7 +8,7 @@ import { useInventoryWorkspace } from "./hooks/useInventoryWorkspace";
 import { useAccountingActions } from "./hooks/useAccountingActions";
 import { extractMaterialName } from "./lib/materials";
 import { getOrderStatusBadge, getPaymentStatusBadge } from "./components/StatusBadges";
-import { EXCHANGE_RATE_STORAGE_KEY, sanitizeExchangeRate, sypToUsd, usdToSyp } from "./lib/currency";
+import { DEFAULT_EXCHANGE_RATE, EXCHANGE_RATE_STORAGE_KEY, sanitizeExchangeRate, sypToUsd, usdToSyp } from "./lib/currency";
 import {
   Shield,
   UserCheck,
@@ -297,7 +297,7 @@ export default function App() {
 
   const [exchangeRate, setExchangeRate] = useState<number>(() => {
     const saved = localStorage.getItem(EXCHANGE_RATE_STORAGE_KEY);
-    return sanitizeExchangeRate(saved, 145);
+    return sanitizeExchangeRate(saved, DEFAULT_EXCHANGE_RATE);
   });
 
   const { calcUsd, calcSyp, handleUsdChange, handleSypChange, refreshFromUsd } = useCurrencyCalculator(exchangeRate);
@@ -321,8 +321,9 @@ export default function App() {
   }, []);
 
   const updateRate = (newRate: number) => {
-    setExchangeRate(newRate);
-    localStorage.setItem(EXCHANGE_RATE_STORAGE_KEY, sanitizeExchangeRate(newRate, exchangeRate).toString());
+    const normalizedRate = sanitizeExchangeRate(newRate, exchangeRate);
+    setExchangeRate(normalizedRate);
+    localStorage.setItem(EXCHANGE_RATE_STORAGE_KEY, normalizedRate.toString());
     window.dispatchEvent(new Event("storage"));
 
     // Push to the backend so PDFs, payment records, and pricing suggestions all
@@ -330,13 +331,13 @@ export default function App() {
     fetch("/api/exchange-rate", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ exchangeRate: newRate })
+      body: JSON.stringify({ exchangeRate: normalizedRate })
     }).catch(() => {});
 
     // Refresh calculator values
     const numUsd = parseFloat(calcUsd);
     if (!isNaN(numUsd)) {
-      refreshFromUsd(calcUsd, newRate);
+      refreshFromUsd(calcUsd, normalizedRate);
     }
   };
 
