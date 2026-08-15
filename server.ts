@@ -2273,6 +2273,8 @@ async function startServer() {
       status: "new",
       priority: priority || "normal",
       totalPrice: finalTotal,
+      currency: "SYP",
+      exchangeRateAtCreation: SETTINGS.exchangeRate,
       taxPercent: taxRate,
       discount: discountAmt,
       paidAmount: Number(paidAmount) || 0,
@@ -2640,7 +2642,8 @@ async function startServer() {
     }
 
     const payAmtUSD = Number(amount) || 0;
-    const payAmtSYP = Math.round(payAmtUSD * SETTINGS.exchangeRate);
+    const orderExchangeRate = Number(order.exchangeRateAtCreation) > 0 ? Number(order.exchangeRateAtCreation) : 135;
+    const payAmtSYP = Math.round(payAmtUSD * orderExchangeRate);
     if (payAmtUSD <= 0) {
       res.status(400).json({ error: "مبلغ الدفعة يجب أن يكون أكبر من الصفر" });
       return;
@@ -2667,6 +2670,7 @@ async function startServer() {
       orderId: order.id,
       amountUSD: payAmtUSD,
       amountSYP: payAmtSYP,
+      exchangeRate: orderExchangeRate,
       paymentMethod: paymentMethod || "cash",
       notes: notes || "دفعة مقبوضة للطلب",
       recordedBy: changedById || "u-1",
@@ -7541,7 +7545,10 @@ Role Guidelines:
   app.get("/api/reports/analytics", (req, res) => {
     // 1. Sales & Orders
     const totalOrdersCount = ORDERS.length;
-    const orderValueUSD = (order: any) => sypToUsd(order.totalPrice, SETTINGS.exchangeRate);
+    const orderValueUSD = (order: any) => {
+      const historicalRate = Number(order.exchangeRateAtCreation) > 0 ? Number(order.exchangeRateAtCreation) : 135;
+      return sypToUsd(order.totalPrice, historicalRate);
+    };
     const totalOrdersValue = ORDERS.reduce((sum, ord) => sum + orderValueUSD(ord), 0);
     const avgOrderValue = totalOrdersCount > 0 ? (totalOrdersValue / totalOrdersCount) : 0;
     
