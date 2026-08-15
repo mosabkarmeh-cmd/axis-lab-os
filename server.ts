@@ -138,6 +138,22 @@ async function initLocalSqlite() {
   return localSqlite;
 }
 
+const SQLITE_BUSY_RETRY_DELAYS_MS = [25, 50, 100, 200, 400];
+async function withSqliteBusyRetry<T>(operation: () => Promise<T>): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= SQLITE_BUSY_RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      const message = String((error as Error)?.message || error).toLowerCase();
+      const isBusy = message.includes("busy") || message.includes("locked");
+      if (!isBusy || attempt === SQLITE_BUSY_RETRY_DELAYS_MS.length) throw error;
+      await new Promise((resolve) => setTimeout(resolve, SQLITE_BUSY_RETRY_DELAYS_MS[attempt]));
+    }
+  }
+  throw lastError;
+}
 async function flushLocalSqlite() {
   if (!localSqlite) return;
   await fs.promises.mkdir(path.dirname(LOCAL_DATA_FILE), { recursive: true });
@@ -1432,24 +1448,26 @@ async function persistStateNow() {
   persistInFlight = true;
   try {
     if (USE_SQLITE) {
-      const sqlite = await initLocalSqlite();
-      const now = new Date().toISOString();
-      sqlite.run("BEGIN TRANSACTION");
-      try {
-        for (const [key, value] of Object.entries(LOCAL_PERSISTED_COLLECTIONS)) {
-          if (NORMALIZED_LOCAL_COLLECTIONS.includes(key as typeof NORMALIZED_LOCAL_COLLECTIONS[number]) || NORMALIZED_FINANCIAL_COLLECTIONS.includes(key as typeof NORMALIZED_FINANCIAL_COLLECTIONS[number])) continue;
-          sqlite.run("INSERT INTO app_state (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at", [key, JSON.stringify(value), now]);
+      await withSqliteBusyRetry(async () => {
+        const sqlite = await initLocalSqlite();
+        const now = new Date().toISOString();
+        sqlite.run("BEGIN TRANSACTION");
+        try {
+          for (const [key, value] of Object.entries(LOCAL_PERSISTED_COLLECTIONS)) {
+            if (NORMALIZED_LOCAL_COLLECTIONS.includes(key as typeof NORMALIZED_LOCAL_COLLECTIONS[number]) || NORMALIZED_FINANCIAL_COLLECTIONS.includes(key as typeof NORMALIZED_FINANCIAL_COLLECTIONS[number])) continue;
+            sqlite.run("INSERT INTO app_state (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at", [key, JSON.stringify(value), now]);
+          }
+          syncNormalizedLocalEntities(sqlite);
+          assertFinancialStateInvariants();
+          syncNormalizedFinancialEntities(sqlite);
+          sqlite.run("UPDATE local_metadata SET value = ?, updated_at = ? WHERE key = 'schema_version'", [String(LOCAL_SCHEMA_VERSION), now]);
+          sqlite.run("COMMIT");
+        } catch (error) {
+          try { sqlite.run("ROLLBACK"); } catch {}
+          throw error;
         }
-        syncNormalizedLocalEntities(sqlite);
-        assertFinancialStateInvariants();
-        syncNormalizedFinancialEntities(sqlite);
-        sqlite.run("UPDATE local_metadata SET value = ?, updated_at = ? WHERE key = 'schema_version'", [String(LOCAL_SCHEMA_VERSION), now]);
-        sqlite.run("COMMIT");
-      } catch (error) {
-        sqlite.run("ROLLBACK");
-        throw error;
-      }
-      await flushLocalSqlite();
+        await flushLocalSqlite();
+      });
     } else {
       for (const [key, value] of Object.entries(PERSISTED_COLLECTIONS)) {
         await db
@@ -1474,7 +1492,10 @@ async function persistStateNow() {
 }
 function schedulePersist() {
   if (persistTimer) clearTimeout(persistTimer);
-  persistTimer = setTimeout(persistStateNow, 400);
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    void persistStateNow();
+  }, 400);
 }
 
 async function startServer() {
