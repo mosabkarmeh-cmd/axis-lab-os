@@ -144,6 +144,8 @@ const assert = (condition, message) => {
     assert(restoredRate.body.exchangeRate === 135, "Exchange rate was not restored after restart");
 
     // Final currency freeze: a fully paid and delivered order must never change when the rate changes later.
+    const statsBeforeFinalization = await request("/api/accounting/stats");
+    const analyticsBeforeFinalization = await request("/api/reports/analytics");
     const finalizedOrderResponse = await request("/api/orders", {
       method: "POST",
       body: JSON.stringify({
@@ -174,6 +176,10 @@ const assert = (condition, message) => {
     const finalizedInvoicesAfterRateChange = await request("/api/accounting/invoices");
     const finalizedInvoice = finalizedInvoicesAfterRateChange.body.invoices.find((item) => item.orderId === finalizedOrderId);
     assert(finalizedInvoice && finalizedInvoice.totalPrice === 45 && finalizedInvoice.totalPriceSYP === 6075 && finalizedInvoice.totalPriceUSD === 45 && finalizedInvoice.exchangeRateAtFinalization === 135, `Finalized invoice changed after exchange-rate update: ${JSON.stringify(finalizedInvoice)}`);
+    const statsAfterRateChange = await request("/api/accounting/stats");
+    assert(statsAfterRateChange.body.stats.totalRevenueSYP === statsBeforeFinalization.body.stats.totalRevenueSYP + 6075, `Accounting stats did not use the finalized invoice SYP value: before=${statsBeforeFinalization.body.stats.totalRevenueSYP}, after=${statsAfterRateChange.body.stats.totalRevenueSYP}, finalized=${JSON.stringify(finalizedInvoice)}, invoices=${JSON.stringify(finalizedInvoicesAfterRateChange.body.invoices.map((item) => ({ id: item.id, orderId: item.orderId, paidAmount: item.paidAmount, paidAmountSYP: item.paidAmountSYP, exchangeRateAtIssue: item.exchangeRateAtIssue, exchangeRateAtFinalization: item.exchangeRateAtFinalization })))}`);
+    const analyticsAfterRateChange = await request("/api/reports/analytics");
+    assert(analyticsAfterRateChange.body.analytics.financial.totalRevenueSYP === analyticsBeforeFinalization.body.analytics.financial.totalRevenueSYP + 6075, "Profit analytics did not use the finalized invoice SYP value");
     const finalInvoicePdf = await fetch(`http://127.0.0.1:${port}/api/accounting/invoices/${finalizedInvoice.id}/pdf`, { headers });
     assert(finalInvoicePdf.ok && (finalInvoicePdf.headers.get("content-type") || "").includes("application/pdf"), `Final invoice PDF was not generated: ${finalInvoicePdf.status}`);
     const lockedOrderUpdate = await request(`/api/orders/${finalizedOrderId}`, { method: "PUT", body: JSON.stringify({ items: [{ productName: "Blocked edit", quantity: 1, unitPrice: 9999 }] }) });

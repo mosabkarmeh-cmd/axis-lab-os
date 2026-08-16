@@ -7596,10 +7596,23 @@ Role Guidelines:
 
   // Get Finance Stats
   app.get("/api/accounting/stats", (req, res) => {
+    const reportRate = Number(SETTINGS.exchangeRate) > 0 ? Number(SETTINGS.exchangeRate) : 135;
+    const invoiceSYP = (inv: any, usdField: string, sypField: string) => {
+      const fixedSYP = Number(inv[sypField]);
+      if (Number.isFinite(fixedSYP)) return Math.round(fixedSYP);
+      const linkedOrder = ORDERS.find((order: any) => order.id === inv.orderId);
+      const historicalRate = Number(inv.exchangeRateAtFinalization || inv.exchangeRateAtIssue || linkedOrder?.exchangeRateAtCreation);
+      const rate = historicalRate > 0 ? historicalRate : 135;
+      return Math.round((Number(inv[usdField]) || 0) * rate);
+    };
     const totalRevenue = INVOICES.reduce((sum, inv) => sum + (inv.paidAmount || 0), 0);
     const totalReceivables = INVOICES.reduce((sum, inv) => sum + (inv.remaining || 0), 0);
+    const totalRevenueSYP = INVOICES.reduce((sum, inv) => sum + invoiceSYP(inv, "paidAmount", "paidAmountSYP"), 0);
+    const totalReceivablesSYP = INVOICES.reduce((sum, inv) => sum + invoiceSYP(inv, "remaining", "remainingSYP"), 0);
     const totalExpenses = EXPENSES.reduce((sum, exp) => sum + (exp.amount || 0), 0);
+    const totalExpensesSYP = Math.round(totalExpenses * reportRate);
     const netProfit = totalRevenue - totalExpenses;
+    const netProfitSYP = totalRevenueSYP - totalExpensesSYP;
 
     // Group expenses by category
     const expenseCategories: Record<string, number> = {};
@@ -7613,27 +7626,32 @@ Role Guidelines:
     }));
 
     // Group revenue and expenses by month
-    const monthlyData: Record<string, { revenue: number; expenses: number }> = {};
+    const monthlyData: Record<string, { revenue: number; revenueSYP: number; expenses: number; expensesSYP: number }> = {};
     
     INVOICES.forEach(inv => {
       const date = new Date(inv.issueDate);
       const monthStr = date.toLocaleString('ar-EG', { month: 'short' });
-      if (!monthlyData[monthStr]) monthlyData[monthStr] = { revenue: 0, expenses: 0 };
+      if (!monthlyData[monthStr]) monthlyData[monthStr] = { revenue: 0, revenueSYP: 0, expenses: 0, expensesSYP: 0 };
       monthlyData[monthStr].revenue += (inv.paidAmount || 0);
+      monthlyData[monthStr].revenueSYP += invoiceSYP(inv, "paidAmount", "paidAmountSYP");
     });
 
     EXPENSES.forEach(exp => {
       const date = new Date(exp.date);
       const monthStr = date.toLocaleString('ar-EG', { month: 'short' });
-      if (!monthlyData[monthStr]) monthlyData[monthStr] = { revenue: 0, expenses: 0 };
+      if (!monthlyData[monthStr]) monthlyData[monthStr] = { revenue: 0, revenueSYP: 0, expenses: 0, expensesSYP: 0 };
       monthlyData[monthStr].expenses += exp.amount;
+      monthlyData[monthStr].expensesSYP += Math.round((Number(exp.amount) || 0) * reportRate);
     });
 
     const monthlyTrends = Object.entries(monthlyData).map(([month, data]) => ({
       month,
       revenue: data.revenue,
+      revenueSYP: data.revenueSYP,
       expenses: data.expenses,
-      profit: data.revenue - data.expenses
+      expensesSYP: data.expensesSYP,
+      profit: data.revenue - data.expenses,
+      profitSYP: data.revenueSYP - data.expensesSYP
     })).slice(-6); // Last 6 months
 
     res.json({
@@ -7641,8 +7659,12 @@ Role Guidelines:
       stats: {
         totalRevenue,
         totalReceivables,
+        totalRevenueSYP,
+        totalReceivablesSYP,
         totalExpenses,
+        totalExpensesSYP,
         netProfit,
+        netProfitSYP,
         categoryBreakdown,
         monthlyTrends
       }
@@ -7683,11 +7705,24 @@ Role Guidelines:
     }).sort((a, b) => b.totalSpent - a.totalSpent).slice(0, 5);
 
     // 2. Financial Metrics
+    const invoiceReportRate = currentRate;
+    const invoiceSYP = (inv: any, usdField: string, sypField: string) => {
+      const fixedSYP = Number(inv[sypField]);
+      if (Number.isFinite(fixedSYP)) return Math.round(fixedSYP);
+      const linkedOrder = ORDERS.find((order: any) => order.id === inv.orderId);
+      const historicalRate = Number(inv.exchangeRateAtFinalization || inv.exchangeRateAtIssue || linkedOrder?.exchangeRateAtCreation);
+      const rate = historicalRate > 0 ? historicalRate : 135;
+      return Math.round((Number(inv[usdField]) || 0) * rate);
+    };
     const totalRevenue = INVOICES.reduce((sum, inv) => sum + (inv.paidAmount || 0), 0);
     const totalReceivables = INVOICES.reduce((sum, inv) => sum + (inv.remaining || 0), 0);
+    const totalRevenueSYP = INVOICES.reduce((sum, inv) => sum + invoiceSYP(inv, "paidAmount", "paidAmountSYP"), 0);
+    const totalReceivablesSYP = INVOICES.reduce((sum, inv) => sum + invoiceSYP(inv, "remaining", "remainingSYP"), 0);
     const totalExpenses = EXPENSES.reduce((sum, exp) => sum + (exp.amount || 0), 0);
+    const totalExpensesSYP = Math.round(totalExpenses * invoiceReportRate);
     const netProfit = totalRevenue - totalExpenses;
-    const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+    const netProfitSYP = totalRevenueSYP - totalExpensesSYP;
+    const profitMargin = totalRevenueSYP > 0 ? (netProfitSYP / totalRevenueSYP) * 100 : 0;
 
     const expenseCategories: Record<string, number> = {};
     EXPENSES.forEach(e => {
@@ -7747,6 +7782,8 @@ Role Guidelines:
       type: "invoice",
       reference: inv.invoiceNumber,
       amount: inv.totalPrice,
+      amountUSD: Number(inv.totalPriceUSD ?? inv.totalPrice ?? 0),
+      amountSYP: Math.round(Number(inv.totalPriceSYP ?? ((Number(inv.totalPriceUSD ?? inv.totalPrice) || 0) * (Number(inv.exchangeRateAtFinalization || inv.exchangeRateAtIssue || ORDERS.find((order: any) => order.id === inv.orderId)?.exchangeRateAtCreation) || 135)))),
       date: inv.issueDate,
       description: `فاتورة مبيعات للعميل: ${CUSTOMERS.find(c => c.id === inv.customerId)?.name || "عميل غير معروف"}`,
       status: inv.status === "paid" ? "تم التحصيل" : (inv.status === "partially_paid" ? "محصل جزئياً" : "غير محصل")
@@ -7784,8 +7821,12 @@ Role Guidelines:
         financial: {
           totalRevenue,
           totalReceivables,
+          totalRevenueSYP,
+          totalReceivablesSYP,
           totalExpenses,
+          totalExpensesSYP,
           netProfit,
+          netProfitSYP,
           profitMargin,
           expenseBreakdown,
           recentTransactions

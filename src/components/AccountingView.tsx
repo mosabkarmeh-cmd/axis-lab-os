@@ -830,11 +830,11 @@ export default function AccountingView({ customers, onRefreshOrders, currentUser
                   <span className="text-[11px] text-zinc-500 font-bold block mb-1">إجمالي الإيرادات المحصلة</span>
                   {selectedCurrency === "BOTH" ? (
                     <>
-                      <div className="text-lg font-mono text-emerald-400 font-bold">{(stats.totalRevenue * exchangeRate).toLocaleString()} ل.س</div>
+                      <div className="text-lg font-mono text-emerald-400 font-bold">{(stats.totalRevenueSYP ?? stats.totalRevenue * exchangeRate).toLocaleString()} ل.س</div>
                       <span className="text-[11px] text-zinc-400 block font-sans font-medium mt-1">${stats.totalRevenue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </>
                   ) : selectedCurrency === "SYP" ? (
-                    <div className="text-lg font-mono text-emerald-400 font-bold">{(stats.totalRevenue * exchangeRate).toLocaleString()} ل.س</div>
+                    <div className="text-lg font-mono text-emerald-400 font-bold">{(stats.totalRevenueSYP ?? stats.totalRevenue * exchangeRate).toLocaleString()} ل.س</div>
                   ) : (
                     <div className="text-lg font-mono text-zinc-100 font-bold">${stats.totalRevenue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                   )}
@@ -854,11 +854,11 @@ export default function AccountingView({ customers, onRefreshOrders, currentUser
                   <span className="text-[11px] text-zinc-500 font-bold block mb-1">إجمالي المصروفات والنفقات</span>
                   {selectedCurrency === "BOTH" ? (
                     <>
-                      <div className="text-lg font-mono text-rose-400 font-bold">{(stats.totalExpenses * exchangeRate).toLocaleString()} ل.س</div>
+                      <div className="text-lg font-mono text-rose-400 font-bold">{(stats.totalExpensesSYP ?? stats.totalExpenses * exchangeRate).toLocaleString()} ل.س</div>
                       <span className="text-[11px] text-zinc-400 block font-sans font-medium mt-1">${stats.totalExpenses.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </>
                   ) : selectedCurrency === "SYP" ? (
-                    <div className="text-lg font-mono text-rose-400 font-bold">{(stats.totalExpenses * exchangeRate).toLocaleString()} ل.س</div>
+                    <div className="text-lg font-mono text-rose-400 font-bold">{(stats.totalExpensesSYP ?? stats.totalExpenses * exchangeRate).toLocaleString()} ل.س</div>
                   ) : (
                     <div className="text-lg font-mono text-zinc-100 font-bold">${stats.totalExpenses.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                   )}
@@ -879,7 +879,7 @@ export default function AccountingView({ customers, onRefreshOrders, currentUser
                   {selectedCurrency === "BOTH" ? (
                     <>
                       <div className={`text-lg font-mono font-bold ${stats.netProfit >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                        {(stats.netProfit * exchangeRate).toLocaleString()} ل.س
+                        {(stats.netProfitSYP ?? stats.netProfit * exchangeRate).toLocaleString()} ل.س
                       </div>
                       <span className={`text-[11px] block font-sans font-medium mt-1 ${stats.netProfit >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
                         ${stats.netProfit.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -887,7 +887,7 @@ export default function AccountingView({ customers, onRefreshOrders, currentUser
                     </>
                   ) : selectedCurrency === "SYP" ? (
                     <div className={`text-lg font-mono font-bold ${stats.netProfit >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                      {(stats.netProfit * exchangeRate).toLocaleString()} ل.س
+                      {(stats.netProfitSYP ?? stats.netProfit * exchangeRate).toLocaleString()} ل.س
                     </div>
                   ) : (
                     <div className={`text-lg font-mono font-bold ${stats.netProfit >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
@@ -910,11 +910,11 @@ export default function AccountingView({ customers, onRefreshOrders, currentUser
                   <span className="text-[11px] text-zinc-500 font-bold block mb-1">الذمم والديون المستحقة</span>
                   {selectedCurrency === "BOTH" ? (
                     <>
-                      <div className="text-lg font-mono text-amber-400 font-bold">{(stats.totalReceivables * exchangeRate).toLocaleString()} ل.س</div>
+                      <div className="text-lg font-mono text-amber-400 font-bold">{(stats.totalReceivablesSYP ?? stats.totalReceivables * exchangeRate).toLocaleString()} ل.س</div>
                       <span className="text-[11px] text-zinc-400 block font-sans font-medium mt-1">${stats.totalReceivables.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </>
                   ) : selectedCurrency === "SYP" ? (
-                    <div className="text-lg font-mono text-amber-400 font-bold">{(stats.totalReceivables * exchangeRate).toLocaleString()} ل.س</div>
+                    <div className="text-lg font-mono text-amber-400 font-bold">{(stats.totalReceivablesSYP ?? stats.totalReceivables * exchangeRate).toLocaleString()} ل.س</div>
                   ) : (
                     <div className="text-lg font-mono text-zinc-100 font-bold">${stats.totalReceivables.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                   )}

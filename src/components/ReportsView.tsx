@@ -83,6 +83,7 @@ export default function ReportsView() {
   };
 
   const formatSypMoney = (value: number) => `${Math.round(Number(value) || 0).toLocaleString("en-US")} ل.س`;
+  const formatFixedFinancialMoney = (sypValue: number, usdValue: number) => `${formatSypMoney(sypValue)} ($${Number(usdValue || 0).toFixed(2)})`;
 
   // CSV Exporter helper
   const exportToCSV = (data: any[], fileName: string) => {
@@ -202,7 +203,7 @@ export default function ReportsView() {
             <div className="text-right">
               <span className="text-[10px] text-zinc-500 font-bold block mb-1">صافي التدفق المالي</span>
               <strong className={`text-xl font-mono ${analytics.financial.netProfit >= 0 ? "text-emerald-400" : "text-rose-400"} print:text-black`}>
-                {formatMoney(analytics.financial.netProfit)}
+                {formatFixedFinancialMoney(analytics.financial.netProfitSYP ?? Math.round(analytics.financial.netProfit * exchangeRate), analytics.financial.netProfit)}
               </strong>
             </div>
           </div>
@@ -358,7 +359,7 @@ export default function ReportsView() {
                                 </span>
                               </td>
                               <td className={`p-3 font-mono font-bold ${isInvoice ? "text-emerald-400" : "text-rose-400"} print:text-black`}>
-                                {isInvoice ? "+" : "-"}{formatMoney(tx.amount)}
+                                {isInvoice ? "+" : "-"}{isInvoice && tx.amountSYP != null ? formatFixedFinancialMoney(tx.amountSYP, tx.amountUSD ?? tx.amount) : formatMoney(tx.amount)}
                               </td>
                               <td className="p-3 text-zinc-400 font-mono print:text-black">
                                 {new Date(tx.date).toLocaleDateString("ar-EG")}
