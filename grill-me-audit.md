@@ -89,3 +89,11 @@ Post-fix validation: `npm run lint` passed and the complete `npm run test:smoke`
 GitHub Actions run [31940885983](https://github.com/mosabkarmeh-cmd/axis-lab-os/actions/runs/31940885983) completed successfully on commit `89c507e5747926b4cd34d89b3db0221e29fd7ece`. Backend validation, Current User installer build/preservation, All Users installer build, and installation/launch checks for both scopes all passed.
 
 At this point, the previously open P0/P1 audit findings addressed in this cycle have passing local and CI evidence. The browser-only login and currency UI checks also passed after the rate-input remediation.
+
+## Stress Test results
+
+A dedicated isolated stress test was added at `tests/stress-test.cjs`. The first run exposed a real concurrency defect: activity log IDs based only on `Date.now()` collided under parallel order writes, producing duplicate `ACTIVITY_LOGS` IDs and fallback storage keys. The implementation was corrected with a unique activity-log ID generator using timestamp, process ID, sequence, and UUID entropy.
+
+The corrected run passed with **712 requests**: 500 concurrent reads across orders/materials/inventory/production/analytics, 200 parallel order writes, and 10 concurrent exchange-rate updates. SQLite integrity was `ok`; schema version remained `5`; 204 orders persisted before and after restart; final exchange rate persisted as `200`; and all 203 activity-log IDs were unique.
+
+Measured timings were: reads p50 `82.89 ms`, p95 `159.26 ms`; order writes p50 `160.51 ms`, p95 `275.64 ms`; exchange-rate writes p50 `9.53 ms`, p95 `13.76 ms`. These are isolated sandbox measurements, not a formal production capacity limit, but they confirm correctness and stability under the tested load.

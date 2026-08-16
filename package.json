@@ -24,7 +24,8 @@
     "test:coverage": "npm run build && node tests/api-coverage-smoke.cjs",
     "test:sqlite-migration": "npm run build && node tests/sqlite-migration-smoke.cjs",
     "test:sqlite-crash": "npm run build && node tests/sqlite-crash-recovery-smoke.cjs",
-    "test:sqlite-concurrency": "npm run build && node tests/sqlite-concurrency-stability-smoke.cjs"
+    "test:sqlite-concurrency": "npm run build && node tests/sqlite-concurrency-stability-smoke.cjs",
+    "test:stress": "npm run build && node tests/stress-test.cjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

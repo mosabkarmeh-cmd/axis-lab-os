@@ -54,6 +54,11 @@ const USE_SQLITE = DB_MODE === "sqlite";
 const LOCAL_DATA_FILE = process.env.AXIS_DATA_FILE || path.join(os.homedir(), "AppData", "Roaming", "AXIS LAB OS", "axis-data.sqlite");
 const LOCAL_LEGACY_DATA_FILE = process.env.AXIS_LEGACY_DATA_FILE || path.join(os.homedir(), "AppData", "Roaming", "Electron", "axis-data.json");
 const LOCAL_SCHEMA_VERSION = 5;
+let activityLogSequence = 0;
+function nextActivityLogId(prefix = "log") {
+  activityLogSequence = (activityLogSequence + 1) % 1000000;
+  return `${prefix}_${Date.now()}_${process.pid}_${activityLogSequence}_${crypto.randomUUID().slice(0, 8)}`;
+}
 const NORMALIZED_LOCAL_COLLECTIONS = ["CUSTOMERS", "PRODUCTS", "MATERIALS", "INVENTORY", "SUPPLIERS", "MACHINES", "ACTIVITY_LOGS", "NOTIFICATIONS", "PRODUCTION_JOBS"] as const;
 const NORMALIZED_FINANCIAL_COLLECTIONS = ["INVOICES", "EXPENSES"] as const;
 let localSqlite: any = null;
@@ -1184,7 +1189,7 @@ async function sendProductionJobEmailNotification(
       console.log(`[SMTP SUCCESS] Sent job email to ${recipients.join(", ")}. MessageId: ${info.messageId}`);
       
       ACTIVITY_LOGS.unshift({
-        id: "log_smtp_" + Date.now(),
+        id: nextActivityLogId("log_smtp"),
         userId: job.operatorId || "u-1",
         action: "SEND_SMTP_NOTIFICATION",
         entityType: "ProductionJob",
@@ -1197,7 +1202,7 @@ async function sendProductionJobEmailNotification(
     } catch (smtpErr: any) {
       console.warn(`[SMTP WARN] Transport response for job ${job.jobNo}: ${smtpErr.message}`);
       ACTIVITY_LOGS.unshift({
-        id: "log_smtp_" + Date.now(),
+        id: nextActivityLogId("log_smtp"),
         userId: job.operatorId || "u-1",
         action: "ATTEMPT_SMTP_NOTIFICATION",
         entityType: "ProductionJob",
@@ -1797,7 +1802,7 @@ async function startServer() {
 
     // Append log
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: user.id,
       action: "LOGIN",
       entityType: "User",
@@ -1885,7 +1890,7 @@ async function startServer() {
 
     // Append log
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: newUser.id,
       action: "REGISTER",
       entityType: "User",
@@ -1961,7 +1966,7 @@ async function startServer() {
 
     // Append log
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: user.id,
       action: "CREATE_USER",
       entityType: "User",
@@ -2009,7 +2014,7 @@ async function startServer() {
 
     // Append log
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: adminUser.id,
       action: "UPDATE_USER",
       entityType: "User",
@@ -2040,7 +2045,7 @@ async function startServer() {
 
     // Append log
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: adminUser.id,
       action: "DELETE_USER",
       entityType: "User",
@@ -2236,7 +2241,7 @@ async function startServer() {
     PRODUCTS.push(newProd);
 
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: "u-1",
       action: "CREATE_PRODUCT",
       entityType: "Product",
@@ -2264,7 +2269,7 @@ async function startServer() {
     if (stock !== undefined) prod.stock = Number(stock) || 0;
 
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: "u-1",
       action: "UPDATE_PRODUCT",
       entityType: "Product",
@@ -2297,7 +2302,7 @@ async function startServer() {
     });
 
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: "u-1",
       action: "DELETE_PRODUCT",
       entityType: "Product",
@@ -2434,7 +2439,7 @@ async function startServer() {
     // Log Activity
     const newOrderMsg = `إنشاء طلب جديد #${newOrder.orderNumber} بقيمة إجمالية $${newOrder.totalPrice.toFixed(2)} (المدفوع: $${newOrder.paidAmount.toFixed(2)} / المتبقي: $${newOrder.remaining.toFixed(2)})`;
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: createdById || "u-1",
       action: "CREATE_ORDER",
       entityType: "Order",
@@ -2585,7 +2590,7 @@ async function startServer() {
 
     // 4. Log Activity
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: req.body.changedById || "u-1",
       action: "UPDATE_ORDER",
       entityType: "Order",
@@ -2725,7 +2730,7 @@ async function startServer() {
     });
 
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: changedById || "u-1",
       action: "UPDATE_ITEM_PROGRESS",
       entityType: "Order",
@@ -2805,7 +2810,7 @@ async function startServer() {
     // Log Activity
     const payDetails = `تسديد دفعة مالية بقيمة $${payAmtUSD.toFixed(2)} (${methodLabel}) | المتبقي الجديد: ${order.remaining.toLocaleString()} ل.س`;
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: changedById || "u-1",
       action: "RECORD_PAYMENT",
       entityType: "Order",
@@ -2863,7 +2868,7 @@ async function startServer() {
     });
 
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: changedById || "u-1",
       action: "DELETE_PAYMENT",
       entityType: "Order",
@@ -2927,7 +2932,7 @@ async function startServer() {
 
     // Log Activity
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: changedById || "u-1",
       action: "UPDATE_ORDER_STATUS",
       entityType: "Order",
@@ -2979,7 +2984,7 @@ async function startServer() {
 
     if (count > 0) {
       ACTIVITY_LOGS.unshift({
-        id: "log_" + Date.now(),
+        id: nextActivityLogId(),
         userId: "system",
         action: "AUTO_ARCHIVE_ORDERS",
         entityType: "Order",
@@ -3059,7 +3064,7 @@ async function startServer() {
     });
 
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: "u-1",
       action: "ARCHIVE_ORDER",
       entityType: "Order",
@@ -3089,7 +3094,7 @@ async function startServer() {
     });
 
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: "u-1",
       action: "RESTORE_ORDER_FROM_ARCHIVE",
       entityType: "Order",
@@ -3450,7 +3455,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
       }
 
       ACTIVITY_LOGS.unshift({
-        id: "log_" + Date.now(),
+        id: nextActivityLogId(),
         userId: "u-1",
         action: "SET_PRIMARY_SUPPLIER",
         entityType: "Material",
@@ -3506,7 +3511,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
     INVENTORY.push(newInv);
 
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: "u-1",
       action: "CREATE_MATERIAL",
       entityType: "Material",
@@ -3546,7 +3551,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
     }
 
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: "u-1",
       action: "UPDATE_MATERIAL",
       entityType: "Material",
@@ -3568,7 +3573,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
       material.qualityStatus = qualityStatus;
     }
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: "u-1",
       action: "UPDATE_MATERIAL_QUALITY_STATUS",
       entityType: "Material",
@@ -3600,7 +3605,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
     });
 
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: "u-1",
       action: "ARCHIVE_MATERIAL",
       entityType: "Material",
@@ -3626,7 +3631,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
     material.status = "active";
 
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: "u-1",
       action: "RESTORE_MATERIAL",
       entityType: "Material",
@@ -3764,7 +3769,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
       INVENTORY_TRANSACTIONS.push(newTx);
 
       ACTIVITY_LOGS.unshift({
-        id: "log_" + Date.now(),
+        id: nextActivityLogId(),
         userId: userId || "u-1",
         action: `INVENTORY_${type ? type.toUpperCase() : 'ADJUSTMENT'}`,
         entityType: "Inventory",
@@ -3983,7 +3988,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
     REMNANTS.push(newRem);
 
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: "u-1",
       action: "CREATE_REMNANT",
       entityType: "Remnant",
@@ -4039,7 +4044,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
       }
 
       ACTIVITY_LOGS.unshift({
-        id: "log_" + Date.now(),
+        id: nextActivityLogId(),
         userId: "u-2",
         action: "CONSUME_REMNANT",
         entityType: "Remnant",
@@ -4070,7 +4075,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
       }
 
       ACTIVITY_LOGS.unshift({
-        id: "log_" + Date.now(),
+        id: nextActivityLogId(),
         userId: "u-2",
         action: "WASTE_REMNANT",
         entityType: "Remnant",
@@ -4165,7 +4170,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
       SUPPLY_ORDERS.push(newOrder);
 
       ACTIVITY_LOGS.unshift({
-        id: "log_" + Date.now(),
+        id: nextActivityLogId(),
         userId: "u-1",
         action: "CREATE_SUPPLY_ORDER",
         entityType: "SupplyOrder",
@@ -4248,7 +4253,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
       }
 
       ACTIVITY_LOGS.unshift({
-        id: "log_" + Date.now(),
+        id: nextActivityLogId(),
         userId: "u-1",
         action: `SUPPLY_ORDER_${status.toUpperCase()}`,
         entityType: "SupplyOrder",
@@ -4347,7 +4352,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
     }
 
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: "u-1",
       action: "RESTORE_" + delItem.entityType.toUpperCase(),
       entityType: delItem.entityType,
@@ -6715,7 +6720,7 @@ Role Guidelines:
     PRODUCTION_JOBS.push(newJob);
 
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: "u-1",
       action: "CREATE_PRODUCTION_JOB",
       entityType: "ProductionJob",
@@ -6836,7 +6841,7 @@ Role Guidelines:
     }
 
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: "u-1",
       action: "AUTO_ASSIGN_JOBS",
       entityType: "ProductionJob",
@@ -6938,7 +6943,7 @@ Role Guidelines:
     }
 
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: job.operatorId,
       action: "START_PRODUCTION_JOB",
       entityType: "ProductionJob",
@@ -7139,7 +7144,7 @@ Role Guidelines:
     }
 
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: job.operatorId || "u-1",
       action: "COMPLETE_PRODUCTION_JOB",
       entityType: "ProductionJob",
@@ -7272,7 +7277,7 @@ Role Guidelines:
 
     // Log Activity
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: "u-1",
       action: "CREATE_INVOICE",
       entityType: "Invoice",
@@ -7343,7 +7348,7 @@ Role Guidelines:
 
     // Log Activity
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: "u-1",
       action: "RECORD_INVOICE_PAYMENT",
       entityType: "Invoice",
@@ -7430,7 +7435,7 @@ Role Guidelines:
 
     // Log Activity
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: "u-1",
       action: "UPDATE_INVOICE",
       entityType: "Invoice",
@@ -7603,7 +7608,7 @@ Role Guidelines:
 
     // Log Activity
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: "u-1",
       action: "CREATE_EXPENSE",
       entityType: "Expense",
@@ -7660,7 +7665,7 @@ Role Guidelines:
 
     // Log Activity
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: "u-1",
       action: "UPDATE_EXPENSE",
       entityType: "Expense",
@@ -7683,7 +7688,7 @@ Role Guidelines:
 
     // Log Activity
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: "u-1",
       action: "DELETE_EXPENSE",
       entityType: "Expense",
@@ -8038,7 +8043,7 @@ Role Guidelines:
 
     // Log Activity
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: "u-1",
       action: "UPDATE_SETTINGS",
       entityType: "Settings",
@@ -8120,7 +8125,7 @@ Role Guidelines:
       if (!newBackup) throw new Error("تعذر إنشاء نسخة SQLite");
       BACKUPS.unshift(newBackup);
       ACTIVITY_LOGS.unshift({
-        id: "log_" + Date.now(), userId: "u-1", action: "CREATE_BACKUP",
+        id: nextActivityLogId(), userId: "u-1", action: "CREATE_BACKUP",
         entityType: "Backup", entityId: newBackup.id, createdAt: new Date().toISOString()
       });
       schedulePersist();
@@ -8155,7 +8160,7 @@ Role Guidelines:
       if (safetyBackup) BACKUPS.unshift(safetyBackup);
       await refreshWarehouseCache();
       ACTIVITY_LOGS.unshift({
-        id: "log_" + Date.now(), userId: "u-1", action: "RESTORE_BACKUP",
+        id: nextActivityLogId(), userId: "u-1", action: "RESTORE_BACKUP",
         entityType: "Backup", entityId: id, createdAt: new Date().toISOString()
       });
       await flushLocalSqlite();
@@ -8210,7 +8215,7 @@ Role Guidelines:
 
       // Log Activity
       ACTIVITY_LOGS.unshift({
-        id: "log_" + Date.now(),
+        id: nextActivityLogId(),
         userId: uploadedBy || "u-1",
         action: "UPLOAD_FILE",
         entityType: "File",
@@ -8265,7 +8270,7 @@ Role Guidelines:
 
     // Log Activity
     ACTIVITY_LOGS.unshift({
-      id: "log_" + Date.now(),
+      id: nextActivityLogId(),
       userId: "u-1",
       action: "DELETE_FILE",
       entityType: "File",
@@ -9168,7 +9173,7 @@ Role Guidelines:
 
       // Record Activity
       ACTIVITY_LOGS.unshift({
-        id: "log_" + Date.now(),
+        id: nextActivityLogId(),
         userId: "u-1",
         action: `SHARE_ORDER_${method.toUpperCase()}`,
         entityType: "Order",
