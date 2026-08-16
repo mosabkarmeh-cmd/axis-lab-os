@@ -3377,11 +3377,11 @@ export default function SettingsView({
                       onClick={() => {
                         let sample = "";
                         if (importType === "materials") {
-                          sample = "name\tpricePerUnit\tcategory\tthickness\tcolor\tstock\nأكريليك شفاف 3مم\t45\tacrylic\t3\ttransparent\t20\nMDF حفر خشب 5مم\t32\twood\t5\tbrown\t15";
+                          sample = "name\tpricePerUnit\tcategory\tthickness\tcolor\tstock\nأكريليك شفاف 3مم\t6075\tacrylic\t3\ttransparent\t20\nMDF حفر خشب 5مم\t4320\twood\t5\tbrown\t15";
                         } else if (importType === "customers") {
                           sample = "name\tphone\tcompany\taddress\nأبو أحمد الدمشقي\t0933112233\tمطابخ الشام\tباب توما، دمشق\nشركة البقاعي للقص\t011445566\tالبقاعي\tمنطقة الميدان";
                         } else {
-                          sample = "name\tprice\tcategory\tdescription\nصحن نقوش فاخر مفرغ\t75\tطبق خشبي\tطبق حفر ليزر دائري مفرغ\nعلبة مناديل هندسية\t50\tعلب\tعلبة خشبية للمناديل مع غطاء زلق";
+                          sample = "name\tprice\tcategory\tdescription\nصحن نقوش فاخر مفرغ\t10125\tطبق خشبي\tطبق حفر ليزر دائري مفرغ\nعلبة مناديل هندسية\t6750\tعلب\tعلبة خشبية للمناديل مع غطاء زلق";
                         }
                         setImportText(sample);
                         setImportStatus({ type: "success", message: "تم ملء صندوق البيانات بنموذج افتراضي كدليل لك ✓" });

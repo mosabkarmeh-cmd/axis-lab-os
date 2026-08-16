@@ -349,7 +349,7 @@ export default function SupplierPriceComparisonModal({
               >
                 {materials.map(m => (
                   <option key={m.id} value={m.id}>
-                    {m.name} ({m.category} {m.thickness ? `${m.thickness}مم` : ""}) - ${Number(m.pricePerUnit).toFixed(2)}
+                    {m.name} ({m.category} {m.thickness ? `${m.thickness}مم` : ""}) - {Math.round(Number(m.pricePerUnit || 0)).toLocaleString()} ل.س
                   </option>
                 ))}
               </select>
@@ -375,7 +375,7 @@ export default function SupplierPriceComparisonModal({
 
           <div className="flex items-center gap-2 bg-zinc-950 px-3 py-1 rounded-lg border border-zinc-800 font-mono text-xs">
             <span className="text-zinc-400">السعر الأساسي المعتمد:</span>
-            <span className="text-[#c59257] font-extrabold text-sm">${currentPrice.toFixed(2)}</span>
+            <span className="text-[#c59257] font-extrabold text-sm">{Math.round(currentPrice).toLocaleString()} ل.س</span>
             <span className="text-zinc-500 text-[10px]">/ {material.unit || "وحدة"}</span>
           </div>
         </div>
@@ -402,11 +402,11 @@ export default function SupplierPriceComparisonModal({
                     </div>
                     <div className="text-sm font-bold text-zinc-100">{lowestQuote.supplierName}</div>
                     <div className="flex items-baseline gap-1 font-mono">
-                      <span className="text-xl font-black text-emerald-400">${lowestQuote.pricePerUnit.toFixed(2)}</span>
+                      <span className="text-xl font-black text-emerald-400">{Math.round(lowestQuote.pricePerUnit).toLocaleString()} ل.س</span>
                       <span className="text-[10px] text-zinc-500">/ {material.unit || "وحدة"}</span>
                       {currentPrice > lowestQuote.pricePerUnit && (
                         <span className="text-[10px] text-emerald-300 font-bold mr-1">
-                          (توفير ${(currentPrice - lowestQuote.pricePerUnit).toFixed(2)})
+                          (توفير {(currentPrice - lowestQuote.pricePerUnit).toLocaleString()} ل.س)
                         </span>
                       )}
                     </div>
@@ -430,7 +430,7 @@ export default function SupplierPriceComparisonModal({
                     </div>
                     <div className="text-sm font-bold text-zinc-100">{fastestQuote.supplierName}</div>
                     <div className="flex items-baseline gap-1 font-mono">
-                      <span className="text-lg font-extrabold text-indigo-300">${fastestQuote.pricePerUnit.toFixed(2)}</span>
+                      <span className="text-lg font-extrabold text-indigo-300">{Math.round(fastestQuote.pricePerUnit).toLocaleString()} ل.س</span>
                       <span className="text-[10px] text-zinc-500">تسليم طارئ</span>
                     </div>
                     <p className="text-[10px] text-zinc-400 line-clamp-1">{fastestQuote.paymentTerms}</p>
@@ -454,7 +454,7 @@ export default function SupplierPriceComparisonModal({
                     </div>
                     <div className="text-sm font-bold text-zinc-100">{topRatedQuote.supplierName}</div>
                     <div className="flex items-baseline gap-1 font-mono">
-                      <span className="text-lg font-extrabold text-amber-300">${topRatedQuote.pricePerUnit.toFixed(2)}</span>
+                      <span className="text-lg font-extrabold text-amber-300">{Math.round(topRatedQuote.pricePerUnit).toLocaleString()} ل.س</span>
                       <span className="text-[10px] text-zinc-500">ضمان شامل</span>
                     </div>
                     <p className="text-[10px] text-zinc-400 line-clamp-1">{topRatedQuote.notes || "مورد معتمد مع شهادة جودة"}</p>

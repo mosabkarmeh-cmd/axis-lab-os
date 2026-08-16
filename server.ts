@@ -2458,17 +2458,17 @@ async function startServer() {
     if (Math.abs(oldState.totalPrice - order.totalPrice) > 0.001) {
       const diff = order.totalPrice - oldState.totalPrice;
       const diffSign = diff > 0 ? `+` : ``;
-      changeDetails.push(`تغير إجمالي السعر من $${oldState.totalPrice.toFixed(2)} إلى $${order.totalPrice.toFixed(2)} (الفرق ${diffSign}$${diff.toFixed(2)})`);
+      changeDetails.push(`تغير إجمالي السعر من ${Math.round(oldState.totalPrice).toLocaleString()} ل.س إلى ${Math.round(order.totalPrice).toLocaleString()} ل.س (الفرق ${diffSign}${Math.round(diff).toLocaleString()} ل.س)`);
     }
 
     if (Math.abs(oldState.paidAmount - order.paidAmount) > 0.001) {
       const diff = order.paidAmount - oldState.paidAmount;
       const diffSign = diff > 0 ? `+` : ``;
-      changeDetails.push(`تغير الواصل/المقدم من $${oldState.paidAmount.toFixed(2)} إلى $${order.paidAmount.toFixed(2)} (الفرق ${diffSign}$${diff.toFixed(2)})`);
+      changeDetails.push(`تغير الواصل/المقدم من ${Math.round(oldState.paidAmount).toLocaleString()} ل.س إلى ${Math.round(order.paidAmount).toLocaleString()} ل.س (الفرق ${diffSign}${Math.round(diff).toLocaleString()} ل.س)`);
     }
 
     if (Math.abs(oldState.remaining - order.remaining) > 0.001) {
-      changeDetails.push(`تعديل المبلغ المتبقي ليصبح $${order.remaining.toFixed(2)} (سابقاً $${oldState.remaining.toFixed(2)})`);
+      changeDetails.push(`تعديل المبلغ المتبقي ليصبح ${Math.round(order.remaining).toLocaleString()} ل.س (سابقاً ${Math.round(oldState.remaining).toLocaleString()} ل.س)`);
     }
 
     if (Math.abs(oldState.discount - order.discount) > 0.001) {
@@ -5296,7 +5296,10 @@ Do not include any markdown format tags like \`\`\`json or \`\`\` in your respon
           } = payload || {};
 
           const mat = MATERIALS.find(m => m.id === materialId) || MATERIALS[0];
-          const matPricePerSheet = mat ? (mat.pricePerUnit || 25) : 25;
+          const exchangeRate = Number(SETTINGS.exchangeRate) > 0 ? Number(SETTINGS.exchangeRate) : 135;
+          // Material prices are stored in SYP. Convert to USD only for this legacy USD-based costing model.
+          const matPricePerSheetSYP = Number(mat?.pricePerUnit || 0) || 1350;
+          const matPricePerSheetUSD = matPricePerSheetSYP / exchangeRate;
           const sheetWidthCm = (mat as any)?.widthCm || mat?.width || 122;
           const sheetLengthCm = (mat as any)?.lengthCm || mat?.height || 244;
           const sheetAreaCm2 = sheetWidthCm * sheetLengthCm;
@@ -5326,7 +5329,7 @@ Do not include any markdown format tags like \`\`\`json or \`\`\` in your respon
           const wasteFactor = 1 + (calculatedWastePercent / 100);
 
           // 1. Raw material cost including exact calculated waste factor
-          const rawMaterialCost = Math.max(0.15, (pieceAreaCm2 / sheetAreaCm2) * matPricePerSheet * wasteFactor);
+          const rawMaterialCost = Math.max(0.15, (pieceAreaCm2 / sheetAreaCm2) * matPricePerSheetUSD * wasteFactor);
 
           // Speed & Pass Calculations
           let cutSpeedMms = 20;
@@ -5420,7 +5423,6 @@ Do not include any markdown format tags like \`\`\`json or \`\`\` in your respon
           const totalBatchRevenueUSD = Math.round(suggestedUnitFinalPrice * quantity * discountFactor);
           const totalBatchCostUSD = Number((totalDirectCost * quantity).toFixed(2));
           const totalBatchProfitUSD = Number(Math.max(0, totalBatchRevenueUSD - totalBatchCostUSD).toFixed(2));
-          const exchangeRate = SETTINGS.exchangeRate;
 
           const detailedFinancials = {
             rawMaterialWithWasteUSD: Number(rawMaterialCost.toFixed(3)),
@@ -5437,7 +5439,7 @@ Do not include any markdown format tags like \`\`\`json or \`\`\` in your respon
           };
 
           const formulas = {
-            rawMaterial: `(مساحة القطعة ${pieceAreaCm2}سم² ÷ مساحة اللوح ${sheetAreaCm2}سم²) × سعر اللوح $${matPricePerSheet} × معامل الهدر ${(wasteFactor).toFixed(2)} = $${rawMaterialCost.toFixed(3)}`,
+            rawMaterial: `(مساحة القطعة ${pieceAreaCm2}سم² ÷ مساحة اللوح ${sheetAreaCm2}سم²) × سعر اللوح ${matPricePerSheetSYP.toLocaleString()} ل.س ÷ سعر الصرف ${exchangeRate} × معامل الهدر ${(wasteFactor).toFixed(2)} = $${rawMaterialCost.toFixed(3)}`,
             electricity: `قدرة النظام الكلية (${totalKwPower} kW) × زمن التشغيل الفعلي (${activeMachineTimeMin.toFixed(2)} دقيقة) × تعرفة الكيلوواط ($${electricityRatePerKwh}/kWh) = $${electricityCost.toFixed(3)}`,
             tubeWear: `ساعات الحرق الفعلي (${activeHours.toFixed(3)} ساعة) × (سعر الأنبوب $${tubeReplacementCostUSD} ÷ العمر ${tubeLifespanHours} ساعة) = $${tubeWearCost.toFixed(3)}`,
             labor: `زمن الإنتاج والتجهيز المباشر (${totalTimeMinutes.toFixed(1)} دقيقة) × أجر الفني ($${operatorRatePerHour}/ساعة) = $${laborCost.toFixed(3)}`,
@@ -5477,7 +5479,7 @@ Do not include any markdown format tags like \`\`\`json or \`\`\` in your respon
             batchFinancials: {
               totalBatchCostUSD,
               totalBatchPriceUSD: totalBatchRevenueUSD,
-              totalBatchPriceSYP: totalBatchRevenueUSD * exchangeRate,
+              totalBatchPriceSYP: Math.round(totalBatchRevenueUSD * exchangeRate),
               totalBatchProfitUSD,
               totalBatchProfitSYP: Math.round(totalBatchProfitUSD * exchangeRate),
               appliedDiscountPercent: Math.round((1 - discountFactor) * 100)
@@ -5490,7 +5492,7 @@ Do not include any markdown format tags like \`\`\`json or \`\`\` in your respon
               totalBatchProfitUSD
             },
             suggestedPriceUSD: suggestedUnitFinalPrice,
-            suggestedPriceSYP: suggestedUnitFinalPrice * exchangeRate,
+            suggestedPriceSYP: Math.round(suggestedUnitFinalPrice * exchangeRate),
             timeBreakdown: {
               cutTimeMinutes: Number((cutTimeSec / 60).toFixed(2)),
               engraveTimeMinutes: Number((engraveTimeSec / 60).toFixed(2)),
@@ -6361,7 +6363,7 @@ Role Guidelines:
           results.push({
             type: "order",
             title: `طلب رقم ${o.orderNumber}`,
-            subtitle: `العميل: ${o.customerName} • القيمة: $${o.totalPrice} • الحالة: ${o.status}`,
+            subtitle: `العميل: ${o.customerName} • القيمة: ${Math.round(Number(o.totalPrice || 0)).toLocaleString()} ل.س • الحالة: ${o.status}`,
             entityId: o.id,
             relevance: 95,
             reason: `عثرنا على مطابقة في بيانات الطلبات المرتبطة بـ ${o.customerName}.`
@@ -6375,7 +6377,7 @@ Role Guidelines:
           results.push({
             type: "material",
             title: m.name,
-            subtitle: `الفئة: ${m.category} • السماكة: ${m.thickness || "غير محدد"} مم • السعر: $${m.pricePerUnit}`,
+            subtitle: `الفئة: ${m.category} • السماكة: ${m.thickness || "غير محدد"} مم • السعر: ${Math.round(Number(m.pricePerUnit || 0)).toLocaleString()} ل.س (≈ $${(Number(m.pricePerUnit || 0) / (Number(SETTINGS.exchangeRate) || 135)).toFixed(2)})`,
             entityId: m.id,
             relevance: 90,
             reason: `تطابق دلالي مع الخامات المخزنية المسجلة من نوع ${m.category}.`
@@ -8238,8 +8240,8 @@ Role Guidelines:
         { header: "اللون", key: "color", width: 15 },
         { header: "الكمية المتوفرة", key: "available", width: 15 },
         { header: "الحد الأدنى", key: "minimum", width: 15 },
-        { header: "سعر الوحدة ($)", key: "price", width: 15 },
-        { header: "القيمة الإجمالية ($)", key: "totalValue", width: 15 }
+        { header: "سعر الوحدة (ل.س)", key: "price", width: 15 },
+        { header: "القيمة الإجمالية (ل.س)", key: "totalValue", width: 15 }
       ];
 
       MATERIALS.forEach(m => {
@@ -8305,7 +8307,7 @@ Role Guidelines:
       const custs = CUSTOMERS;
       const allOrders = ORDERS;
 
-      const headers = ["معرف العميل", "اسم العميل", "رقم الهاتف", "الواتساب", "الشركة", "العنوان", "عدد الطلبات", "إجمالي المسحوبات ($)", "ملاحظات"];
+      const headers = ["معرف العميل", "اسم العميل", "رقم الهاتف", "الواتساب", "الشركة", "العنوان", "عدد الطلبات", "إجمالي المسحوبات (ل.س)", "ملاحظات"];
       const rows = custs.map(c => {
         const cOrders = allOrders.filter(o => o.customerId === c.id);
         const totalSpent = cOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0).toFixed(2);
@@ -8350,14 +8352,14 @@ Role Guidelines:
         "السماكة (ملم)",
         "اللون",
         "حالة الجودة",
-        "سعر الوحدة ($)",
+        "سعر الوحدة (ل.س)",
         "الرصيد المتاح",
         "الوحدة",
         "الكمية المحجوزة",
         "الحد الأدنى",
         "موقع التخزين",
         "حالة التوفر",
-        "إجمالي قيمة المخزون ($)"
+        "إجمالي قيمة المخزون (ل.س)"
       ];
 
       const rows = mats.map(m => {
@@ -8365,8 +8367,8 @@ Role Guidelines:
         const qty = inv ? inv.quantity : 0;
         const reserved = inv ? inv.reservedQuantity : 0;
         const min = m.minimumStock || 0;
-        const priceUSD = m.pricePerUnit || 0;
-        const totalVal = (qty * priceUSD).toFixed(2);
+        const priceSYP = Math.round(Number(m.pricePerUnit) || 0);
+        const totalVal = Math.round(qty * priceSYP);
         const quality = (m as any).qualityStatus === 'defective' ? 'معيبة' : (m as any).qualityStatus === 'in_preparation' ? 'قيد التجهيز' : 'مفحوصة';
         const statusText = qty <= 0 ? 'نافذ بالكامل' : qty <= min ? 'منخفض / يتطلب توريد' : 'سليم ومتوفر';
 
@@ -8377,7 +8379,7 @@ Role Guidelines:
           m.thickness || '-',
           m.color || '-',
           quality,
-          priceUSD,
+          priceSYP,
           qty,
           m.unit || 'وحدة',
           reserved,
