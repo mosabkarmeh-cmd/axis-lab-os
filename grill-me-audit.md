@@ -83,3 +83,9 @@ The expanded converter passed the reverse-direction check at rate `200`: `20,000
 The severe inline-rate defect was fixed in `DashboardCharts.tsx` by separating `rateDraft` from the committed `exchangeRate`, normalizing appended numeric suffixes, selecting the field on focus, and committing only on blur or Enter. The expanded `CurrencyConverterModal.tsx` received equivalent committed-rate handling. The browser test now passes: the field accepts `200`, commits `200`, and both forward and reverse conversions remain mathematically correct.
 
 Post-fix validation: `npm run lint` passed and the complete `npm run test:smoke` suite passed, including currency conversion, financial persistence, first-run password, API security/coverage, SQLite migration/recovery/concurrency, production completion, monthly reporting, and inventory guards.
+
+## Final Windows QA checkpoint
+
+GitHub Actions run [31940885983](https://github.com/mosabkarmeh-cmd/axis-lab-os/actions/runs/31940885983) completed successfully on commit `89c507e5747926b4cd34d89b3db0221e29fd7ece`. Backend validation, Current User installer build/preservation, All Users installer build, and installation/launch checks for both scopes all passed.
+
+At this point, the previously open P0/P1 audit findings addressed in this cycle have passing local and CI evidence. The browser-only login and currency UI checks also passed after the rate-input remediation.
