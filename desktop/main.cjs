@@ -20,13 +20,13 @@ function getBootstrapAdminPassword() {
   const passwordPath = path.join(app.getPath('userData'), 'bootstrap-admin-password.txt');
   try {
     const existing = fs.readFileSync(passwordPath, 'utf8').trim();
-    if (existing.length >= 12) return existing;
+    if (existing) return existing;
   } catch {}
-  const generated = crypto.randomBytes(12).toString('base64url');
+  const initialPassword = '12345';
   fs.mkdirSync(path.dirname(passwordPath), { recursive: true });
-  fs.writeFileSync(passwordPath, generated, { encoding: 'utf8', mode: 0o600 });
+  fs.writeFileSync(passwordPath, initialPassword, { encoding: 'utf8', mode: 0o600 });
   bootstrapPasswordCreated = true;
-  return generated;
+  return initialPassword;
 }
 
 function getDesktopJwtSecret() {

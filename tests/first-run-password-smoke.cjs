@@ -4,8 +4,8 @@ const os = require("node:os");
 const path = require("node:path");
 
 const port = 3800 + Math.floor(Math.random() * 300);
-const password = "BootstrapPass123";
-const newPassword = "ChangedPass456";
+const password = "12345";
+const newPassword = "ChangedPass123";
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "axis-lab-first-run-"));
 const env = {
   ...process.env,

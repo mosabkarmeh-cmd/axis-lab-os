@@ -6,7 +6,7 @@ files:
   - desktop/**/*
   - package.json
   - assets/icon.ico
-  - node_modules/sql.js/**/*
+  - node_modules/**/*
 extraResources:
   - from: dist/server.cjs
     to: server.cjs

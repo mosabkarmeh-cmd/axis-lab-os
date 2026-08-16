@@ -9379,7 +9379,8 @@ Role Guidelines:
   });
 
   // Vite middleware for development or static serving for production
-  if (process.env.NODE_ENV !== "production") {
+  const isElectronProduction = process.env.ELECTRON_RUN_AS_NODE === "1";
+  if (!isElectronProduction && process.env.NODE_ENV !== "production") {
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: {
