@@ -117,3 +117,7 @@ The order-create path now records internal timings for validation, item parsing,
 SQLite persistence now uses a single-flight/coalesced queue. Order creation performs the in-memory domain update, requests one durable fast flush for the first mutation in a burst, and coalesces concurrent follow-up saves. Shutdown and backup paths still perform an explicit flush. A regression initially showed that fully non-blocking persistence could lose the newest order during forced termination; the fast-durability step corrected that and the crash-recovery smoke test passed afterward.
 
 At the same 150% load, order-write P95 improved from the previous `436.97 ms` to `211.66 ms`, a reduction of approximately `51.6%`. The latest run passed with 750 reads, 300 order writes, and 15 rate writes. SQLite integrity remained `ok`, schema version remained `5`, 304 orders survived restart, all 303 activity IDs were unique, and persistence recorded zero failures. Internal order-handler benchmarks showed request-total P95 `0.17 ms`; persistence flush P95 was `216.42 ms`, confirming that most remaining tail cost is durable SQLite export rather than order-domain computation.
+
+## Post-optimization Windows QA
+
+Windows Installer QA run [31944554518](https://github.com/mosabkarmeh-cmd/axis-lab-os/actions/runs/31944554518) completed successfully on the performance-optimized branch. Backend validation, Current User build, All Users build, and installation/launch checks for both installer scopes all passed.
