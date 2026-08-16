@@ -186,6 +186,14 @@ export default function AccountingView({ customers, onRefreshOrders, currentUser
   const [editedInvoiceNotes, setEditedInvoiceNotes] = useState<string>("");
   const [editedInvoiceDueDate, setEditedInvoiceDueDate] = useState<string>("");
 
+  const printedRate = invoiceToPrint?.exchangeRateAtFinalization || invoiceToPrint?.exchangeRateAtIssue || exchangeRate;
+  const printedTotalUSD = invoiceToPrint ? Number(invoiceToPrint.totalPriceUSD ?? invoiceToPrint.totalPrice ?? 0) : 0;
+  const printedPaidUSD = invoiceToPrint ? Number(invoiceToPrint.paidAmountUSD ?? invoiceToPrint.paidAmount ?? 0) : 0;
+  const printedRemainingUSD = invoiceToPrint ? Number(invoiceToPrint.remainingUSD ?? invoiceToPrint.remaining ?? 0) : 0;
+  const printedTotalSYP = invoiceToPrint ? Math.round(Number(invoiceToPrint.totalPriceSYP ?? (printedTotalUSD * printedRate))) : 0;
+  const printedPaidSYP = invoiceToPrint ? Math.round(Number(invoiceToPrint.paidAmountSYP ?? (printedPaidUSD * printedRate))) : 0;
+  const printedRemainingSYP = invoiceToPrint ? Math.round(Number(invoiceToPrint.remainingSYP ?? (printedRemainingUSD * printedRate))) : 0;
+
   // New Invoice Form state
   const [newInvCustomer, setNewInvCustomer] = useState("");
   const [newInvTotal, setNewInvTotal] = useState("");
@@ -2801,9 +2809,9 @@ export default function AccountingView({ customers, onRefreshOrders, currentUser
                                 خدمة قص ونقش بالليزر وتنفيذ طلبية #{invoiceToPrint.orderNumber || invoiceToPrint.invoiceNumber}
                               </td>
                               <td className="p-3 text-center font-mono text-zinc-300 print:text-black">1</td>
-                              <td className="p-3 font-mono text-zinc-300 print:text-black">${invoiceToPrint.totalPrice.toFixed(2)}</td>
-                              <td className="p-3 font-mono font-bold text-zinc-200 print:text-black">${invoiceToPrint.totalPrice.toFixed(2)}</td>
-                              <td className="p-3 font-mono text-[#c59257] print:text-black font-bold">{Math.round(Number(invoiceToPrint.totalPrice || 0)).toLocaleString()} ل.س</td>
+                              <td className="p-3 font-mono text-zinc-300 print:text-black">${printedTotalUSD.toFixed(2)}</td>
+                              <td className="p-3 font-mono font-bold text-zinc-200 print:text-black">${printedTotalUSD.toFixed(2)}</td>
+                              <td className="p-3 font-mono text-[#c59257] print:text-black font-bold">{printedTotalSYP.toLocaleString()} ل.س</td>
                             </tr>
                           )}
                         </tbody>
@@ -2823,7 +2831,7 @@ export default function AccountingView({ customers, onRefreshOrders, currentUser
                     <div className="w-full sm:w-80 bg-zinc-950 border border-zinc-800 p-4 rounded-xl space-y-2 text-xs font-sans print:bg-white print:border-black print:text-black">
                       <div className="flex justify-between text-zinc-400 print:text-zinc-700">
                         <span>الخصم الممنوح:</span>
-                        <span className="font-mono font-bold">${(invoiceToPrint.discount || 0).toFixed(2)}</span>
+                        <span className="font-mono font-bold">${Number(invoiceToPrint.discount || 0).toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between text-zinc-400 print:text-zinc-700">
                         <span>نسبة الضريبة:</span>
@@ -2831,19 +2839,19 @@ export default function AccountingView({ customers, onRefreshOrders, currentUser
                       </div>
                       <div className="border-t border-zinc-850 pt-2 flex justify-between items-center print:border-black">
                         <span className="font-bold text-zinc-200 print:text-black">المبلغ الإجمالي بالدولار:</span>
-                        <span className="text-base font-mono font-extrabold text-zinc-100 print:text-black">${invoiceToPrint.totalPrice.toFixed(2)}</span>
+                        <span className="text-base font-mono font-extrabold text-zinc-100 print:text-black">${printedTotalUSD.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between items-center text-[#c59257] print:text-black">
                         <span className="font-extrabold text-xs">المبلغ الإجمالي بالليرة السورية:</span>
-                        <span className="text-base font-mono font-black">{Math.round(Number(invoiceToPrint.totalPrice || 0)).toLocaleString()} ل.س</span>
+                        <span className="text-base font-mono font-black">{printedTotalSYP.toLocaleString()} ل.س</span>
                       </div>
                       <div className="border-t border-zinc-850 pt-2 flex justify-between text-emerald-400 print:text-black">
                         <span>المبلغ المقبوض:</span>
-                        <span className="font-mono font-bold">{Math.round(Number(invoiceToPrint.paidAmount || 0)).toLocaleString()} ل.س (${invoiceToPrint.paidAmount.toFixed(2)})</span>
+                        <span className="font-mono font-bold">{printedPaidSYP.toLocaleString()} ل.س (${printedPaidUSD.toFixed(2)})</span>
                       </div>
                       <div className="flex justify-between text-rose-400 print:text-black font-bold">
                         <span>المبلغ المتبقي للتحصيل:</span>
-                        <span className="font-mono">{Math.round(Number(invoiceToPrint.remaining || 0)).toLocaleString()} ل.س (${invoiceToPrint.remaining.toFixed(2)})</span>
+                        <span className="font-mono">{printedRemainingSYP.toLocaleString()} ل.س (${printedRemainingUSD.toFixed(2)})</span>
                       </div>
                     </div>
                   </div>

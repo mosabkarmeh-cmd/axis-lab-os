@@ -984,6 +984,56 @@ function mergeSmtpSettings(input: any) {
   if (typeof pass === "string" && pass.trim()) SETTINGS.smtp.pass = pass;
 }
 
+/**
+ * Freeze the exchange-rate snapshot exactly once when an order is fully paid and delivered.
+ * Operational order values remain SYP; USD values are immutable final-invoice presentation values.
+ */
+function freezeOrderCurrencySnapshot(order: any, invoice?: any) {
+  if (order.currencyFinalizedAt && order.exchangeRateAtFinalization) {
+    return { order, invoice: invoice || INVOICES.find((candidate: any) => candidate.orderId === order.id) };
+  }
+  const historicalRate = Number(order.exchangeRateAtFinalization || order.exchangeRateAtCreation || invoice?.exchangeRateAtIssue);
+  const rate = historicalRate > 0 ? historicalRate : (Number(SETTINGS.exchangeRate) > 0 ? Number(SETTINGS.exchangeRate) : 135);
+  const finalizedAt = new Date().toISOString();
+  const totalSYP = Math.round(Number(order.totalPrice) || 0);
+  const paidSYP = Math.round(Number(order.paidAmount) || 0);
+  const remainingSYP = Math.max(0, totalSYP - paidSYP);
+  const finalInvoice = invoice || INVOICES.find((candidate: any) => candidate.orderId === order.id);
+
+  order.currency = "SYP";
+  order.exchangeRateAtFinalization = rate;
+  order.currencyFinalizedAt = finalizedAt;
+  order.finalTotalSYP = totalSYP;
+  order.finalPaidSYP = paidSYP;
+  order.finalRemainingSYP = remainingSYP;
+  order.finalTotalUSD = Number(sypToUsd(totalSYP, rate).toFixed(2));
+  order.finalPaidUSD = Number(sypToUsd(paidSYP, rate).toFixed(2));
+  order.finalRemainingUSD = Number(sypToUsd(remainingSYP, rate).toFixed(2));
+
+  if (finalInvoice) {
+    finalInvoice.currency = "USD";
+    finalInvoice.exchangeRateAtFinalization = rate;
+    finalInvoice.currencyFinalizedAt = finalizedAt;
+    finalInvoice.totalPriceSYP = totalSYP;
+    finalInvoice.paidAmountSYP = paidSYP;
+    finalInvoice.remainingSYP = remainingSYP;
+    finalInvoice.totalPriceUSD = order.finalTotalUSD;
+    finalInvoice.paidAmountUSD = order.finalPaidUSD;
+    finalInvoice.remainingUSD = order.finalRemainingUSD;
+    finalInvoice.items = (finalInvoice.items || []).map((item: any) => {
+      const issueRate = Number(finalInvoice.exchangeRateAtIssue) > 0 ? Number(finalInvoice.exchangeRateAtIssue) : rate;
+      const unitPriceSYP = Math.round(Number(item.unitPriceSYP ?? (Number(item.unitPrice || 0) * issueRate)));
+      const totalSYP = Math.round(Number(item.totalSYP ?? (Number(item.total || 0) * issueRate)));
+      return { ...item, unitPriceSYP, totalSYP, unitPrice: Number(sypToUsd(unitPriceSYP, rate).toFixed(2)), total: Number(sypToUsd(totalSYP, rate).toFixed(2)) };
+    });
+    // Existing invoice fields are USD and remain stable after finalization.
+    finalInvoice.totalPrice = order.finalTotalUSD;
+    finalInvoice.paidAmount = order.finalPaidUSD;
+    finalInvoice.remaining = order.finalRemainingUSD;
+  }
+  return { order, invoice: finalInvoice };
+}
+
 async function sendProductionJobEmailNotification(
   job: any,
   eventType: "created" | "started" | "paused" | "completed" | "cancelled",
@@ -2305,7 +2355,7 @@ async function startServer() {
       priority: priority || "normal",
       totalPrice: finalTotal,
       currency: "SYP",
-      exchangeRateAtCreation: SETTINGS.exchangeRate,
+      exchangeRateAtCreation: Number(SETTINGS.exchangeRate) > 0 ? Number(SETTINGS.exchangeRate) : 135,
       taxPercent: taxRate,
       discount: discountAmt,
       paidAmount: Number(paidAmount) || 0,
@@ -2341,15 +2391,17 @@ async function startServer() {
       customerId: newOrder.customerId,
       issueDate: new Date().toISOString(),
       dueDate: newOrder.deliveryDateExpected || new Date().toISOString(),
-      totalPrice: sypToUsd(newOrder.totalPrice, SETTINGS.exchangeRate),
-      subtotal: sypToUsd(itemsSubtotal, SETTINGS.exchangeRate),
+      totalPrice: sypToUsd(newOrder.totalPrice, newOrder.exchangeRateAtCreation),
+      totalPriceSYP: Math.round(newOrder.totalPrice),
+      exchangeRateAtIssue: newOrder.exchangeRateAtCreation,
+      subtotal: sypToUsd(itemsSubtotal, newOrder.exchangeRateAtCreation),
       taxPercent: taxRate,
-      discount: sypToUsd(discountAmt, SETTINGS.exchangeRate),
-      paidAmount: sypToUsd(newOrder.paidAmount, SETTINGS.exchangeRate),
-      remaining: sypToUsd(newOrder.remaining, SETTINGS.exchangeRate),
+      discount: sypToUsd(discountAmt, newOrder.exchangeRateAtCreation),
+      paidAmount: sypToUsd(newOrder.paidAmount, newOrder.exchangeRateAtCreation),
+      remaining: sypToUsd(newOrder.remaining, newOrder.exchangeRateAtCreation),
       status: newOrder.remaining === 0 ? "paid" : newOrder.paidAmount > 0 ? "partially_paid" : "unpaid",
       currency: "USD",
-      items: invoiceItems.map((item: any) => ({ ...item, unitPrice: sypToUsd(item.unitPrice, SETTINGS.exchangeRate), total: sypToUsd(item.total, SETTINGS.exchangeRate) })),
+      items: invoiceItems.map((item: any) => ({ ...item, unitPriceSYP: Math.round(item.unitPrice), totalSYP: Math.round(item.total), unitPrice: sypToUsd(item.unitPrice, newOrder.exchangeRateAtCreation), total: sypToUsd(item.total, newOrder.exchangeRateAtCreation) })),
       history: [
         {
           id: `invhist-${Date.now()}`,
@@ -2795,7 +2847,7 @@ async function startServer() {
   });
 
   // API - Update Order Status
-  app.patch("/api/orders/:id/status", (req, res) => {
+  app.patch("/api/orders/:id/status", async (req, res) => {
     const { status, notes, changedById } = req.body;
     const order = ORDERS.find(o => o.id === req.params.id);
     if (!order) {
@@ -2819,6 +2871,8 @@ async function startServer() {
     
     if (status === "delivered") {
       order.deliveryDateActual = new Date().toISOString();
+      // Freeze SYP and USD values exactly at final delivery; later rate changes cannot affect this invoice.
+      freezeOrderCurrencySnapshot(order);
     } else {
       // Clear actual delivery date if state was downgraded from delivered
       delete order.deliveryDateActual;
@@ -2853,6 +2907,7 @@ async function startServer() {
       createdAt: new Date().toISOString()
     });
 
+    await persistStateNow();
     res.json(order);
   });
 
@@ -8418,6 +8473,13 @@ Role Guidelines:
 
       const customer = CUSTOMERS.find(c => c.id === inv.customerId);
       const customerName = customer ? customer.name : "عميل عام";
+      const pdfRate = Number(inv.exchangeRateAtFinalization || inv.exchangeRateAtIssue || SETTINGS.exchangeRate) > 0 ? Number(inv.exchangeRateAtFinalization || inv.exchangeRateAtIssue || SETTINGS.exchangeRate) : 135;
+      const pdfTotalUSD = Number(inv.totalPriceUSD ?? inv.totalPrice ?? 0);
+      const pdfPaidUSD = Number(inv.paidAmountUSD ?? inv.paidAmount ?? 0);
+      const pdfRemainingUSD = Number(inv.remainingUSD ?? inv.remaining ?? 0);
+      const pdfTotalSYP = Math.round(Number(inv.totalPriceSYP ?? (pdfTotalUSD * pdfRate)));
+      const pdfPaidSYP = Math.round(Number(inv.paidAmountSYP ?? (pdfPaidUSD * pdfRate)));
+      const pdfRemainingSYP = Math.round(Number(inv.remainingSYP ?? (pdfRemainingUSD * pdfRate)));
 
       const doc = new PDFDocument({ size: "A4", margin: 50 });
       const fontFile = await ensureFontExists();
@@ -8525,11 +8587,11 @@ Role Guidelines:
 
       // Draw financial summary block on the left
       const sumLeftX = 50;
-      const subtotal = inv.subtotal || inv.totalPrice;
+      const subtotal = inv.subtotal || pdfTotalUSD;
       const discount = inv.discount || 0;
       const taxPercent = inv.taxPercent || 0;
       const taxAmount = (subtotal * taxPercent) / 100;
-      const finalTotal = inv.totalPrice;
+      const finalTotal = pdfTotalUSD;
 
       doc.fillColor("#71717a");
       doc.text(reverseArabicLine("المجموع الفرعي:"), sumLeftX, summaryY, { align: "right", width: 100 });
@@ -8545,15 +8607,15 @@ Role Guidelines:
       doc.rect(sumLeftX, summaryY + 54, 200, 24).fill("#f4f4f5");
       doc.fillColor("#09090b").fontSize(11).font("Amiri");
       doc.text(reverseArabicLine("المجموع الإجمالي:"), sumLeftX, summaryY + 61, { align: "right", width: 100 });
-      doc.text(`$${finalTotal.toFixed(2)}`, sumLeftX + 110, summaryY + 61, { align: "left", width: 80 });
+      doc.text(`$${finalTotal.toFixed(2)} / ${pdfTotalSYP.toLocaleString()} ل.س`, sumLeftX + 110, summaryY + 61, { align: "left", width: 150 });
 
       doc.fillColor("#16a34a").fontSize(10);
-      doc.text(reverseArabicLine("المبلغ المدفوع:"), sumLeftX, summaryY + 84, { align: "right", width: 100 });
-      doc.text(`$${inv.paidAmount.toFixed(2)}`, sumLeftX + 110, summaryY + 84, { align: "left", width: 80 });
+      doc.text(reverseArabicLine(`المبلغ المدفوع (سعر الصرف ${pdfRate}):`), sumLeftX, summaryY + 84, { align: "right", width: 100 });
+      doc.text(`$${pdfPaidUSD.toFixed(2)} / ${pdfPaidSYP.toLocaleString()} ل.س`, sumLeftX + 110, summaryY + 84, { align: "left", width: 150 });
 
       doc.fillColor("#dc2626");
       doc.text(reverseArabicLine("المتبقي المستحق:"), sumLeftX, summaryY + 102, { align: "right", width: 100 });
-      doc.text(`$${inv.remaining.toFixed(2)}`, sumLeftX + 110, summaryY + 102, { align: "left", width: 80 });
+      doc.text(`$${pdfRemainingUSD.toFixed(2)} / ${pdfRemainingSYP.toLocaleString()} ل.س`, sumLeftX + 110, summaryY + 102, { align: "left", width: 150 });
 
       // Footer brand signature
       const footerY = 740;

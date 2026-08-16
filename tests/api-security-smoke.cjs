@@ -143,6 +143,41 @@ const assert = (condition, message) => {
     const restoredRate = await request("/api/exchange-rate");
     assert(restoredRate.body.exchangeRate === 135, "Exchange rate was not restored after restart");
 
+    // Final currency freeze: a fully paid and delivered order must never change when the rate changes later.
+    const finalizedOrderResponse = await request("/api/orders", {
+      method: "POST",
+      body: JSON.stringify({
+        customerId: "c-1",
+        items: [{ productName: "Final currency freeze test", quantity: 1, unitPrice: 6075 }],
+        totalPrice: 6075,
+        paidAmount: 0,
+        priority: "normal",
+      }),
+    });
+    assert(finalizedOrderResponse.response.ok, `Finalization test order failed: ${JSON.stringify(finalizedOrderResponse.body)}`);
+    const finalizedOrderId = finalizedOrderResponse.body.id;
+    const finalizedPayment = await request(`/api/orders/${finalizedOrderId}/payments`, {
+      method: "POST",
+      body: JSON.stringify({ amount: 45, paymentId: "final-currency-payment", paymentMethod: "cash" }),
+    });
+    assert(finalizedPayment.response.ok && finalizedPayment.body.paidAmount === 6075 && finalizedPayment.body.remaining === 0, `Final payment failed: ${JSON.stringify(finalizedPayment.body)}`);
+    const delivered = await request(`/api/orders/${finalizedOrderId}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "delivered", notes: "Final currency freeze smoke test" }),
+    });
+    assert(delivered.response.ok && delivered.body.exchangeRateAtFinalization === 135 && delivered.body.finalTotalSYP === 6075 && delivered.body.finalTotalUSD === 45, `Currency snapshot was not created: ${JSON.stringify(delivered.body)}`);
+    const changedRate = await request("/api/exchange-rate", { method: "PUT", body: JSON.stringify({ exchangeRate: 150 }) });
+    assert(changedRate.response.ok && changedRate.body.exchangeRate === 150, "Could not change rate after finalization");
+    const finalizedOrdersAfterRateChange = await request("/api/orders");
+    const finalizedOrderAfterRateChange = finalizedOrdersAfterRateChange.body.find((item) => item.id === finalizedOrderId);
+    assert(finalizedOrderAfterRateChange.finalTotalSYP === 6075 && finalizedOrderAfterRateChange.finalTotalUSD === 45 && finalizedOrderAfterRateChange.exchangeRateAtFinalization === 135, `Finalized order changed after exchange-rate update: ${JSON.stringify(finalizedOrderAfterRateChange)}`);
+    const finalizedInvoicesAfterRateChange = await request("/api/accounting/invoices");
+    const finalizedInvoice = finalizedInvoicesAfterRateChange.body.invoices.find((item) => item.orderId === finalizedOrderId);
+    assert(finalizedInvoice && finalizedInvoice.totalPrice === 45 && finalizedInvoice.totalPriceSYP === 6075 && finalizedInvoice.totalPriceUSD === 45 && finalizedInvoice.exchangeRateAtFinalization === 135, `Finalized invoice changed after exchange-rate update: ${JSON.stringify(finalizedInvoice)}`);
+    const finalInvoicePdf = await fetch(`http://127.0.0.1:${port}/api/accounting/invoices/${finalizedInvoice.id}/pdf`, { headers });
+    assert(finalInvoicePdf.ok && (finalInvoicePdf.headers.get("content-type") || "").includes("application/pdf"), `Final invoice PDF was not generated: ${finalInvoicePdf.status}`);
+    await request("/api/exchange-rate", { method: "PUT", body: JSON.stringify({ exchangeRate: 135 }) });
+
     const calculatedOrder = await request("/api/orders", {
       method: "POST",
       body: JSON.stringify({
@@ -199,8 +234,8 @@ const assert = (condition, message) => {
       return invoiceCount > 0 && paymentCount > 0 && expenseCount > 0;
     });
     assert(backupContainsFinancialLedger, "Manual backup did not contain the normalized financial ledger");
-    const changedRate = await request("/api/exchange-rate", { method: "PUT", body: JSON.stringify({ exchangeRate: 200 }) });
-    assert(changedRate.response.ok && changedRate.body.exchangeRate === 200, "Could not change rate before restore");
+    const changedRateBeforeRestore = await request("/api/exchange-rate", { method: "PUT", body: JSON.stringify({ exchangeRate: 200 }) });
+    assert(changedRateBeforeRestore.response.ok && changedRateBeforeRestore.body.exchangeRate === 200, "Could not change rate before restore");
     const restore = await request(`/api/backup/restore/${backup.body.backup.id}`, { method: "POST" });
     assert(restore.response.ok, `Backup restore failed: ${JSON.stringify(restore.body)}`);
     const restoredAfterBackup = await request("/api/exchange-rate");
