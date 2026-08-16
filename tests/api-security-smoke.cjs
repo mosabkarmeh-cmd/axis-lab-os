@@ -143,6 +143,22 @@ const assert = (condition, message) => {
     const restoredRate = await request("/api/exchange-rate");
     assert(restoredRate.body.exchangeRate === 135, "Exchange rate was not restored after restart");
 
+    const invalidExpenseResponse = await request("/api/accounting/expenses", {
+      method: "POST",
+      body: JSON.stringify({ category: "صيانة", amount: -10, date: "2026-08-16", status: "paid" }),
+    });
+    assert(invalidExpenseResponse.response.status === 400, `Negative expense was accepted: ${JSON.stringify(invalidExpenseResponse.body)}`);
+    const invalidExpenseDateResponse = await request("/api/accounting/expenses", {
+      method: "POST",
+      body: JSON.stringify({ category: "صيانة", amount: 10, date: "not-a-date", status: "paid" }),
+    });
+    assert(invalidExpenseDateResponse.response.status === 400, `Invalid expense date was accepted: ${JSON.stringify(invalidExpenseDateResponse.body)}`);
+    const invalidRateResponse = await request("/api/settings", {
+      method: "PUT",
+      body: JSON.stringify({ exchangeRate: 0 }),
+    });
+    assert(invalidRateResponse.response.status === 400, `Non-positive exchange rate was accepted: ${JSON.stringify(invalidRateResponse.body)}`);
+
     // Historical expense snapshot: changing the global rate must not rewrite a previously recorded expense.
     const stableExpenseResponse = await request("/api/accounting/expenses", {
       method: "POST",

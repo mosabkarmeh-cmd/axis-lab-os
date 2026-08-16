@@ -77,10 +77,10 @@ function setupAutoUpdater() {
     if (!mainWindow || mainWindow.isDestroyed()) return;
     const result = await dialog.showMessageBox(mainWindow, {
       type: 'info',
-      title: 'ØªØ­Ø¯ÙŠØ« AXIS LAB OS',
-      message: `ÙŠØªÙˆÙØ± Ø¥ØµØ¯Ø§Ø± Ø¬Ø¯ÙŠØ¯: ${info.version}`,
-      detail: 'Ù‡Ù„ ØªØ±ÙŠØ¯ ØªÙ†Ø²ÙŠÙ„ Ø§Ù„ØªØ­Ø¯ÙŠØ« Ø§Ù„Ø¢Ù†ØŸ ÙŠÙ…ÙƒÙ†Ùƒ Ù…ØªØ§Ø¨Ø¹Ø© Ø§Ù„Ø¹Ù…Ù„ Ø£Ø«Ù†Ø§Ø¡ Ø§Ù„ØªÙ†Ø²ÙŠÙ„.',
-      buttons: ['ØªÙ†Ø²ÙŠÙ„ Ø§Ù„ØªØ­Ø¯ÙŠØ«', 'Ù„Ø§Ø­Ù‚Ù‹Ø§'],
+      title: 'تحديث AXIS LAB OS',
+      message: `يتوفر إصدار جديد: ${info.version}`,
+      detail: 'هل تريد تنزيل التحديث الآن؟ يمكنك متابعة العمل أثناء التنزيل.',
+      buttons: ['تنزيل التحديث', 'لاحقاً'],
       defaultId: 0,
       cancelId: 1,
     });
@@ -90,7 +90,7 @@ function setupAutoUpdater() {
   });
 
   autoUpdater.on('update-not-available', () => {
-    console.log('[AXIS UPDATER] Ø§Ù„ØªØ·Ø¨ÙŠÙ‚ Ù…Ø­Ø¯Ø«.');
+    console.log('[AXIS UPDATER] التطبيق محدث.');
   });
 
   autoUpdater.on('download-progress', (progress) => {
@@ -101,10 +101,10 @@ function setupAutoUpdater() {
     if (!mainWindow || mainWindow.isDestroyed()) return;
     const result = await dialog.showMessageBox(mainWindow, {
       type: 'info',
-      title: 'Ø§Ù„ØªØ­Ø¯ÙŠØ« Ø¬Ø§Ù‡Ø²',
-      message: `ØªÙ… ØªÙ†Ø²ÙŠÙ„ Ø§Ù„Ø¥ØµØ¯Ø§Ø± ${info.version} Ø¨Ù†Ø¬Ø§Ø­.`,
-      detail: 'Ø³ÙŠØªÙ… Ø­ÙØ¸ Ø¨ÙŠØ§Ù†Ø§Øª SQLite Ø«Ù… Ø¥Ø¹Ø§Ø¯Ø© ØªØ´ØºÙŠÙ„ Ø§Ù„ØªØ·Ø¨ÙŠÙ‚ Ù„ØªØ«Ø¨ÙŠØª Ø§Ù„ØªØ­Ø¯ÙŠØ«.',
-      buttons: ['Ø¥Ø¹Ø§Ø¯Ø© Ø§Ù„ØªØ´ØºÙŠÙ„ ÙˆØ§Ù„ØªØ«Ø¨ÙŠØª', 'Ù„Ø§Ø­Ù‚Ù‹Ø§'],
+      title: 'التحديث جاهز',
+      message: `تم تنزيل الإصدار ${info.version} بنجاح.`,
+      detail: 'سيتم حفظ بيانات SQLite ثم إعادة تشغيل التطبيق لتثبيت التحديث.',
+      buttons: ['إعادة التشغيل والتثبيت', 'لاحقاً'],
       defaultId: 0,
       cancelId: 1,
     });
@@ -138,7 +138,7 @@ function waitForServer(url, timeoutMs = 30000) {
       request.setTimeout(1200, () => { request.destroy(); retry(); });
     };
     const retry = () => {
-      if (Date.now() - started > timeoutMs) return reject(new Error('Ù„Ù… ÙŠØ¨Ø¯Ø£ Ø®Ø§Ø¯Ù… AXIS LAB Ø®Ù„Ø§Ù„ Ø§Ù„ÙˆÙ‚Øª Ø§Ù„Ù…ØªÙˆÙ‚Ø¹'));
+      if (Date.now() - started > timeoutMs) return reject(new Error('لم يبدأ خادم AXIS LAB خلال الوقت المتوقع'));
       setTimeout(check, 300);
     };
     check();
@@ -173,7 +173,7 @@ function startServer() {
   serverProcess.stdout.on('data', (data) => console.log(`[AXIS SERVER] ${data}`));
   serverProcess.stderr.on('data', (data) => console.error(`[AXIS SERVER] ${data}`));
   serverProcess.on('exit', (code) => {
-    if (code && !app.isQuitting) dialog.showErrorBox('ØªØ¹Ø°Ø± ØªØ´ØºÙŠÙ„ AXIS LAB', `ØªÙˆÙ‚Ù Ø§Ù„Ø®Ø§Ø¯Ù… Ø¨Ø±Ù…Ø² ${code}`);
+    if (code && !app.isQuitting) dialog.showErrorBox('تعذر تشغيل AXIS LAB', `توقف الخادم برمز ${code}`);
   });
 }
 

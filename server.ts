@@ -6976,6 +6976,24 @@ Role Guidelines:
       return;
     }
 
+    if (job.status === "completed") {
+      res.status(409).json({ success: false, message: "Production job is already completed" });
+      return;
+    }
+
+    if (job.materialId) {
+      const inv = INVENTORY.find(i => i.materialId === job.materialId);
+      const availableQuantity = Number(inv?.availableQuantity ?? inv?.quantity ?? 0);
+      if (!inv || Number(inv.quantity) < 1 || availableQuantity < 1) {
+        res.status(409).json({
+          success: false,
+          code: "INSUFFICIENT_STOCK",
+          message: "Production cannot be completed because material stock is insufficient",
+        });
+        return;
+      }
+    }
+
     job.status = "completed";
     job.progress = 100;
     job.completedAt = new Date().toISOString();
@@ -7512,21 +7530,26 @@ Role Guidelines:
 
   // Create Expense
   app.post("/api/accounting/expenses", (req, res) => {
-    const { category, amount, amountSYP, date, description, status, exchangeRateAtCreation } = req.body;
-    if (!category || !amount || !date) {
-      res.status(400).json({ success: false, message: "الفئة والقيمة والتاريخ مطلوبة" });
+        const { category, amount, amountSYP, date, description, status, exchangeRateAtCreation } = req.body;
+    const amountUSD = Number(amount);
+    const requestedSYP = amountSYP === undefined ? undefined : Number(amountSYP);
+    const expenseRate = Number(exchangeRateAtCreation ?? SETTINGS.exchangeRate);
+    if (!String(category || "").trim() || !Number.isFinite(amountUSD) || amountUSD <= 0 || !String(date || "").trim() || Number.isNaN(Date.parse(String(date)))) {
+      res.status(400).json({ success: false, message: "الفئة والقيمة الموجبة والتاريخ الصحيح مطلوبة" });
       return;
     }
-
-    const expenseRate = Number(exchangeRateAtCreation || SETTINGS.exchangeRate) > 0 ? Number(exchangeRateAtCreation || SETTINGS.exchangeRate) : 135;
-    const amountUSD = Number(amount) || 0;
+    if (requestedSYP !== undefined && (!Number.isFinite(requestedSYP) || requestedSYP <= 0)) {
+      res.status(400).json({ success: false, message: "قيمة SYP يجب أن تكون موجبة وصالحة" });
+      return;
+    }
+    const safeExpenseRate = Number.isFinite(expenseRate) && expenseRate > 0 ? expenseRate : 135;
     const newExp = {
       id: "exp-" + (EXPENSES.length + 1),
       category,
       amount: amountUSD,
       amountUSD,
-      amountSYP: Number.isFinite(Number(amountSYP)) ? Math.round(Number(amountSYP)) : Math.round(amountUSD * expenseRate),
-      exchangeRateAtCreation: expenseRate,
+      amountSYP: requestedSYP === undefined ? Math.round(amountUSD * safeExpenseRate) : Math.round(requestedSYP),
+      exchangeRateAtCreation: safeExpenseRate,
       currency: "USD",
       date,
       description: description || "",
@@ -7558,18 +7581,40 @@ Role Guidelines:
       return;
     }
 
-    if (category) exp.category = category;
+    if (category !== undefined && !String(category || "").trim()) {
+      res.status(400).json({ success: false, message: "فئة المصروف مطلوبة" });
+      return;
+    }
     if (amount !== undefined) {
-      const expenseRate = Number(exchangeRateAtCreation || SETTINGS.exchangeRate) > 0 ? Number(exchangeRateAtCreation || SETTINGS.exchangeRate) : 135;
-      exp.amount = Number(amount);
-      exp.amountUSD = Number(amount);
-      exp.amountSYP = Number.isFinite(Number(amountSYP)) ? Math.round(Number(amountSYP)) : Math.round((Number(amount) || 0) * expenseRate);
-      exp.exchangeRateAtCreation = expenseRate;
+      const nextAmountUSD = Number(amount);
+      const nextAmountSYP = amountSYP === undefined ? undefined : Number(amountSYP);
+      const requestedRate = Number(exchangeRateAtCreation ?? SETTINGS.exchangeRate);
+      const safeRate = Number.isFinite(requestedRate) && requestedRate > 0 ? requestedRate : 135;
+      if (!Number.isFinite(nextAmountUSD) || nextAmountUSD <= 0 || (nextAmountSYP !== undefined && (!Number.isFinite(nextAmountSYP) || nextAmountSYP <= 0))) {
+        res.status(400).json({ success: false, message: "قيمة المصروف وقيمة SYP يجب أن تكونا موجبتين وصالحتين" });
+        return;
+      }
+      exp.amount = nextAmountUSD;
+      exp.amountUSD = nextAmountUSD;
+      exp.amountSYP = nextAmountSYP === undefined ? Math.round(nextAmountUSD * safeRate) : Math.round(nextAmountSYP);
+      exp.exchangeRateAtCreation = safeRate;
       exp.currency = "USD";
     }
-    if (date) exp.date = date;
+    if (date !== undefined) {
+      if (!String(date || "").trim() || Number.isNaN(Date.parse(String(date)))) {
+        res.status(400).json({ success: false, message: "تاريخ المصروف غير صالح" });
+        return;
+      }
+      exp.date = date;
+    }
     if (description !== undefined) exp.description = description;
-    if (status) exp.status = status;
+    if (status !== undefined) {
+      if (!["paid", "pending"].includes(status)) {
+        res.status(400).json({ success: false, message: "حالة المصروف غير صالحة" });
+        return;
+      }
+      exp.status = status;
+    }
 
     // Log Activity
     ACTIVITY_LOGS.unshift({
@@ -7924,7 +7969,14 @@ Role Guidelines:
     if (inventory) SETTINGS.inventory = { ...SETTINGS.inventory, ...inventory };
     if (backup) SETTINGS.backup = { ...SETTINGS.backup, ...backup };
     if (autoArchive) SETTINGS.autoArchive = { ...SETTINGS.autoArchive, ...autoArchive };
-    if (exchangeRate !== undefined && Number(exchangeRate) > 0) SETTINGS.exchangeRate = Number(exchangeRate);
+    if (exchangeRate !== undefined) {
+      const nextExchangeRate = Number(exchangeRate);
+      if (!Number.isFinite(nextExchangeRate) || nextExchangeRate <= 0) {
+        res.status(400).json({ success: false, message: "سعر الصرف يجب أن يكون رقماً موجباً وصالحاً" });
+        return;
+      }
+      SETTINGS.exchangeRate = nextExchangeRate;
+    }
 
     // Log Activity
     ACTIVITY_LOGS.unshift({

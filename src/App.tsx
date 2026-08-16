@@ -356,15 +356,6 @@ export default function App() {
       let revenue = dayOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
       let orderCount = dayOrders.length;
       
-      // Inject beautiful baseline values so chart is populated with visual richness
-      if (i === 6) { revenue += 120.0; orderCount += 2; }
-      else if (i === 5) { revenue += 245.0; orderCount += 4; }
-      else if (i === 4) { revenue += 180.0; orderCount += 3; }
-      else if (i === 3) { revenue += 310.0; orderCount += 5; }
-      else if (i === 2) { revenue += 150.0; orderCount += 2; }
-      else if (i === 1) { revenue += 420.0; orderCount += 6; }
-      else if (i === 0) { revenue += 95.0; orderCount += 1; }
-
       // Map real orders
       const mappedRealOrders = dayOrders.map(o => {
         const cust = customers.find(c => c.id === o.customerId);
@@ -388,45 +379,7 @@ export default function App() {
         };
       });
 
-      // Simulated orders for background baseline
-      let mockOrdersList: any[] = [];
-      if (i === 6) {
-        mockOrdersList = [
-          { orderNumber: "ORD-706", customerName: "أحمد الحموي (افتراضي)", totalPrice: 70.0, itemsSummary: "درع أكريليك تذكاري x2", status: "تم التسليم", isMock: true },
-          { orderNumber: "ORD-705", customerName: "مكتبة الشرق (افتراضي)", totalPrice: 50.0, itemsSummary: "ميداليات جلدية x10", status: "تم التسليم", isMock: true }
-        ];
-      } else if (i === 5) {
-        mockOrdersList = [
-          { orderNumber: "ORD-704", customerName: "مؤسسة النجاح (افتراضي)", totalPrice: 150.0, itemsSummary: "علب هدايا خشبية زان x15", status: "تم التسليم", isMock: true },
-          { orderNumber: "ORD-703", customerName: "فندق الشام (افتراضي)", totalPrice: 95.0, itemsSummary: "لوحات توجيهية أكريليك x5", status: "تم التسليم", isMock: true }
-        ];
-      } else if (i === 4) {
-        mockOrdersList = [
-          { orderNumber: "ORD-702", customerName: "سحر الورد (افتراضي)", totalPrice: 100.0, itemsSummary: "حوامل أكريليك لعرض الزهور x10", status: "تم التسليم", isMock: true },
-          { orderNumber: "ORD-701", customerName: "رائد الخطيب (افتراضي)", totalPrice: 80.0, itemsSummary: "علبة مصحف خشبية محفورة x2", status: "تم التسليم", isMock: true }
-        ];
-      } else if (i === 3) {
-        mockOrdersList = [
-          { orderNumber: "ORD-700", customerName: "مطعم الوالي (افتراضي)", totalPrice: 180.0, itemsSummary: "قوائم طعام خشبية مخصصة x30", status: "تم التسليم", isMock: true },
-          { orderNumber: "ORD-699", customerName: "صالون لمسة (افتراضي)", totalPrice: 130.0, itemsSummary: "لوحة أكريليك مضيئة بشعار الصالون x1", status: "تم التسليم", isMock: true }
-        ];
-      } else if (i === 2) {
-        mockOrdersList = [
-          { orderNumber: "ORD-698", customerName: "جنى تيك (افتراضي)", totalPrice: 90.0, itemsSummary: "قواعد خشبية مضيئة x6", status: "تم التسليم", isMock: true },
-          { orderNumber: "ORD-697", customerName: "شركة الأمل (افتراضي)", totalPrice: 60.0, itemsSummary: "بطاقات عمل خشبية رقيقة x100", status: "تم التسليم", isMock: true }
-        ];
-      } else if (i === 1) {
-        mockOrdersList = [
-          { orderNumber: "ORD-696", customerName: "جامعة دمشق (افتراضي)", totalPrice: 250.0, itemsSummary: "دروع تخرج زجاجية وأكريليك x25", status: "تم التسليم", isMock: true },
-          { orderNumber: "ORD-695", customerName: "مطبعة المدينة (افتراضي)", totalPrice: 170.0, itemsSummary: "أغطية دفاتر جلدية منقوشة x50", status: "تم التسليم", isMock: true }
-        ];
-      } else if (i === 0) {
-        mockOrdersList = [
-          { orderNumber: "ORD-694", customerName: "موزع الجملة (افتراضي)", totalPrice: 95.0, itemsSummary: "حوامل خشبية للهواتف x20", status: "جاهز للتسليم", isMock: true }
-        ];
-      }
-
-      const allDayOrderDetails = [...mappedRealOrders, ...mockOrdersList];
+      const allDayOrderDetails = mappedRealOrders;
       
       data.push({
         date: dateStr,
@@ -3892,9 +3845,9 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
             {/* Bottom Credits & System Specs */}
             <div className="pt-6 mt-6 border-t border-zinc-850/80 flex flex-wrap items-center justify-between text-[10px] font-mono text-zinc-500 gap-2">
               <div className="flex items-center gap-3">
-                <span className="text-zinc-400 font-bold">AXIS LAB v0.1.2</span>
+                <span className="text-zinc-400 font-bold">AXIS LAB v0.13.5</span>
                 <span>•</span>
-                <span>Postgres & Prisma Engine</span>
+                <span>SQLite Local ERP Engine</span>
               </div>
               <div className="flex items-center gap-2 text-zinc-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
@@ -4259,7 +4212,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
           <AxisLabLogo size={28} src={companySettings?.logo} className="transform hover:rotate-12 transition-transform duration-300" />
           <h1 className="font-semibold text-xs tracking-tight text-zinc-100 flex items-center gap-1.5">
             <span className="text-[#c59257] font-bold">AXIS</span><span>LAB OS</span> 
-            <span className="text-zinc-500 font-mono text-[10px] hidden sm:inline">/ v0.1.2 (Interactive)</span>
+            <span className="text-zinc-500 font-mono text-[10px] hidden sm:inline">/ v0.13.5 (Interactive)</span>
           </h1>
         </div>
 

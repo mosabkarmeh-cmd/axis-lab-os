@@ -1,0 +1,15 @@
+const fs = require('fs');
+const server = fs.readFileSync('server.ts', 'utf8');
+const testFiles = fs.readdirSync('tests').filter((name) => /\.(cjs|ts)$/.test(name));
+const tests = testFiles.map((name) => fs.readFileSync(`tests/${name}`, 'utf8')).join('\n');
+const routeRe = /app\.(get|post|put|patch|delete)\(\s*["'`]([^"'`]+)["'`]/g;
+const apiRe = /["'`]((?:\/api|api)\/[^"'`\s?]+)["'`]/g;
+const routes = [];
+let match;
+while ((match = routeRe.exec(server))) routes.push({ method: match[1].toUpperCase(), path: match[2] });
+const referenced = new Set();
+while ((match = apiRe.exec(tests))) referenced.add(match[1].startsWith('/') ? match[1] : `/${match[1]}`);
+const normalize = (path) => path.replace(/:[A-Za-z0-9_]+/g, ':param').replace(/\\/g, '/');
+const referencedNormalized = new Set([...referenced].map(normalize));
+const missing = routes.filter((route) => ![...referencedNormalized].some((path) => normalize(route.path) === path));
+console.log(JSON.stringify({ routeCount: routes.length, referencedCount: referenced.size, missingCount: missing.length, missing }, null, 2));
