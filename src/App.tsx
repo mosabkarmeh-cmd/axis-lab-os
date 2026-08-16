@@ -130,6 +130,7 @@ import HelpTooltip from "./components/HelpTooltip";
 import AddOrderModal from "./components/AddOrderModal";
 import AutoLogoutTimer from "./components/AutoLogoutTimer";
 import CurrencyConverterModal from "./components/CurrencyConverterModal";
+import FirstRunPasswordModal from "./components/FirstRunPasswordModal";
 
 const USERS = [
   { id: "u-1", email: "admin@axislab.com", fullName: "المدير العام", role: "admin" },
@@ -153,6 +154,8 @@ export default function App() {
   const [rememberMe, setRememberMe] = useState<boolean>(true);
   const [activePreset, setActivePreset] = useState<string>("admin");
   const [inspectToken, setInspectToken] = useState<any>(null);
+  const [firstRunPasswordCurrent, setFirstRunPasswordCurrent] = useState<string | null>(null);
+  const [isFirstRunPasswordLoading, setIsFirstRunPasswordLoading] = useState(false);
 
   // Developer logs and JWT inspect panel visibility states (Hidden by default to keep the UI clean)
   const [showTerminalLogs, setShowTerminalLogs] = useLocalStorage<boolean>("axis_show_terminal_logs", false);
@@ -835,28 +838,35 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
   }, []);
 
   useEffect(() => {
-    if (!currentUser?.mustChangePassword || !token) return;
-    const currentPassword = window.prompt("هذه كلمة مرور مؤقتة. أدخل كلمة المرور الحالية:");
-    const newPassword = currentPassword === null ? null : window.prompt("أدخل كلمة المرور الجديدة (8 أحرف على الأقل):");
-    if (!currentPassword || !newPassword) {
-      setAuthError("يجب تغيير كلمة المرور المؤقتة قبل استخدام النظام.");
-      return;
+    if (currentUser?.mustChangePassword && token) {
+      setFirstRunPasswordCurrent(authPassword || null);
+    } else {
+      setFirstRunPasswordCurrent(null);
     }
-    fetch("/api/auth/change-password", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ currentPassword, newPassword }),
-    }).then(async (res) => {
+  }, [currentUser?.mustChangePassword, token, authPassword]);
+
+  const handleFirstRunPasswordChange = async (currentPassword: string, newPassword: string) => {
+    if (!token) return;
+    setIsFirstRunPasswordLoading(true);
+    try {
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "تعذر تغيير كلمة المرور");
       setCurrentUser(data.user);
+      setFirstRunPasswordCurrent(null);
       setAuthError(null);
       addTerminalLog("AUTH", "تم تغيير كلمة مرور المسؤول المؤقتة بنجاح.");
-    }).catch((error) => {
+    } catch (error: any) {
       setAuthError(error.message);
       addTerminalLog("ERROR", error.message);
-    });
-  }, [currentUser?.mustChangePassword, token]);
+    } finally {
+      setIsFirstRunPasswordLoading(false);
+    }
+  };
 
   // Enforce role-based view permissions dynamically
   useEffect(() => {
@@ -4204,6 +4214,14 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
   return (
     <div id="axis-system" dir="rtl" className={`flex flex-col h-screen w-full bg-[#09090b] text-zinc-300 font-sans overflow-hidden ${theme === "light" ? "theme-light" : ""}`}>
       <AutoLogoutTimer token={token} onLogout={() => handleLogout(true)} />
+      {firstRunPasswordCurrent && (
+        <FirstRunPasswordModal
+          initialCurrentPassword={firstRunPasswordCurrent}
+          onSubmit={handleFirstRunPasswordChange}
+          error={authError}
+          loading={isFirstRunPasswordLoading}
+        />
+      )}
       {/* Upper Navigation Rail */}
       <header className="h-12 border-b border-zinc-800 flex items-center justify-between px-4 bg-zinc-950 shrink-0 select-none">
         

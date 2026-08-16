@@ -45,3 +45,41 @@ The isolated admin password was entered successfully. The login submission actio
 The production build and complete smoke command passed after two fixes: stale UI/Electron version labels were updated to 0.13.5 and all injected dashboard baseline orders/revenue were removed so the seven-day chart uses real orders only. A P0 production-flow issue was also fixed: completing a job now rejects insufficient available material stock and rejects repeated completion attempts before changing job state. No negative-stock deduction is permitted through this route.
 
 Windows Installer QA run 31935527457 completed successfully for commit faea983: backend validation, Current User build, All Users build, installation and launch checks all passed. The focused production endpoint test also passed, and the source audit found no remaining mojibake in the inspected logo/Electron files after repair. The only remaining evidence gap is a visual post-login browser pass because the browser session became unavailable; multi-month report/PDF visual verification and the broader P2 data/integration checks are not yet evidence-backed, so a 100% release claim would be premature.
+
+## Browser visual checkpoint — current pass
+
+The local UI reopened successfully at port 3000. The login screen renders the Arabic branding, service labels, AXIS LAB v0.13.5, SQLite engine label, and 1$ = 135 SYP without visible mojibake. Selecting the admin demo account did not visibly populate a password; clicking secure login with an empty password triggered the browser's required-field validation. The post-login pass remains pending until the isolated server credentials are known or the preset behavior is corrected.
+
+The isolated UI instance on port 3001 hydrated successfully and rendered the same corrected Arabic branding, version v0.13.5, SQLite label, and SYP rate display. A temporary bootstrap credential is available for the next login action.
+
+The isolated login form accepted the temporary bootstrap password and the secure-login submission was sent. The browser session became unavailable again immediately after submission, so the post-login visual state could not be observed. This is an environment/browser evidence gap, not an observed authentication failure; API login and protected-route tests remain the source of automated evidence.
+
+## Hard Grill Me pass — report and inventory guards
+
+The monthly accounting aggregation now uses a `YYYY-MM` key, sorts chronologically, and keeps January 2025 separate from January 2026. A dedicated `report-monthly-smoke.cjs` test proves the separation and confirms historical expense SYP totals remain unchanged after a rate update.
+
+Inventory guards now reject non-finite/zero adjustment quantities, negative or zero reservations, unreserve quantities greater than the active reservation, and adjustments that would reduce quantity below reserved stock. SQLite mode no longer attempts PostgreSQL writes for these routes; successful changes are persisted through the local SQLite snapshot path. Seed inventory `inv-4` was corrected from an impossible reservation of 15 against quantity 12, and startup normalization repairs legacy inconsistent inventory records. `inventory-guards-smoke.cjs` covers these cases.
+
+After these changes, `npm run lint` and the complete `npm run test:smoke` suite passed, including currency, authentication/security, password bootstrap, API coverage, SQLite migration/recovery/concurrency, production completion, monthly reports, and inventory guards.
+
+## Browser visual checkpoint — authentication modal
+
+The isolated login flow now succeeds without browser prompt interruption. After submitting the bootstrap password, the dashboard loaded and displayed the in-app `تغيير كلمة المرور المؤقتة` dialog with current-password, new-password, confirmation, and submit fields. The dashboard navigation, SYP rate control, empty-state metrics, and Arabic UI rendered behind the modal. This closes the previous post-login visual gap caused by `window.prompt`.
+
+The first-run password flow completed successfully in the browser: the current password was prefilled from login, the new password and confirmation were accepted, the modal disappeared, and the full dashboard remained usable. The visible navigation includes dashboard, orders, production, inventory, products, accounting, reports, AI, G-code, settings, and help. No post-login crash or mojibake was observed in this pass.
+
+## Currency UI hard finding
+
+The browser audit reproduced a severe rate-input issue: entering `200` into the numeric exchange-rate field appended to the existing value (`135` became `135200`, then continued growing on repeated automated entry). This distorted live USD displays and dashboard calculations. Adding `onFocus(select())` alone did not eliminate the behavior under the browser input path. The issue remains open and must be fixed with a controlled draft/apply interaction or equivalent deterministic input handling before release.
+
+The actual DashboardCharts field was the source of the reproduced bug, not only the expanded converter modal. It now uses a separate draft and committed-rate reference. After reload, entering `200` produced a draft value of exactly `200` while the old committed rate remained unchanged until blur/Enter, preventing transient server writes and preserving existing historical values.
+
+The inline rate fix passed its commit test: leaving the field committed rate `200`, the header changed to `1$ = 200 ل.س`, and the inline converter showed `100 USD = 20,000 SYP`. Existing order SYP totals remained unchanged; only their live USD display changed as expected for open orders. The expanded converter also opened with rate `200`.
+
+The expanded converter passed the reverse-direction check at rate `200`: `20,000 SYP` produced `100.00 USD`, matching the forward result `100 USD = 20,000 SYP`. The dashboard header and both converter surfaces showed the same committed rate.
+
+## Rate-input remediation
+
+The severe inline-rate defect was fixed in `DashboardCharts.tsx` by separating `rateDraft` from the committed `exchangeRate`, normalizing appended numeric suffixes, selecting the field on focus, and committing only on blur or Enter. The expanded `CurrencyConverterModal.tsx` received equivalent committed-rate handling. The browser test now passes: the field accepts `200`, commits `200`, and both forward and reverse conversions remain mathematically correct.
+
+Post-fix validation: `npm run lint` passed and the complete `npm run test:smoke` suite passed, including currency conversion, financial persistence, first-run password, API security/coverage, SQLite migration/recovery/concurrency, production completion, monthly reporting, and inventory guards.

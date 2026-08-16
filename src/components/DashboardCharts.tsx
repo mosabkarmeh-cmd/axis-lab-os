@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { 
   ResponsiveContainer, 
   AreaChart, 
@@ -59,12 +59,17 @@ export default function DashboardCharts({
     return Math.round(100 * exchangeRate).toString();
   });
 
+  const [rateDraft, setRateDraft] = useState<string>(exchangeRate.toString());
+  const committedRateRef = useRef<string>(exchangeRate.toString());
   const [activeMetric, setActiveMetric] = useState<"combined" | "revenue" | "orders">("combined");
   const [selectedDayIndex, setSelectedDayIndex] = useState<number>(6);
   const [chartType, setChartType] = useState<"area" | "bar" | "line">("area");
 
-  // Keep calcSyp updated when exchangeRate changes externally
+  // Keep the editable rate and calculator synchronized with the committed server rate.
   useEffect(() => {
+    const nextRate = exchangeRate.toString();
+    committedRateRef.current = nextRate;
+    setRateDraft(nextRate);
     const numUsd = parseFloat(calcUsd);
     if (!isNaN(numUsd)) {
       setCalcSyp(Math.round(numUsd * exchangeRate).toString());
@@ -91,7 +96,34 @@ export default function DashboardCharts({
     }
   };
 
+  const handleRateDraftChange = (value: string) => {
+    const committed = committedRateRef.current;
+    let nextValue = value;
+    if (committed && value.startsWith(committed) && value.length > committed.length) {
+      const suffix = value.slice(committed.length);
+      const suffixNumber = Number(suffix);
+      if (/^\d+(?:\.\d+)?$/.test(suffix) && Number.isFinite(suffixNumber) && suffixNumber >= 100) {
+        nextValue = suffix;
+      }
+    }
+    setRateDraft(nextValue);
+  };
+
+  const commitRateDraft = () => {
+    const nextRate = Number(rateDraft);
+    if (!Number.isFinite(nextRate) || nextRate <= 0) {
+      setRateDraft(committedRateRef.current);
+      return;
+    }
+    const normalized = String(nextRate);
+    committedRateRef.current = normalized;
+    setRateDraft(normalized);
+    updateRate(nextRate);
+  };
+
   const handleQuickRateUpdate = (rate: number) => {
+    committedRateRef.current = String(rate);
+    setRateDraft(String(rate));
     updateRate(rate);
   };
 
@@ -866,12 +898,17 @@ export default function DashboardCharts({
                 </label>
                 <div className="relative">
                   <input
-                    type="number"
-                    value={exchangeRate || ""}
-                    onChange={(e) => {
-                      const val = parseFloat(e.target.value);
-                      updateRate(isNaN(val) ? 0 : val);
-                    }}
+                      type="number"
+                      value={rateDraft}
+                      onFocus={(e) => e.currentTarget.select()}
+                      onChange={(e) => handleRateDraftChange(e.target.value)}
+                      onBlur={commitRateDraft}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          commitRateDraft();
+                        }
+                      }}
                     className="w-full bg-zinc-950 border border-zinc-800/80 rounded-lg p-2 text-xs font-mono font-bold text-[#c59257] pl-16 text-left focus:border-[#c59257]/50 focus:outline-none font-sans"
                   />
                   <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-bold px-2 py-0.5 rounded bg-amber-950/40 text-[#c59257] border border-amber-900/20 font-sans">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   X,
@@ -34,6 +34,7 @@ export const CurrencyConverterModal: React.FC<CurrencyConverterModalProps> = ({
   onUpdateRate
 }) => {
   const [rateInput, setRateInput] = useState<string>(exchangeRate.toString());
+  const committedRateRef = useRef<string>(exchangeRate.toString());
   const [usdVal, setUsdVal] = useState<string>("100");
   const [sypVal, setSypVal] = useState<string>(
     Math.round(100 * exchangeRate).toString()
@@ -46,7 +47,9 @@ export const CurrencyConverterModal: React.FC<CurrencyConverterModalProps> = ({
 
   // Sync local fields only when the committed rate changes.
   useEffect(() => {
-    setRateInput(exchangeRate.toString());
+    const nextRate = exchangeRate.toString();
+    committedRateRef.current = nextRate;
+    setRateInput(nextRate);
     const usd = parseFloat(usdVal);
     if (!isNaN(usd)) setSypVal(Math.round(usd * exchangeRate).toString());
   }, [exchangeRate]);
@@ -57,6 +60,7 @@ export const CurrencyConverterModal: React.FC<CurrencyConverterModalProps> = ({
     const num = Number(value);
     if (!Number.isFinite(num) || num <= 0) return;
     const normalized = String(num);
+    committedRateRef.current = normalized;
     setRateInput(normalized);
     onUpdateRate(num);
     saveUpdateTimestamp();
@@ -65,8 +69,17 @@ export const CurrencyConverterModal: React.FC<CurrencyConverterModalProps> = ({
   };
 
   const handleRateInputChange = (val: string) => {
-    setRateInput(val);
-    const num = Number(val);
+    const committed = committedRateRef.current;
+    let nextValue = val;
+    // Some paste/automation paths append to a selected numeric value one character at a time.
+    // Compare against the last committed rate, and accept a plausible numeric suffix as the replacement.
+    if (committed && val.startsWith(committed) && val.length > committed.length) {
+      const suffix = val.slice(committed.length);
+      const suffixNumber = Number(suffix);
+      if (/^\d+(?:\.\d+)?$/.test(suffix) && Number.isFinite(suffixNumber) && suffixNumber >= 100) nextValue = suffix;
+    }
+    setRateInput(nextValue);
+    const num = Number(nextValue);
     const usd = parseFloat(usdVal);
     if (Number.isFinite(num) && num > 0 && !isNaN(usd)) {
       setSypVal(Math.round(usd * num).toString());
@@ -202,6 +215,7 @@ export const CurrencyConverterModal: React.FC<CurrencyConverterModalProps> = ({
                     <input
                       type="number"
                       value={rateInput}
+                      onFocus={(e) => e.currentTarget.select()}
                       onChange={(e) => handleRateInputChange(e.target.value)}
                       onBlur={() => commitRate(rateInput)}
                       onKeyDown={(e) => {

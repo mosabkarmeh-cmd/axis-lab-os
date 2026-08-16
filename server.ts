@@ -524,7 +524,7 @@ const INVENTORY = [
   { id: "inv-1", materialId: "m-1", quantity: 45, reservedQuantity: 12, availableQuantity: 33, location: "مستودع أ - رف 1" },
   { id: "inv-2", materialId: "m-2", quantity: 18, reservedQuantity: 5, availableQuantity: 13, location: "مستودع أ - رف 2" },
   { id: "inv-3", materialId: "m-3", quantity: 30, reservedQuantity: 0, availableQuantity: 30, location: "مستودع ب - رف 1" },
-  { id: "inv-4", materialId: "m-4", quantity: 12, reservedQuantity: 15, availableQuantity: -3, location: "مستودع ب - رف 2" },
+  { id: "inv-4", materialId: "m-4", quantity: 12, reservedQuantity: 5, availableQuantity: 7, location: "مستودع ب - رف 2" },
   { id: "inv-5", materialId: "m-5", quantity: 8, reservedQuantity: 2, availableQuantity: 6, location: "مستودع أ - رف 5" }
 ];
 
@@ -533,6 +533,22 @@ const INVENTORY_TRANSACTIONS = [
   { id: "tx-2", materialId: "m-1", type: "consumption", quantity: -5, beforeQty: 50, afterQty: 45, referenceType: "order", referenceId: "ord-1", reason: "قص لوحة أحرف مضيئة", createdById: "u-2", createdAt: new Date(Date.now() - 3600000 * 3).toISOString() },
   { id: "tx-3", materialId: "m-2", type: "adjustment", quantity: 2, beforeQty: 16, afterQty: 18, referenceType: "adjustment", referenceId: "adj-202", reason: "جرد تسوية دورية", createdById: "u-1", createdAt: new Date(Date.now() - 3600000 * 12).toISOString() }
 ];
+
+function normalizeInventoryState() {
+  let changed = false;
+  for (const inventory of INVENTORY) {
+    const quantity = Math.max(0, Number(inventory.quantity) || 0);
+    const reservedQuantity = Math.min(quantity, Math.max(0, Number(inventory.reservedQuantity) || 0));
+    const availableQuantity = quantity - reservedQuantity;
+    if (inventory.quantity !== quantity || inventory.reservedQuantity !== reservedQuantity || inventory.availableQuantity !== availableQuantity) {
+      inventory.quantity = quantity;
+      inventory.reservedQuantity = reservedQuantity;
+      inventory.availableQuantity = availableQuantity;
+      changed = true;
+    }
+  }
+  return changed;
+}
 
 const REMNANTS = [
   { id: "rem-1", materialId: "m-1", width: 400, height: 600, area: 240000, quantity: 2, status: "available", location: "صندوق البقايا أكريليك" },
@@ -1650,6 +1666,7 @@ async function startServer() {
   // last snapshot saved in Postgres, if any. On a brand-new database this finds
   // nothing and the app just keeps the hardcoded seed data (also true on first boot).
   const restoredCount = await loadPersistedState();
+  normalizeInventoryState();
   normalizeLegacyMaterialPrices();
   console.log(`[STATE] Mode=${DB_MODE}; restored ${restoredCount} collections from ${USE_SQLITE ? LOCAL_DATA_FILE : "database"}.`);
   // Make sure a fresh local store/database immediately has a snapshot saved.
@@ -3694,12 +3711,16 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
       return;
     }
 
-    const beforeQty = inv.quantity;
-    const qtyChange = Number(quantity) || 0;
+    const beforeQty = Number(inv.quantity) || 0;
+    const qtyChange = Number(quantity);
+    if (!Number.isFinite(qtyChange) || qtyChange === 0) {
+      res.status(400).json({ success: false, message: "Inventory adjustment must be a finite non-zero number" });
+      return;
+    }
     const afterQty = beforeQty + qtyChange;
 
-    if (afterQty < 0) {
-      res.status(400).json({ success: false, message: `Insufficient stock. Available: ${beforeQty}, Requested adjustment: ${qtyChange}` });
+    if (afterQty < 0 || afterQty < Number(inv.reservedQuantity || 0)) {
+      res.status(400).json({ success: false, message: `Insufficient stock. Available: ${beforeQty - Number(inv.reservedQuantity || 0)}, Requested adjustment: ${qtyChange}` });
       return;
     }
 
@@ -3711,18 +3732,20 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
     const invId = idNum(inv.id, "inv-");
 
     try {
-      if (invId) {
-        await db.update(inventoryTable).set({
-          quantity: afterQty, availableQuantity: inv.availableQuantity,
-          ...(location ? { location } : {}),
-        }).where(eq(inventoryTable.id, invId));
-      }
-      if (matId) {
-        await db.insert(inventoryTransactionsTable).values({
-          materialId: matId, type: type || "adjustment", quantity: qtyChange, beforeQty, afterQty,
-          referenceType: referenceType || null, referenceId: referenceId || null,
-          reason: reason || "تحديث يدوي للمخزون",
-        });
+      if (USE_POSTGRES) {
+        if (invId) {
+          await db.update(inventoryTable).set({
+            quantity: afterQty, availableQuantity: inv.availableQuantity,
+            ...(location ? { location } : {}),
+          }).where(eq(inventoryTable.id, invId));
+        }
+        if (matId) {
+          await db.insert(inventoryTransactionsTable).values({
+            materialId: matId, type: type || "adjustment", quantity: qtyChange, beforeQty, afterQty,
+            referenceType: referenceType || null, referenceId: referenceId || null,
+            reason: reason || "تحديث يدوي للمخزون",
+          });
+        }
       }
 
       const newTx = {
@@ -3749,6 +3772,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
         createdAt: new Date().toISOString()
       });
 
+      await persistStateNow();
       res.json({ success: true, inventory: inv });
     } catch (err: any) {
       console.error("Error updating inventory:", err);
@@ -3766,7 +3790,11 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
       return;
     }
 
-    const qty = Number(quantity) || 0;
+    const qty = Number(quantity);
+    if (!Number.isFinite(qty) || qty <= 0) {
+      res.status(400).json({ success: false, message: "Reservation quantity must be a positive finite number" });
+      return;
+    }
     const available = inv.quantity - inv.reservedQuantity;
     if (available < qty) {
       res.status(400).json({ success: false, message: `Insufficient available stock. Available: ${available}, Requested: ${qty}` });
@@ -3780,16 +3808,18 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
     const invId = idNum(inv.id, "inv-");
 
     try {
-      if (invId) {
-        await db.update(inventoryTable).set({
-          reservedQuantity: inv.reservedQuantity, availableQuantity: inv.availableQuantity,
-        }).where(eq(inventoryTable.id, invId));
-      }
-      if (matId) {
-        await db.insert(inventoryTransactionsTable).values({
-          materialId: matId, type: "reservation", quantity: qty, beforeQty: inv.quantity, afterQty: inv.quantity,
-          referenceType: "order", referenceId: referenceId || null, reason: "حجز مواد للطلب",
-        });
+      if (USE_POSTGRES) {
+        if (invId) {
+          await db.update(inventoryTable).set({
+            reservedQuantity: inv.reservedQuantity, availableQuantity: inv.availableQuantity,
+          }).where(eq(inventoryTable.id, invId));
+        }
+        if (matId) {
+          await db.insert(inventoryTransactionsTable).values({
+            materialId: matId, type: "reservation", quantity: qty, beforeQty: inv.quantity, afterQty: inv.quantity,
+            referenceType: "order", referenceId: referenceId || null, reason: "حجز مواد للطلب",
+          });
+        }
       }
 
       const newTx = {
@@ -3807,6 +3837,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
       };
       INVENTORY_TRANSACTIONS.push(newTx);
 
+      await persistStateNow();
       res.json({ success: true, inventory: inv });
     } catch (err: any) {
       console.error("Error reserving inventory:", err);
@@ -3824,24 +3855,34 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
       return;
     }
 
-    const qty = Number(quantity) || 0;
-    inv.reservedQuantity = Math.max(0, inv.reservedQuantity - qty);
+    const qty = Number(quantity);
+    if (!Number.isFinite(qty) || qty <= 0) {
+      res.status(400).json({ success: false, message: "Unreservation quantity must be a positive finite number" });
+      return;
+    }
+    if (qty > Number(inv.reservedQuantity || 0)) {
+      res.status(400).json({ success: false, message: "Cannot release more stock than is currently reserved" });
+      return;
+    }
+    inv.reservedQuantity = inv.reservedQuantity - qty;
     inv.availableQuantity = inv.quantity - inv.reservedQuantity;
 
     const matId = idNum(materialId, "m-");
     const invId = idNum(inv.id, "inv-");
 
     try {
-      if (invId) {
-        await db.update(inventoryTable).set({
-          reservedQuantity: inv.reservedQuantity, availableQuantity: inv.availableQuantity,
-        }).where(eq(inventoryTable.id, invId));
-      }
-      if (matId) {
-        await db.insert(inventoryTransactionsTable).values({
-          materialId: matId, type: "unreserve", quantity: -qty, beforeQty: inv.quantity, afterQty: inv.quantity,
-          referenceType: "order", referenceId: referenceId || null, reason: "إلغاء حجز مواد",
-        });
+      if (USE_POSTGRES) {
+        if (invId) {
+          await db.update(inventoryTable).set({
+            reservedQuantity: inv.reservedQuantity, availableQuantity: inv.availableQuantity,
+          }).where(eq(inventoryTable.id, invId));
+        }
+        if (matId) {
+          await db.insert(inventoryTransactionsTable).values({
+            materialId: matId, type: "unreserve", quantity: -qty, beforeQty: inv.quantity, afterQty: inv.quantity,
+            referenceType: "order", referenceId: referenceId || null, reason: "إلغاء حجز مواد",
+          });
+        }
       }
 
       const newTx = {
@@ -3859,6 +3900,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
       };
       INVENTORY_TRANSACTIONS.push(newTx);
 
+      await persistStateNow();
       res.json({ success: true, inventory: inv });
     } catch (err: any) {
       console.error("Error unreserving inventory:", err);
@@ -7689,34 +7731,50 @@ Role Guidelines:
       value
     }));
 
-    // Group revenue and expenses by month
+    // Group revenue and expenses by calendar month without merging the same month across years.
     const monthlyData: Record<string, { revenue: number; revenueSYP: number; expenses: number; expensesSYP: number }> = {};
-    
+    const monthKeyFor = (value: unknown) => {
+      const date = new Date(String(value || ""));
+      if (Number.isNaN(date.getTime())) return null;
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    };
+    const monthLabelFor = (monthKey: string) => {
+      const [year, month] = monthKey.split("-").map(Number);
+      return new Date(year, month - 1, 1).toLocaleDateString("ar-EG", { month: "short", year: "numeric" });
+    };
+
     INVOICES.forEach(inv => {
-      const date = new Date(inv.issueDate);
-      const monthStr = date.toLocaleString('ar-EG', { month: 'short' });
-      if (!monthlyData[monthStr]) monthlyData[monthStr] = { revenue: 0, revenueSYP: 0, expenses: 0, expensesSYP: 0 };
-      monthlyData[monthStr].revenue += (inv.paidAmount || 0);
-      monthlyData[monthStr].revenueSYP += invoiceSYP(inv, "paidAmount", "paidAmountSYP");
+      const monthKey = monthKeyFor(inv.issueDate);
+      if (!monthKey) return;
+      if (!monthlyData[monthKey]) monthlyData[monthKey] = { revenue: 0, revenueSYP: 0, expenses: 0, expensesSYP: 0 };
+      monthlyData[monthKey].revenue += (inv.paidAmount || 0);
+      monthlyData[monthKey].revenueSYP += invoiceSYP(inv, "paidAmount", "paidAmountSYP");
     });
 
     EXPENSES.forEach(exp => {
-      const date = new Date(exp.date);
-      const monthStr = date.toLocaleString('ar-EG', { month: 'short' });
-      if (!monthlyData[monthStr]) monthlyData[monthStr] = { revenue: 0, revenueSYP: 0, expenses: 0, expensesSYP: 0 };
-      monthlyData[monthStr].expenses += (exp.amountUSD ?? exp.amount);
-      monthlyData[monthStr].expensesSYP += expenseSYP(exp);
+      const monthKey = monthKeyFor(exp.date);
+      if (!monthKey) return;
+      if (!monthlyData[monthKey]) monthlyData[monthKey] = { revenue: 0, revenueSYP: 0, expenses: 0, expensesSYP: 0 };
+      monthlyData[monthKey].expenses += (exp.amountUSD ?? exp.amount);
+      monthlyData[monthKey].expensesSYP += expenseSYP(exp);
     });
 
-    const monthlyTrends = Object.entries(monthlyData).map(([month, data]) => ({
-      month,
-      revenue: data.revenue,
-      revenueSYP: data.revenueSYP,
-      expenses: data.expenses,
-      expensesSYP: data.expensesSYP,
-      profit: data.revenue - data.expenses,
-      profitSYP: data.revenueSYP - data.expensesSYP
-    })).slice(-6); // Last 6 months
+    const monthlyTrends = Object.keys(monthlyData)
+      .sort()
+      .slice(-6)
+      .map(monthKey => {
+        const data = monthlyData[monthKey];
+        return {
+          month: monthLabelFor(monthKey),
+          monthKey,
+          revenue: data.revenue,
+          revenueSYP: data.revenueSYP,
+          expenses: data.expenses,
+          expensesSYP: data.expensesSYP,
+          profit: data.revenue - data.expenses,
+          profitSYP: data.revenueSYP - data.expensesSYP
+        };
+      });
 
     res.json({
       success: true,
