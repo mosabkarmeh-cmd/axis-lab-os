@@ -143,6 +143,13 @@ const assert = (condition, message) => {
     const restoredRate = await request("/api/exchange-rate");
     assert(restoredRate.body.exchangeRate === 135, "Exchange rate was not restored after restart");
 
+    // Historical expense snapshot: changing the global rate must not rewrite a previously recorded expense.
+    const stableExpenseResponse = await request("/api/accounting/expenses", {
+      method: "POST",
+      body: JSON.stringify({ category: "صيانة", amount: 10, date: "2026-08-16", description: "Historical expense rate test", status: "paid" }),
+    });
+    assert(stableExpenseResponse.response.ok && stableExpenseResponse.body.expense.amountSYP === 1350 && stableExpenseResponse.body.expense.exchangeRateAtCreation === 135, `Expense snapshot was not stored: ${JSON.stringify(stableExpenseResponse.body)}`);
+
     // Final currency freeze: a fully paid and delivered order must never change when the rate changes later.
     const statsBeforeFinalization = await request("/api/accounting/stats");
     const analyticsBeforeFinalization = await request("/api/reports/analytics");
@@ -178,6 +185,7 @@ const assert = (condition, message) => {
     assert(finalizedInvoice && finalizedInvoice.totalPrice === 45 && finalizedInvoice.totalPriceSYP === 6075 && finalizedInvoice.totalPriceUSD === 45 && finalizedInvoice.exchangeRateAtFinalization === 135, `Finalized invoice changed after exchange-rate update: ${JSON.stringify(finalizedInvoice)}`);
     const statsAfterRateChange = await request("/api/accounting/stats");
     assert(statsAfterRateChange.body.stats.totalRevenueSYP === statsBeforeFinalization.body.stats.totalRevenueSYP + 6075, `Accounting stats did not use the finalized invoice SYP value: before=${statsBeforeFinalization.body.stats.totalRevenueSYP}, after=${statsAfterRateChange.body.stats.totalRevenueSYP}, finalized=${JSON.stringify(finalizedInvoice)}, invoices=${JSON.stringify(finalizedInvoicesAfterRateChange.body.invoices.map((item) => ({ id: item.id, orderId: item.orderId, paidAmount: item.paidAmount, paidAmountSYP: item.paidAmountSYP, exchangeRateAtIssue: item.exchangeRateAtIssue, exchangeRateAtFinalization: item.exchangeRateAtFinalization })))}`);
+    assert(statsAfterRateChange.body.stats.totalExpensesSYP === statsBeforeFinalization.body.stats.totalExpensesSYP, `Historical expense changed after exchange-rate update: before=${statsBeforeFinalization.body.stats.totalExpensesSYP}, after=${statsAfterRateChange.body.stats.totalExpensesSYP}`);
     const analyticsAfterRateChange = await request("/api/reports/analytics");
     assert(analyticsAfterRateChange.body.analytics.financial.totalRevenueSYP === analyticsBeforeFinalization.body.analytics.financial.totalRevenueSYP + 6075, "Profit analytics did not use the finalized invoice SYP value");
     const finalInvoicePdf = await fetch(`http://127.0.0.1:${port}/api/accounting/invoices/${finalizedInvoice.id}/pdf`, { headers });

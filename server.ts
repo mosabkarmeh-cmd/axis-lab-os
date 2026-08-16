@@ -7512,16 +7512,22 @@ Role Guidelines:
 
   // Create Expense
   app.post("/api/accounting/expenses", (req, res) => {
-    const { category, amount, date, description, status } = req.body;
+    const { category, amount, amountSYP, date, description, status, exchangeRateAtCreation } = req.body;
     if (!category || !amount || !date) {
       res.status(400).json({ success: false, message: "الفئة والقيمة والتاريخ مطلوبة" });
       return;
     }
 
+    const expenseRate = Number(exchangeRateAtCreation || SETTINGS.exchangeRate) > 0 ? Number(exchangeRateAtCreation || SETTINGS.exchangeRate) : 135;
+    const amountUSD = Number(amount) || 0;
     const newExp = {
       id: "exp-" + (EXPENSES.length + 1),
       category,
-      amount: Number(amount),
+      amount: amountUSD,
+      amountUSD,
+      amountSYP: Number.isFinite(Number(amountSYP)) ? Math.round(Number(amountSYP)) : Math.round(amountUSD * expenseRate),
+      exchangeRateAtCreation: expenseRate,
+      currency: "USD",
       date,
       description: description || "",
       status: status || "paid",
@@ -7545,7 +7551,7 @@ Role Guidelines:
 
   // Update Expense
   app.put("/api/accounting/expenses/:id", (req, res) => {
-    const { category, amount, date, description, status } = req.body;
+    const { category, amount, amountSYP, date, description, status, exchangeRateAtCreation } = req.body;
     const exp = EXPENSES.find(e => e.id === req.params.id);
     if (!exp) {
       res.status(404).json({ success: false, message: "المصروف غير موجود" });
@@ -7553,7 +7559,14 @@ Role Guidelines:
     }
 
     if (category) exp.category = category;
-    if (amount !== undefined) exp.amount = Number(amount);
+    if (amount !== undefined) {
+      const expenseRate = Number(exchangeRateAtCreation || SETTINGS.exchangeRate) > 0 ? Number(exchangeRateAtCreation || SETTINGS.exchangeRate) : 135;
+      exp.amount = Number(amount);
+      exp.amountUSD = Number(amount);
+      exp.amountSYP = Number.isFinite(Number(amountSYP)) ? Math.round(Number(amountSYP)) : Math.round((Number(amount) || 0) * expenseRate);
+      exp.exchangeRateAtCreation = expenseRate;
+      exp.currency = "USD";
+    }
     if (date) exp.date = date;
     if (description !== undefined) exp.description = description;
     if (status) exp.status = status;
@@ -7609,15 +7622,21 @@ Role Guidelines:
     const totalReceivables = INVOICES.reduce((sum, inv) => sum + (inv.remaining || 0), 0);
     const totalRevenueSYP = INVOICES.reduce((sum, inv) => sum + invoiceSYP(inv, "paidAmount", "paidAmountSYP"), 0);
     const totalReceivablesSYP = INVOICES.reduce((sum, inv) => sum + invoiceSYP(inv, "remaining", "remainingSYP"), 0);
-    const totalExpenses = EXPENSES.reduce((sum, exp) => sum + (exp.amount || 0), 0);
-    const totalExpensesSYP = Math.round(totalExpenses * reportRate);
+    const expenseSYP = (exp: any) => {
+      const fixedSYP = Number(exp.amountSYP);
+      if (Number.isFinite(fixedSYP)) return Math.round(fixedSYP);
+      const historicalRate = Number(exp.exchangeRateAtCreation);
+      return Math.round((Number(exp.amountUSD ?? exp.amount) || 0) * (historicalRate > 0 ? historicalRate : 135));
+    };
+    const totalExpenses = EXPENSES.reduce((sum, exp) => sum + (exp.amountUSD ?? exp.amount ?? 0), 0);
+    const totalExpensesSYP = EXPENSES.reduce((sum, exp) => sum + expenseSYP(exp), 0);
     const netProfit = totalRevenue - totalExpenses;
     const netProfitSYP = totalRevenueSYP - totalExpensesSYP;
 
     // Group expenses by category
     const expenseCategories: Record<string, number> = {};
     EXPENSES.forEach(e => {
-      expenseCategories[e.category] = (expenseCategories[e.category] || 0) + e.amount;
+      expenseCategories[e.category] = (expenseCategories[e.category] || 0) + (e.amountUSD ?? e.amount);
     });
 
     const categoryBreakdown = Object.entries(expenseCategories).map(([name, value]) => ({
@@ -7640,8 +7659,8 @@ Role Guidelines:
       const date = new Date(exp.date);
       const monthStr = date.toLocaleString('ar-EG', { month: 'short' });
       if (!monthlyData[monthStr]) monthlyData[monthStr] = { revenue: 0, revenueSYP: 0, expenses: 0, expensesSYP: 0 };
-      monthlyData[monthStr].expenses += exp.amount;
-      monthlyData[monthStr].expensesSYP += Math.round((Number(exp.amount) || 0) * reportRate);
+      monthlyData[monthStr].expenses += (exp.amountUSD ?? exp.amount);
+      monthlyData[monthStr].expensesSYP += expenseSYP(exp);
     });
 
     const monthlyTrends = Object.entries(monthlyData).map(([month, data]) => ({
@@ -7718,19 +7737,27 @@ Role Guidelines:
     const totalReceivables = INVOICES.reduce((sum, inv) => sum + (inv.remaining || 0), 0);
     const totalRevenueSYP = INVOICES.reduce((sum, inv) => sum + invoiceSYP(inv, "paidAmount", "paidAmountSYP"), 0);
     const totalReceivablesSYP = INVOICES.reduce((sum, inv) => sum + invoiceSYP(inv, "remaining", "remainingSYP"), 0);
-    const totalExpenses = EXPENSES.reduce((sum, exp) => sum + (exp.amount || 0), 0);
-    const totalExpensesSYP = Math.round(totalExpenses * invoiceReportRate);
+    const expenseSYP = (exp: any) => {
+      const fixedSYP = Number(exp.amountSYP);
+      if (Number.isFinite(fixedSYP)) return Math.round(fixedSYP);
+      const historicalRate = Number(exp.exchangeRateAtCreation);
+      return Math.round((Number(exp.amountUSD ?? exp.amount) || 0) * (historicalRate > 0 ? historicalRate : 135));
+    };
+    const totalExpenses = EXPENSES.reduce((sum, exp) => sum + (exp.amountUSD ?? exp.amount ?? 0), 0);
+    const totalExpensesSYP = EXPENSES.reduce((sum, exp) => sum + expenseSYP(exp), 0);
     const netProfit = totalRevenue - totalExpenses;
     const netProfitSYP = totalRevenueSYP - totalExpensesSYP;
     const profitMargin = totalRevenueSYP > 0 ? (netProfitSYP / totalRevenueSYP) * 100 : 0;
 
     const expenseCategories: Record<string, number> = {};
     EXPENSES.forEach(e => {
-      expenseCategories[e.category] = (expenseCategories[e.category] || 0) + e.amount;
+      expenseCategories[e.category] = (expenseCategories[e.category] || 0) + (e.amountUSD ?? e.amount);
     });
     const expenseBreakdown = Object.entries(expenseCategories).map(([name, value]) => ({
       name,
-      value
+      value,
+      valueUSD: value,
+      valueSYP: EXPENSES.filter((expense: any) => expense.category === name).reduce((sum, expense) => sum + expenseSYP(expense), 0)
     }));
 
     // 3. Machines & Operations

@@ -417,7 +417,7 @@ export default function ReportsView() {
                 <div className="space-y-1.5 max-h-32 overflow-y-auto pt-3 border-t border-zinc-900 text-xs text-zinc-400">
                   {analytics.financial.expenseBreakdown.map((item: any, i: number) => (
                     <div key={item.name} className="flex justify-between items-center">
-                      <span className="font-mono font-bold text-zinc-200">{formatMoney(item.value)}</span>
+                      <span className="font-mono font-bold text-zinc-200">{item.valueSYP != null ? formatFixedFinancialMoney(item.valueSYP, item.valueUSD ?? item.value) : formatMoney(item.value)}</span>
                       <div className="flex items-center gap-1.5">
                         <span>{item.name}</span>
                         <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />

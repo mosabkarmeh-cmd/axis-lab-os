@@ -221,7 +221,12 @@ export interface Invoice {
 export interface Expense {
   id: string;
   category: string;
+  /** Legacy/reporting amount in USD. */
   amount: number;
+  amountUSD?: number;
+  amountSYP?: number;
+  exchangeRateAtCreation?: number;
+  currency?: 'USD' | 'SYP' | string;
   date: string;
   description?: string;
   status: 'paid' | 'pending';
