@@ -97,3 +97,7 @@ A dedicated isolated stress test was added at `tests/stress-test.cjs`. The first
 The corrected run passed with **712 requests**: 500 concurrent reads across orders/materials/inventory/production/analytics, 200 parallel order writes, and 10 concurrent exchange-rate updates. SQLite integrity was `ok`; schema version remained `5`; 204 orders persisted before and after restart; final exchange rate persisted as `200`; and all 203 activity-log IDs were unique.
 
 Measured timings were: reads p50 `82.89 ms`, p95 `159.26 ms`; order writes p50 `160.51 ms`, p95 `275.64 ms`; exchange-rate writes p50 `9.53 ms`, p95 `13.76 ms`. These are isolated sandbox measurements, not a formal production capacity limit, but they confirm correctness and stability under the tested load.
+
+## Post-stress Windows validation
+
+After the activity-log ID fix, Windows Installer QA run [31941624140](https://github.com/mosabkarmeh-cmd/axis-lab-os/actions/runs/31941624140) completed successfully on commit `1a4944b7f85a78f05e2be92910e566151b16a7cf`. Current User and All Users installers both built, installed, and launched successfully, and backend validation passed in the same workflow.
