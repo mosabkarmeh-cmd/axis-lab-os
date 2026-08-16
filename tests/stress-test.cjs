@@ -152,7 +152,12 @@ async function runRateWave(values) {
     const report = await request("/api/reports/analytics");
     assert(report.response.ok && report.body?.success === true && report.body.analytics?.sales && report.body.analytics?.financial, `analytics report failed after stress: ${report.response.status} ${JSON.stringify(report.body).slice(0, 500)}`);
 
-    await new Promise((resolve) => setTimeout(resolve, 2200));
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    const benchmarkResponse = await request("/api/diagnostics/benchmarks");
+    assert(benchmarkResponse.response.ok && benchmarkResponse.body?.success === true, `benchmark endpoint failed: ${benchmarkResponse.response.status} ${JSON.stringify(benchmarkResponse.body).slice(0, 500)}`);
+    const benchmarks = benchmarkResponse.body;
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
     assert(fs.existsSync(dataFile), "SQLite file was not flushed after stress");
     const sizeBytes = fs.statSync(dataFile).size;
     const SQL = await initSqlJs({ locateFile: (file) => path.join(root, "node_modules/sql.js/dist", file) });
@@ -184,6 +189,7 @@ async function runRateWave(values) {
       durationMs: Date.now() - startedAt,
       load: { scale, readRequests: readTimes.length, orderWrites: writeTimes.length, rateWrites: rateTimes.length, totalRequests: readTimes.length + writeTimes.length + rateTimes.length + 2 },
       performanceMs: { reads: stats(readTimes), orderWrites: stats(writeTimes), rateWrites: stats(rateTimes) },
+      benchmarks: { orderCreate: benchmarks.orderCreate, persistence: benchmarks.persistence, persistenceQueue: benchmarks.persistenceQueue },
       persistence: { schemaVersion, integrity, sizeBytes, orderCountBefore, orderCountAfterRestart: afterRestart.body.length, activityLogCount: activityIds.length, uniqueActivityLogIds: uniqueActivityIds.size, finalRate: 200 },
     }, null, 2));
   } catch (error) {

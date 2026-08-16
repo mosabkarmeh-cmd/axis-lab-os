@@ -59,6 +59,28 @@ function nextActivityLogId(prefix = "log") {
   activityLogSequence = (activityLogSequence + 1) % 1000000;
   return `${prefix}_${Date.now()}_${process.pid}_${activityLogSequence}_${crypto.randomUUID().slice(0, 8)}`;
 }
+type BenchmarkBucket = { count: number; totalMs: number; maxMs: number; samples: number[] };
+const orderCreateBenchmarks = new Map<string, BenchmarkBucket>();
+const persistenceBenchmarks = new Map<string, BenchmarkBucket>();
+const persistQueueStats = { scheduled: 0, coalesced: 0, completed: 0, failed: 0 };
+function recordBenchmark(target: Map<string, BenchmarkBucket>, name: string, startedAt: number) {
+  const elapsed = Math.max(0, performance.now() - startedAt);
+  const bucket = target.get(name) || { count: 0, totalMs: 0, maxMs: 0, samples: [] };
+  bucket.count += 1;
+  bucket.totalMs += elapsed;
+  bucket.maxMs = Math.max(bucket.maxMs, elapsed);
+  bucket.samples.push(elapsed);
+  if (bucket.samples.length > 1000) bucket.samples.shift();
+  target.set(name, bucket);
+  return elapsed;
+}
+function benchmarkSnapshot(target: Map<string, BenchmarkBucket>) {
+  return [...target.entries()].map(([name, bucket]) => {
+    const sorted = [...bucket.samples].sort((a, b) => a - b);
+    const p95 = sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] : 0;
+    return { name, count: bucket.count, avgMs: Number((bucket.totalMs / Math.max(1, bucket.count)).toFixed(2)), p95Ms: Number(p95.toFixed(2)), maxMs: Number(bucket.maxMs.toFixed(2)) };
+  });
+}
 const NORMALIZED_LOCAL_COLLECTIONS = ["CUSTOMERS", "PRODUCTS", "MATERIALS", "INVENTORY", "SUPPLIERS", "MACHINES", "ACTIVITY_LOGS", "NOTIFICATIONS", "PRODUCTION_JOBS"] as const;
 const NORMALIZED_FINANCIAL_COLLECTIONS = ["INVOICES", "EXPENSES"] as const;
 let localSqlite: any = null;
@@ -1570,10 +1592,12 @@ async function persistStateNow() {
   if (!USE_POSTGRES && !USE_SQLITE) return;
   if (persistInFlight) {
     persistAgainAfter = true;
+    persistQueueStats.coalesced += 1;
     await new Promise<void>((resolve) => persistWaiters.push(resolve));
     return;
   }
   persistInFlight = true;
+  const persistStartedAt = performance.now();
   try {
     if (USE_SQLITE) {
       await withSqliteBusyRetry(async () => {
@@ -1594,7 +1618,9 @@ async function persistStateNow() {
           try { sqlite.run("ROLLBACK"); } catch {}
           throw error;
         }
+        const flushStartedAt = performance.now();
         await flushLocalSqlite();
+        recordBenchmark(persistenceBenchmarks, "sqlite_export_and_atomic_flush", flushStartedAt);
       });
     } else {
       for (const [key, value] of Object.entries(PERSISTED_COLLECTIONS)) {
@@ -1604,7 +1630,10 @@ async function persistStateNow() {
           .onConflictDoUpdate({ target: appState.key, set: { value: value as any, updatedAt: new Date() } });
       }
     }
+    recordBenchmark(persistenceBenchmarks, USE_SQLITE ? "persist_state_sqlite" : "persist_state_postgres", persistStartedAt);
+    persistQueueStats.completed += 1;
   } catch (err) {
+    persistQueueStats.failed += 1;
     console.error("[STATE] Failed to persist app state to database:", err);
     } finally {
     persistInFlight = false;
@@ -1618,8 +1647,24 @@ async function persistStateNow() {
     }
   }
 }
+async function persistMutationWithFastDurability() {
+  if (!USE_POSTGRES && !USE_SQLITE) return;
+  if (persistInFlight) {
+    schedulePersist();
+    return;
+  }
+  if (persistTimer) {
+    clearTimeout(persistTimer);
+    persistTimer = null;
+  }
+  await persistStateNow();
+}
 function schedulePersist() {
-  if (persistTimer) clearTimeout(persistTimer);
+  persistQueueStats.scheduled += 1;
+  if (persistTimer) {
+    persistQueueStats.coalesced += 1;
+    clearTimeout(persistTimer);
+  }
   persistTimer = setTimeout(() => {
     persistTimer = null;
     void persistStateNow();
@@ -1703,7 +1748,7 @@ async function startServer() {
         ["POST", "PUT", "PATCH", "DELETE"].includes(req.method) &&
         res.statusCode >= 200 && res.statusCode < 400
       ) {
-        if (USE_POSTGRES || USE_SQLITE) schedulePersist();
+        if ((USE_POSTGRES || USE_SQLITE) && !(res.locals as any).axisPersistScheduled) schedulePersist();
       }
     });
     next();
@@ -1712,6 +1757,21 @@ async function startServer() {
   // API Health Check Route
   app.get("/api/health", (req, res) => {
     res.json({ success: true, status: "ok", database: USE_POSTGRES ? "postgres" : USE_SQLITE ? "sqlite" : "memory" });
+  });
+
+  app.get("/api/diagnostics/benchmarks", (req, res) => {
+    const user = (req as any).user as UserRecord | undefined;
+    if (!user || user.role !== "admin") {
+      res.status(403).json({ success: false, message: "غير مصرح لك بعرض قياسات الأداء الداخلية" });
+      return;
+    }
+    res.json({
+      success: true,
+      collectedAt: new Date().toISOString(),
+      orderCreate: benchmarkSnapshot(orderCreateBenchmarks),
+      persistence: benchmarkSnapshot(persistenceBenchmarks),
+      persistenceQueue: { ...persistQueueStats, pendingTimer: Boolean(persistTimer), inFlight: persistInFlight, pendingFollowUp: persistAgainAfter },
+    });
   });
 
   // Mount PostgreSQL-backed routers only when PostgreSQL mode is active.
@@ -2345,12 +2405,14 @@ async function startServer() {
 
   // API - Create Order
   app.post("/api/orders", async (req, res) => {
+    const orderRequestStartedAt = performance.now();
     const { customerId, notes, priority, items, totalPrice, paidAmount, createdById, deliveryDateExpected, taxPercent, discount } = req.body;
     if (!customerId || !items || items.length === 0) {
       res.status(400).json({ error: "الرجاء اختيار العميل وإضافة عنصر واحد على الأقل للطلب" });
       return;
     }
-
+    recordBenchmark(orderCreateBenchmarks, "request_validation", orderRequestStartedAt);
+    const parseItemsStartedAt = performance.now();
     const parsedItems = items.map((it: any, idx: number) => ({
       id: `item-${Date.now()}-${idx}`,
       productName: it.productName,
@@ -2359,6 +2421,8 @@ async function startServer() {
       totalPrice: (Number(it.quantity) || 1) * (Number(it.unitPrice) || 0),
       notes: it.notes || ""
     }));
+    recordBenchmark(orderCreateBenchmarks, "parse_items", parseItemsStartedAt);
+    const totalsStartedAt = performance.now();
 
     const itemsSubtotal = parsedItems.reduce((acc: number, cur: any) => acc + cur.totalPrice, 0);
     const taxRate = Number(taxPercent) || 0;
@@ -2368,6 +2432,8 @@ async function startServer() {
     // Respect the explicit totalPrice from the frontend if passed, otherwise use computedTotal
     const finalTotal = totalPrice !== undefined ? Number(totalPrice) : Math.max(0, computedTotal);
     const orderNum = getNextNumber("order");
+    recordBenchmark(orderCreateBenchmarks, "calculate_totals_and_number", totalsStartedAt);
+    const objectBuildStartedAt = performance.now();
 
     const newOrder = {
       id: "ord-" + (ORDERS.length + 1),
@@ -2435,7 +2501,9 @@ async function startServer() {
       ]
     };
     INVOICES.unshift(newInvoice);
+    recordBenchmark(orderCreateBenchmarks, "build_order_and_invoice", objectBuildStartedAt);
 
+    const activityStartedAt = performance.now();
     // Log Activity
     const newOrderMsg = `إنشاء طلب جديد #${newOrder.orderNumber} بقيمة إجمالية $${newOrder.totalPrice.toFixed(2)} (المدفوع: $${newOrder.paidAmount.toFixed(2)} / المتبقي: $${newOrder.remaining.toFixed(2)})`;
     ACTIVITY_LOGS.unshift({
@@ -2447,14 +2515,13 @@ async function startServer() {
       details: newOrderMsg,
       createdAt: new Date().toISOString()
     });
+    recordBenchmark(orderCreateBenchmarks, "append_activity_log", activityStartedAt);
 
-        try {
-      await persistStateNow();
-    } catch (error: any) {
-      console.error("[ORDERS] Failed to persist newly created order:", error);
-      res.status(500).json({ error: "تعذر حفظ الطلب في قاعدة البيانات المحلية" });
-      return;
-    }
+    const queueStartedAt = performance.now();
+    await persistMutationWithFastDurability();
+    res.locals.axisPersistScheduled = true;
+    recordBenchmark(orderCreateBenchmarks, "queue_persistence", queueStartedAt);
+    recordBenchmark(orderCreateBenchmarks, "request_total_to_response", orderRequestStartedAt);
     res.json(newOrder);
   });
   // API - Update Order (Edit details)

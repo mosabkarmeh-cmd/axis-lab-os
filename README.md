@@ -113,6 +113,21 @@ The test scales the baseline of five read waves, two order-write waves, and ten 
 
 A passing stress test demonstrates correctness for the tested workload; it is not a formal production capacity guarantee. Compare P95 latency between runs and investigate any failed request, SQLite integrity error, data-count mismatch, rate mismatch, or activity-log collision.
 
+### Internal benchmarks and persistence queue
+
+Order creation records internal timings for request validation, item parsing, totals and number generation, order/invoice construction, activity-log append, persistence handling, and total handler time. An administrator can inspect the current in-memory measurements with the protected endpoint:
+
+```text
+GET /api/diagnostics/benchmarks
+Authorization: Bearer <admin-jwt>
+```
+
+The response includes order-create buckets, persistence buckets, and queue state. Each bucket reports `count`, `avgMs`, `p95Ms`, and `maxMs`. The endpoint is admin-only because it exposes internal operational information.
+
+SQLite writes use a single-flight queue with coalescing. The first mutation in a burst requests a fast durable flush, while concurrent follow-up mutations are combined into one later snapshot. Shutdown and backup operations still force a complete flush. This design reduces request-tail latency without removing the durability boundary required for local data recovery.
+
+When comparing performance, use the same `STRESS_SCALE`, machine class, Node.js version, and database seed. Compare order-write P95 with the internal `request_total_to_response` and persistence buckets: a low handler P95 with a higher persistence P95 means the remaining cost is SQLite export/atomic file replacement rather than order calculation.
+
 ## CI and Windows installers
 
 GitHub Actions validates the backend and produces two NSIS installer variants:

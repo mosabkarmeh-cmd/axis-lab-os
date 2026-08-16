@@ -109,3 +109,11 @@ The stress harness now accepts `STRESS_SCALE` and was rerun with `STRESS_SCALE=1
 The latest 150% measurements were: reads p50 `121.93 ms`, p95 `235.82 ms`, maximum `302.99 ms`; order writes p50 `264.54 ms`, p95 `436.97 ms`, maximum `437.09 ms`; exchange-rate writes p50 `11.98 ms`, p95 `19.88 ms`, maximum `19.88 ms`. The result is a successful tolerance run, not a formal maximum-capacity guarantee.
 
 README.md was rewritten to document setup, SQLite isolation, currency rules, smoke tests, stress scaling, PowerShell syntax, Windows packaging, troubleshooting, and release workflow.
+
+## Persistence queue and internal benchmarks
+
+The order-create path now records internal timings for validation, item parsing, totals/number generation, order/invoice construction, activity-log append, persistence queue handling, and total handler time. Admin-only diagnostics are exposed at `/api/diagnostics/benchmarks`.
+
+SQLite persistence now uses a single-flight/coalesced queue. Order creation performs the in-memory domain update, requests one durable fast flush for the first mutation in a burst, and coalesces concurrent follow-up saves. Shutdown and backup paths still perform an explicit flush. A regression initially showed that fully non-blocking persistence could lose the newest order during forced termination; the fast-durability step corrected that and the crash-recovery smoke test passed afterward.
+
+At the same 150% load, order-write P95 improved from the previous `436.97 ms` to `211.66 ms`, a reduction of approximately `51.6%`. The latest run passed with 750 reads, 300 order writes, and 15 rate writes. SQLite integrity remained `ok`, schema version remained `5`, 304 orders survived restart, all 303 activity IDs were unique, and persistence recorded zero failures. Internal order-handler benchmarks showed request-total P95 `0.17 ms`; persistence flush P95 was `216.42 ms`, confirming that most remaining tail cost is durable SQLite export rather than order-domain computation.
