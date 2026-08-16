@@ -260,8 +260,8 @@ export default function AccountingView({ customers, onRefreshOrders, currentUser
 
   // WhatsApp quick invoice share helper
   const handleShareInvoiceWhatsApp = (inv: Invoice) => {
-    const invTotalSYP = ((inv.totalPrice || 0) * exchangeRate).toLocaleString();
-    const invRemainingSYP = ((inv.remaining || 0) * exchangeRate).toLocaleString();
+    const invTotalSYP = Math.round(Number(inv.totalPrice || 0)).toLocaleString();
+    const invRemainingSYP = Math.round(Number(inv.remaining || 0)).toLocaleString();
     const statusLabel = inv.status === "paid" ? "مدفوعة بالكامل ✅" : inv.status === "partially_paid" ? "مدفوعة جزئياً ⚠️" : "غير مدفوعة ❌";
     const msg = `*AXIS LAB - فاتورة مبيعات*\n\n` +
       `📄 *رقم الفاتورة:* ${inv.invoiceNumber}\n` +
@@ -269,9 +269,9 @@ export default function AccountingView({ customers, onRefreshOrders, currentUser
       `📅 *تاريخ الإصدار:* ${new Date(inv.issueDate).toLocaleDateString("ar-EG")}\n` +
       `⏳ *تاريخ الاستحقاق:* ${inv.dueDate ? new Date(inv.dueDate).toLocaleDateString("ar-EG") : "غير محدد"}\n` +
       `📌 *الحالة:* ${statusLabel}\n\n` +
-      `💰 *المبلغ الإجمالي:* $${inv.totalPrice.toFixed(2)} (${invTotalSYP} ل.س)\n` +
-      `💵 *المدفوع:* $${inv.paidAmount.toFixed(2)}\n` +
-      `🔻 *المتبقي للتحصيل:* $${inv.remaining.toFixed(2)} (${invRemainingSYP} ل.س)\n\n` +
+      `💰 *المبلغ الإجمالي:* ${invTotalSYP} ل.س ($${(Number(inv.totalPrice || 0) / (exchangeRate || 135)).toFixed(2)})\n` +
+      `💵 *المدفوع:* ${Math.round(Number(inv.paidAmount || 0)).toLocaleString()} ل.س\n` +
+      `🔻 *المتبقي للتحصيل:* ${invRemainingSYP} ل.س ($${(Number(inv.remaining || 0) / (exchangeRate || 135)).toFixed(2)})\n\n` +
       `نشكركم لتعاملكم مع ورش AXIS LAB لليزر.`;
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
   };
@@ -1158,8 +1158,8 @@ export default function AccountingView({ customers, onRefreshOrders, currentUser
                         isPartial ? "مدفوع جزئياً" :
                         "غير مدفوع";
 
-                      const invTotalSYP = ((inv.totalPrice || 0) * exchangeRate).toLocaleString();
-                      const invRemainingSYP = ((inv.remaining || 0) * exchangeRate).toLocaleString();
+                      const invTotalSYP = Math.round(Number(inv.totalPrice || 0)).toLocaleString();
+                      const invRemainingSYP = Math.round(Number(inv.remaining || 0)).toLocaleString();
 
                       return (
                         <tr key={inv.id} className="hover:bg-zinc-900/20 transition-all font-sans">
@@ -1742,7 +1742,7 @@ export default function AccountingView({ customers, onRefreshOrders, currentUser
                 <div className="bg-black/40 p-3 rounded-lg border border-zinc-900/60">
                   <span className="text-[9px] text-zinc-500 font-bold block mb-1">الذمم بالليرة السورية</span>
                   <div className="text-sm font-mono text-[#c59257] font-bold">
-                    {(invoices.reduce((sum, inv) => sum + inv.remaining, 0) * exchangeRate).toLocaleString()} ل.س
+                    {Math.round(invoices.reduce((sum, inv) => sum + Number(inv.remaining || 0), 0)).toLocaleString()} ل.س
                   </div>
                 </div>
               </div>
@@ -2803,7 +2803,7 @@ export default function AccountingView({ customers, onRefreshOrders, currentUser
                               <td className="p-3 text-center font-mono text-zinc-300 print:text-black">1</td>
                               <td className="p-3 font-mono text-zinc-300 print:text-black">${invoiceToPrint.totalPrice.toFixed(2)}</td>
                               <td className="p-3 font-mono font-bold text-zinc-200 print:text-black">${invoiceToPrint.totalPrice.toFixed(2)}</td>
-                              <td className="p-3 font-mono text-[#c59257] print:text-black font-bold">{Math.round(invoiceToPrint.totalPrice * exchangeRate).toLocaleString()} ل.س</td>
+                              <td className="p-3 font-mono text-[#c59257] print:text-black font-bold">{Math.round(Number(invoiceToPrint.totalPrice || 0)).toLocaleString()} ل.س</td>
                             </tr>
                           )}
                         </tbody>
@@ -2835,15 +2835,15 @@ export default function AccountingView({ customers, onRefreshOrders, currentUser
                       </div>
                       <div className="flex justify-between items-center text-[#c59257] print:text-black">
                         <span className="font-extrabold text-xs">المبلغ الإجمالي بالليرة السورية:</span>
-                        <span className="text-base font-mono font-black">{Math.round(invoiceToPrint.totalPrice * exchangeRate).toLocaleString()} ل.س</span>
+                        <span className="text-base font-mono font-black">{Math.round(Number(invoiceToPrint.totalPrice || 0)).toLocaleString()} ل.س</span>
                       </div>
                       <div className="border-t border-zinc-850 pt-2 flex justify-between text-emerald-400 print:text-black">
                         <span>المبلغ المقبوض:</span>
-                        <span className="font-mono font-bold">{Math.round(invoiceToPrint.paidAmount * exchangeRate).toLocaleString()} ل.س (${invoiceToPrint.paidAmount.toFixed(2)})</span>
+                        <span className="font-mono font-bold">{Math.round(Number(invoiceToPrint.paidAmount || 0)).toLocaleString()} ل.س (${invoiceToPrint.paidAmount.toFixed(2)})</span>
                       </div>
                       <div className="flex justify-between text-rose-400 print:text-black font-bold">
                         <span>المبلغ المتبقي للتحصيل:</span>
-                        <span className="font-mono">{Math.round(invoiceToPrint.remaining * exchangeRate).toLocaleString()} ل.س (${invoiceToPrint.remaining.toFixed(2)})</span>
+                        <span className="font-mono">{Math.round(Number(invoiceToPrint.remaining || 0)).toLocaleString()} ل.س (${invoiceToPrint.remaining.toFixed(2)})</span>
                       </div>
                     </div>
                   </div>

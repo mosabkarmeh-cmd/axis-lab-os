@@ -689,9 +689,9 @@ export default function App() {
 ${itemsStr}
 
 التفاصيل المالية:
-- القيمة الإجمالية للطلب: $${selectedOrder.totalPrice.toFixed(2)} (${Math.round(selectedOrder.totalPrice * exchangeRate).toLocaleString()} ل.س)
-- المبلغ المدفوع: $${selectedOrder.paidAmount.toFixed(2)} (${Math.round(selectedOrder.paidAmount * exchangeRate).toLocaleString()} ل.س)
-- المبلغ المتبقي: $${selectedOrder.remaining.toFixed(2)} (${Math.round(selectedOrder.remaining * exchangeRate).toLocaleString()} ل.س)
+- القيمة الإجمالية للطلب: ${Number(selectedOrder.totalPrice || 0).toLocaleString()} ل.س
+- المبلغ المدفوع: ${Number(selectedOrder.paidAmount || 0).toLocaleString()} ل.س
+- المبلغ المتبقي: ${Number(selectedOrder.remaining || 0).toLocaleString()} ل.س
 
 تحميل الفاتورة وسند التسليم الإلكتروني PDF:
 https://axislab-portal.sy/api/orders/${selectedOrder.id}/pdf
@@ -2681,7 +2681,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
           width: matWidth ? parseFloat(matWidth) : null,
           height: matHeight ? parseFloat(matHeight) : null,
           unit: matUnit,
-          pricePerUnit: matPrice ? materialPriceUSD(parseFloat(matPrice), exchangeRate) : 0,
+          pricePerUnit: matPrice ? Math.round(parseFloat(matPrice)) : 0,
           minimumStock: matMinStock ? parseFloat(matMinStock) : 0,
           supplierId: matSupplierId || null,
           notes: matNotes,
@@ -2757,7 +2757,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
           width: editingMaterial.width,
           height: editingMaterial.height,
           unit: editingMaterial.unit,
-          pricePerUnit: materialPriceUSD(editingMaterial.pricePerUnit, exchangeRate),
+          pricePerUnit: Math.round(Number(editingMaterial.pricePerUnit) || 0),
           minimumStock: editingMaterial.minimumStock,
           supplierId: editingMaterial.supplierId,
           notes: editingMaterial.notes,

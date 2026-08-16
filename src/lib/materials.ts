@@ -19,11 +19,13 @@ export function extractMaterialName(item: Record<string, unknown>): string {
   return name || "مواد عامة";
 }
 
-/** The API and database store material unit prices in USD. */
-export function materialPriceUSD(pricePerUnit: unknown, _exchangeRate: number): number {
-  return Number(pricePerUnit) || 0;
+/** Material unit prices are stored and edited in Syrian pounds (SYP). */
+export function materialPriceSYP(pricePerUnit: unknown, _exchangeRate?: number): number {
+  return Math.round(Number(pricePerUnit) || 0);
 }
 
-export function materialPriceSYP(pricePerUnit: unknown, exchangeRate: number): number {
-  return Math.round(materialPriceUSD(pricePerUnit, exchangeRate) * exchangeRate);
+/** USD is presentation-only for final invoices or monthly reports. */
+export function materialPriceUSD(pricePerUnit: unknown, exchangeRate: number): number {
+  const rate = Number(exchangeRate) > 0 ? Number(exchangeRate) : 135;
+  return materialPriceSYP(pricePerUnit) / rate;
 }

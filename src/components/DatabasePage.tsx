@@ -208,15 +208,15 @@ export default function DatabasePage(props: Record<string, any>) {
                                       </td>
                                       <td className="p-3 text-right font-mono">
                                         <div className="font-bold text-[#c59257]">
-                                          {(o.totalPrice * exchangeRate).toLocaleString()} ل.س
+                                          {Math.round(Number(o.totalPrice || 0)).toLocaleString()} ل.س
                                         </div>
                                         <div className="text-[10px] text-zinc-500 font-normal">
-                                          ${o.totalPrice.toFixed(2)}
+                                          ${(Number(o.totalPrice || 0) / (exchangeRate || 135)).toFixed(2)}
                                         </div>
                                       </td>
                                       <td className="p-3 text-right font-mono">
                                         {o.remaining > 0 ? (
-                                          <span className="text-rose-400 font-bold">{(o.remaining * exchangeRate).toLocaleString()} ل.س</span>
+                                          <span className="text-rose-400 font-bold">{Math.round(Number(o.remaining || 0)).toLocaleString()} ل.س</span>
                                         ) : (
                                           <span className="text-emerald-400 font-bold">مسدد بالكامل</span>
                                         )}
@@ -356,7 +356,7 @@ export default function DatabasePage(props: Record<string, any>) {
                                     <td className="p-2 font-mono text-zinc-600">{o.id}</td>
                                     <td className="p-2 font-mono font-bold text-zinc-200">{o.orderNumber}</td>
                                     <td className="p-2 font-mono text-indigo-400">{o.customerId}</td>
-                                    <td className="p-2 text-right font-mono text-emerald-400">${o.totalPrice.toFixed(2)}</td>
+                                    <td className="p-2 text-right font-mono text-emerald-400">{Math.round(Number(o.totalPrice || 0)).toLocaleString()} ل.س</td>
                                     <td className="p-2">
                                       {(() => {
                                         const badge = getOrderStatusBadge(o.status);

@@ -502,18 +502,18 @@ export default function GlobalDialogs(props: Record<string, any>) {
                 <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4 grid grid-cols-3 gap-3 text-center">
                   <div className="p-2 bg-zinc-950/60 rounded-lg border border-zinc-850">
                     <span className="text-[10px] text-zinc-500 block">إجمالي التكلفة</span>
-                    <span className="text-xs font-bold text-zinc-200 font-mono block mt-0.5">${deliveryBlockedOrder.totalPrice.toFixed(2)}</span>
-                    <span className="text-[9px] text-zinc-500 font-mono">{Math.round(deliveryBlockedOrder.totalPrice * exchangeRate).toLocaleString()} ل.س</span>
+                    <span className="text-xs font-bold text-zinc-200 font-mono block mt-0.5">{Math.round(Number(deliveryBlockedOrder.totalPrice || 0)).toLocaleString()} ل.س</span>
+                    <span className="text-[9px] text-zinc-500 font-mono">${(Number(deliveryBlockedOrder.totalPrice || 0) / (exchangeRate || 135)).toFixed(2)}</span>
                   </div>
                   <div className="p-2 bg-emerald-950/30 rounded-lg border border-emerald-900/30">
                     <span className="text-[10px] text-emerald-400 block">المقبوض سابقاً</span>
-                    <span className="text-xs font-bold text-emerald-300 font-mono block mt-0.5">${deliveryBlockedOrder.paidAmount.toFixed(2)}</span>
-                    <span className="text-[9px] text-emerald-500 font-mono">{Math.round(deliveryBlockedOrder.paidAmount * exchangeRate).toLocaleString()} ل.س</span>
+                    <span className="text-xs font-bold text-emerald-300 font-mono block mt-0.5">{Math.round(Number(deliveryBlockedOrder.paidAmount || 0)).toLocaleString()} ل.س</span>
+                    <span className="text-[9px] text-emerald-500 font-mono">${(Number(deliveryBlockedOrder.paidAmount || 0) / (exchangeRate || 135)).toFixed(2)}</span>
                   </div>
                   <div className="p-2 bg-rose-950/40 rounded-lg border border-rose-900/40 animate-pulse">
                     <span className="text-[10px] text-rose-400 block font-bold">المتبقي المستحق</span>
-                    <span className="text-sm font-extrabold text-rose-300 font-mono block mt-0.5">${deliveryBlockedOrder.remaining.toFixed(2)}</span>
-                    <span className="text-[10px] text-rose-400 font-bold font-mono">{Math.round(deliveryBlockedOrder.remaining * exchangeRate).toLocaleString()} ل.س</span>
+                    <span className="text-sm font-extrabold text-rose-300 font-mono block mt-0.5">{Math.round(Number(deliveryBlockedOrder.remaining || 0)).toLocaleString()} ل.س</span>
+                    <span className="text-[10px] text-rose-400 font-bold font-mono">${(Number(deliveryBlockedOrder.remaining || 0) / (exchangeRate || 135)).toFixed(2)}</span>
                   </div>
                 </div>
 
@@ -558,7 +558,7 @@ export default function GlobalDialogs(props: Record<string, any>) {
                     ) : (
                       <>
                         <CheckCircle2 className="w-4 h-4" />
-                        <span>قبض المتبقي كاش (${deliveryBlockedOrder.remaining.toFixed(2)} / {Math.round(deliveryBlockedOrder.remaining * exchangeRate).toLocaleString()} ل.س) والتسليم فوراً</span>
+                        <span>قبض المتبقي كاش ({Math.round(Number(deliveryBlockedOrder.remaining || 0)).toLocaleString()} ل.س / ${(Number(deliveryBlockedOrder.remaining || 0) / (exchangeRate || 135)).toFixed(2)} USD) والتسليم فوراً</span>
                       </>
                     )}
                   </button>
@@ -806,7 +806,7 @@ export default function GlobalDialogs(props: Record<string, any>) {
                         <span>{payBadge.text}</span>
                         {selectedOrder.remaining > 0.01 && (
                           <span className="font-mono text-rose-300 mr-1">
-                            (متبقي ${selectedOrder.remaining.toFixed(2)})
+                            (متبقي ${(Number(selectedOrder.remaining || 0) / (exchangeRate || 135)).toFixed(2)})
                           </span>
                         )}
                       </span>
@@ -1253,15 +1253,15 @@ export default function GlobalDialogs(props: Record<string, any>) {
                           <div>
                             <span className="font-bold text-xs block text-rose-200">حظر تسليم الطلب غير المسدد</span>
                             <span className="text-[11px] text-rose-300/80 block">
-                              يتبقى رصيد معلق قدره <strong className="font-mono text-rose-200 font-extrabold">${selectedOrder.remaining.toFixed(2)} ({Math.round(selectedOrder.remaining * exchangeRate).toLocaleString()} ل.س)</strong>. النظام يمنع تحويل الحالة إلى (تم التسليم) لحين استيفاء كامل المبلغ.
+                              يتبقى رصيد معلق قدره <strong className="font-mono text-rose-200 font-extrabold">{Math.round(Number(selectedOrder.remaining || 0)).toLocaleString()} ل.س (${(Number(selectedOrder.remaining || 0) / (exchangeRate || 135)).toFixed(2)} USD)</strong>. النظام يمنع تحويل الحالة إلى (تم التسليم) لحين استيفاء كامل المبلغ.
                             </span>
                           </div>
                         </div>
                         <button
                           type="button"
                           onClick={() => {
-                            setNewPaymentAmount(selectedOrder.remaining.toFixed(2));
-                            setNewPaymentSYPAmount(Math.round(selectedOrder.remaining * exchangeRate).toString());
+                            setNewPaymentAmount((Number(selectedOrder.remaining || 0) / (exchangeRate || 135)).toFixed(2));
+                            setNewPaymentSYPAmount(Math.round(Number(selectedOrder.remaining || 0)).toString());
                             setNewPaymentNotes("تسديد كامل المتبقي لاستيفاء الشروط وتسليم الطلب");
                           }}
                           className="px-3 py-1.5 bg-rose-900/60 hover:bg-rose-800 text-rose-100 rounded-lg text-[10px] font-bold border border-rose-700/60 transition-all cursor-pointer shrink-0"
@@ -1289,18 +1289,18 @@ export default function GlobalDialogs(props: Record<string, any>) {
                           <div className="grid grid-cols-3 gap-3 text-center">
                             <div className="bg-zinc-950/60 border border-zinc-850 p-2.5 rounded-lg">
                               <span className="text-[10px] text-zinc-500 block mb-0.5">إجمالي التكلفة</span>
-                              <strong className="text-base font-mono text-zinc-200 block">{Math.round(selectedOrder.totalPrice * exchangeRate).toLocaleString()} ل.س</strong>
-                              <span className="text-[10px] text-zinc-500 font-mono block">${selectedOrder.totalPrice.toFixed(2)}</span>
+                              <strong className="text-base font-mono text-zinc-200 block">{Math.round(Number(selectedOrder.totalPrice || 0)).toLocaleString()} ل.س</strong>
+                              <span className="text-[10px] text-zinc-500 font-mono block">${(Number(selectedOrder.totalPrice || 0) / (exchangeRate || 135)).toFixed(2)}</span>
                             </div>
                             <div className="bg-zinc-950/60 border border-zinc-850 p-2.5 rounded-lg">
                               <span className="text-[10px] text-zinc-500 block mb-0.5">المبلغ المقبوض</span>
-                              <strong className="text-base font-mono text-emerald-400 block">{Math.round(selectedOrder.paidAmount * exchangeRate).toLocaleString()} ل.س</strong>
-                              <span className="text-[10px] text-emerald-500 font-mono font-bold block">${selectedOrder.paidAmount.toFixed(2)} ({paidPct}%)</span>
+                              <strong className="text-base font-mono text-emerald-400 block">{Math.round(Number(selectedOrder.paidAmount || 0)).toLocaleString()} ل.س</strong>
+                              <span className="text-[10px] text-emerald-500 font-mono font-bold block">${(Number(selectedOrder.paidAmount || 0) / (exchangeRate || 135)).toFixed(2)} USD ({paidPct}%)</span>
                             </div>
                             <div className="bg-zinc-950/60 border border-zinc-850 p-2.5 rounded-lg">
                               <span className="text-[10px] text-zinc-500 block mb-0.5">المتبقي المستحق</span>
-                              <strong className="text-base font-mono text-rose-400 block">{Math.round(selectedOrder.remaining * exchangeRate).toLocaleString()} ل.س</strong>
-                              <span className="text-[10px] text-rose-500 font-mono font-bold block">${selectedOrder.remaining.toFixed(2)}</span>
+                              <strong className="text-base font-mono text-rose-400 block">{Math.round(Number(selectedOrder.remaining || 0)).toLocaleString()} ل.س</strong>
+                              <span className="text-[10px] text-rose-500 font-mono font-bold block">${(Number(selectedOrder.remaining || 0) / (exchangeRate || 135)).toFixed(2)}</span>
                             </div>
                           </div>
 
@@ -1368,24 +1368,24 @@ export default function GlobalDialogs(props: Record<string, any>) {
                           <button
                             type="button"
                             onClick={() => {
-                              const rem = selectedOrder.remaining;
-                              setNewPaymentAmount(rem.toFixed(2));
-                              setNewPaymentSYPAmount(Math.round(rem * exchangeRate).toString());
+                              const rem = Number(selectedOrder.remaining || 0);
+                              setNewPaymentAmount((rem / (exchangeRate || 135)).toFixed(2));
+                              setNewPaymentSYPAmount(Math.round(rem).toString());
                             }}
                             className="px-2 py-1 bg-amber-950/40 hover:bg-amber-900/60 border border-amber-800/60 text-amber-300 rounded font-mono font-bold cursor-pointer"
                           >
-                            ⚡ كامل المتبقي (${selectedOrder.remaining.toFixed(2)})
+                            ⚡ كامل المتبقي ({Math.round(Number(selectedOrder.remaining || 0)).toLocaleString()} ل.س)
                           </button>
                           <button
                             type="button"
                             onClick={() => {
-                              const half = selectedOrder.totalPrice * 0.5;
-                              setNewPaymentAmount(half.toFixed(2));
-                              setNewPaymentSYPAmount(Math.round(half * exchangeRate).toString());
+                              const half = Number(selectedOrder.totalPrice || 0) * 0.5;
+                              setNewPaymentAmount((half / (exchangeRate || 135)).toFixed(2));
+                              setNewPaymentSYPAmount(Math.round(half).toString());
                             }}
                             className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 rounded font-mono cursor-pointer"
                           >
-                            🪙 50% عربون (${(selectedOrder.totalPrice * 0.5).toFixed(2)})
+                            🪙 50% عربون ({Math.round(Number(selectedOrder.totalPrice || 0) * 0.5).toLocaleString()} ل.س)
                           </button>
                           {[500000, 1000000, 2000000].map(sypVal => (
                             <button
@@ -1452,7 +1452,7 @@ export default function GlobalDialogs(props: Record<string, any>) {
                                       setNewPaymentSYPAmount("");
                                     }
                                   }}
-                                  placeholder={`الحد الأقصى $${selectedOrder.remaining.toFixed(2)}`}
+                                  placeholder={`الحد الأقصى $${(Number(selectedOrder.remaining || 0) / (exchangeRate || 135)).toFixed(2)}`}
                                   className="w-full bg-black border border-zinc-800 rounded-lg p-2.5 text-zinc-200 text-right font-mono font-bold focus:border-emerald-500 focus:outline-none"
                                 />
                                 {newPaymentAmount && Number(newPaymentAmount) > 0 && (
@@ -3120,25 +3120,25 @@ export default function GlobalDialogs(props: Record<string, any>) {
                 {/* Price & Min Stock */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-zinc-400 block mb-1">سعر شراء اللوح/الوحدة بالدولار (USD)</label>
+                    <label className="text-zinc-400 block mb-1">سعر شراء اللوح/الوحدة بالليرة السورية الجديدة (ل.س)</label>
                     <input
                       type="number"
-                      step="0.01"
+                      step="1"
                       min="0"
-                      value={editingMaterial ? materialPriceUSD(editingMaterial.pricePerUnit, exchangeRate) : matPrice}
+                      value={editingMaterial ? materialPriceSYP(editingMaterial.pricePerUnit) : matPrice}
                       onChange={(e) => {
-                        const valueUSD = e.target.value ? parseFloat(e.target.value) : 0;
+                        const valueSYP = e.target.value ? parseFloat(e.target.value) : 0;
                         if (editingMaterial) {
-                          setEditingMaterial({ ...editingMaterial, pricePerUnit: valueUSD });
+                          setEditingMaterial({ ...editingMaterial, pricePerUnit: valueSYP });
                         } else {
                           setMatPrice(e.target.value);
                         }
                       }}
-                      placeholder="مثال: 10"
+                      placeholder="مثال: 1,350"
                       className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-zinc-200 text-right font-mono focus:outline-none focus:border-[#c59257]"
                     />
                     <div className="text-[10px] text-zinc-400 font-mono text-left">
-                      ≈ {(editingMaterial ? materialPriceSYP(editingMaterial.pricePerUnit, exchangeRate) : (Number(matPrice) || 0) * exchangeRate).toLocaleString()} ل.س عند سعر صرف {exchangeRate}
+                      ≈ ${(editingMaterial ? materialPriceUSD(editingMaterial.pricePerUnit, exchangeRate) : (Number(matPrice) || 0) / exchangeRate).toFixed(2)} عند سعر صرف {exchangeRate} ل.س/دولار
                     </div>
                   </div>
                   <div className="space-y-1">
@@ -3577,8 +3577,8 @@ export default function GlobalDialogs(props: Record<string, any>) {
                             )}
                           </td>
                           <td className="p-3 text-center font-mono font-bold">{it.quantity}</td>
-                          <td className="p-3 text-left font-mono">${it.unitPrice.toFixed(2)}</td>
-                          <td className="p-3 text-left font-mono font-bold text-indigo-400 print:text-black">${(it.quantity * it.unitPrice).toFixed(2)}</td>
+                          <td className="p-3 text-left font-mono">{Number(it.unitPrice || 0).toLocaleString()} ل.س</td>
+                          <td className="p-3 text-left font-mono font-bold text-indigo-400 print:text-black">{Math.round(Number(it.quantity || 0) * Number(it.unitPrice || 0)).toLocaleString()} ل.س</td>
                         </tr>
                       ))}
                     </tbody>
@@ -3598,16 +3598,16 @@ export default function GlobalDialogs(props: Record<string, any>) {
               <div className="flex justify-end">
                 <div className="w-full sm:w-80 bg-zinc-900/30 border border-zinc-850 p-4 rounded-xl space-y-2.5 print:border-black print:p-3 print:rounded-none print:w-64 text-xs print:text-[10px]">
                   <div className="flex justify-between items-center">
-                    <span className="font-mono text-zinc-200 font-bold print:text-black">${printTicketOrder.totalPrice.toFixed(2)}</span>
+                    <span className="font-mono text-zinc-200 font-bold print:text-black">{Number(printTicketOrder.totalPrice || 0).toLocaleString()} ل.س</span>
                     <span className="text-zinc-500 print:text-zinc-700">إجمالي قيمة الفاتورة:</span>
                   </div>
                   <div className="flex justify-between items-center border-b border-zinc-850/80 pb-2 print:border-black">
-                    <span className="font-mono text-emerald-400 font-bold print:text-black">${printTicketOrder.paidAmount.toFixed(2)}</span>
+                    <span className="font-mono text-emerald-400 font-bold print:text-black">{Number(printTicketOrder.paidAmount || 0).toLocaleString()} ل.س</span>
                     <span className="text-zinc-500 print:text-zinc-700">المبلغ المقبوض سلفاً:</span>
                   </div>
                   <div className="flex justify-between items-center pt-0.5">
                     <span className="font-mono text-lg font-black text-indigo-400 print:text-black print:text-xs">
-                      ${printTicketOrder.remaining.toFixed(2)}
+                      {Number(printTicketOrder.remaining || 0).toLocaleString()} ل.س
                     </span>
                     <span className="font-bold text-zinc-300 print:text-black">المبلغ المتبقي المستحق:</span>
                   </div>
@@ -4254,7 +4254,7 @@ export default function GlobalDialogs(props: Record<string, any>) {
                     </div>
                     <div className="text-right">
                       <span className="text-zinc-500 block">إجمالي المستحق:</span>
-                      <span className="font-bold text-[#c59257]">${selectedOrder.totalPrice.toFixed(2)} ({Math.round(selectedOrder.totalPrice * exchangeRate).toLocaleString()} ل.س)</span>
+                      <span className="font-bold text-[#c59257]">{Number(selectedOrder.totalPrice || 0).toLocaleString()} ل.س</span>
                     </div>
                   </div>
                 );

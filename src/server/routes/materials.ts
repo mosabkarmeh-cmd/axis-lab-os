@@ -8,10 +8,36 @@ const router = express.Router();
 
 const getRequestUser = getVerifiedRequestUser;
 
+const LEGACY_USD_TO_SYP: Record<number, number> = {
+  1: 1350,
+  2: 6075,
+  3: 2700,
+  4: 1620,
+  5: 4725,
+};
+const LEGACY_USD_VALUES: Record<number, number> = {
+  1: 10,
+  2: 45,
+  3: 20,
+  4: 12,
+  5: 35,
+};
+
+async function normalizeMaterialCurrency(rows: any[]) {
+  for (const row of rows) {
+    if (LEGACY_USD_VALUES[row.id] !== undefined && Number(row.pricePerUnit) === LEGACY_USD_VALUES[row.id]) {
+      const pricePerUnit = LEGACY_USD_TO_SYP[row.id];
+      await db.update(materials).set({ pricePerUnit }).where(eq(materials.id, row.id));
+      row.pricePerUnit = pricePerUnit;
+    }
+  }
+}
+
 // 1. Get all materials
 router.get("/materials", async (req, res) => {
   try {
     const list = await db.select().from(materials).orderBy(materials.id);
+    await normalizeMaterialCurrency(list);
     const mapped = list.map(m => ({
       id: "m-" + m.id,
       name: m.name,

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { DEFAULT_EXCHANGE_RATE, usdToSyp } from "../lib/currency";
-import { materialPriceUSD } from "../lib/materials";
+import { materialPriceSYP, materialPriceUSD } from "../lib/materials";
 import {
   ResponsiveContainer,
   PieChart,
@@ -124,8 +124,9 @@ export default function MaterialCostCharts({
 
     const itemsWithCalculatedValue = materials.map((m) => {
       const qty = m.inventory?.availableQuantity ?? m.inventory?.quantity ?? m.stockQuantity ?? m.quantity ?? 0;
-      const unitPrice = materialPriceUSD(m.pricePerUnit || (m.stockQuantity && m.stockValue ? (m.stockValue / m.stockQuantity) : 0), exchangeRate);
-      const itemValueUSD = m.stockValue !== undefined && m.stockValue > 0 ? m.stockValue : (qty * unitPrice);
+      const unitPriceSYP = materialPriceSYP(m.pricePerUnit || (m.stockQuantity && m.stockValue ? (m.stockValue / m.stockQuantity) : 0));
+      const itemValueSYP = m.stockValueSYP !== undefined && m.stockValueSYP > 0 ? m.stockValueSYP : (m.stockValue !== undefined && m.stockValue > 0 ? m.stockValue : (qty * unitPriceSYP));
+      const itemValueUSD = itemValueSYP / (exchangeRate || 135);
       const category = m.category || "عام";
       const quality = m.qualityStatus || "inspected";
 
@@ -159,7 +160,7 @@ export default function MaterialCostCharts({
         ...m,
         calcQty: qty,
         calcValueUSD: itemValueUSD,
-        calcValueSYP: usdToSyp(itemValueUSD, exchangeRate),
+        calcValueSYP: itemValueSYP,
       };
     });
 
@@ -195,6 +196,7 @@ export default function MaterialCostCharts({
         category: m.category || "عام",
         valueUSD: parseFloat(m.calcValueUSD.toFixed(2)),
         valueSYP: m.calcValueSYP,
+        unitPriceSYP: materialPriceSYP(m.pricePerUnit),
         unitPriceUSD: materialPriceUSD(m.pricePerUnit, exchangeRate),
         qty: m.calcQty,
         unit: m.unit || "لوح",

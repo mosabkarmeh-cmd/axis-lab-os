@@ -82,6 +82,8 @@ export default function ReportsView() {
     return `${syp} (${usd})`;
   };
 
+  const formatSypMoney = (value: number) => `${Math.round(Number(value) || 0).toLocaleString("en-US")} ل.س`;
+
   // CSV Exporter helper
   const exportToCSV = (data: any[], fileName: string) => {
     if (!data || data.length === 0) return;
@@ -243,7 +245,7 @@ export default function ReportsView() {
             </div>
           </div>
           <div className="text-[10px] text-zinc-500 mt-2 flex items-center gap-1 justify-end">
-            <span>بمعدل قيمة {formatMoney(analytics.sales.avgOrderValue)} للطلب</span>
+            <span>بمعدل قيمة {formatSypMoney(analytics.sales.avgOrderValueSYP ?? analytics.sales.avgOrderValue)} للطلب</span>
             <ArrowUpRight className="w-3.5 h-3.5 text-indigo-400" />
           </div>
         </div>
@@ -450,7 +452,7 @@ export default function ReportsView() {
                         <RechartsTooltip
                           contentStyle={{ backgroundColor: "#09090b", borderColor: "#27272a", borderRadius: "8px", color: "#f4f4f5" }}
                         />
-                        <Bar name="إجمالي المشتريات ($)" dataKey="totalSpent" fill="#c59257" radius={[0, 4, 4, 0]} />
+                        <Bar name="إجمالي المشتريات (ل.س)" dataKey="totalSpentSYP" fill="#c59257" radius={[0, 4, 4, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
@@ -477,7 +479,7 @@ export default function ReportsView() {
                       {analytics.sales.topCustomers.map((cust: any, index: number) => (
                         <tr key={cust.id} className="hover:bg-zinc-900/20 transition-all font-sans">
                           <td className="p-3 font-mono font-bold text-indigo-400 print:text-black">
-                            {formatMoney(cust.totalSpent)}
+                            {formatSypMoney(cust.totalSpentSYP ?? cust.totalSpent)}
                           </td>
                           <td className="p-3 text-zinc-400 print:text-black">
                             {cust.company}
@@ -518,7 +520,7 @@ export default function ReportsView() {
             <div className="bg-zinc-950 border border-zinc-850 rounded-2xl p-5 print:bg-white print:text-black print:border-black">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
                 <span className="text-xs font-mono text-emerald-400 print:text-black">
-                  إجمالي قيمة المخزون الحالية: <strong className="text-sm font-bold text-zinc-200 print:text-black">{formatMoney(analytics.inventory.totalInventoryValue)}</strong>
+                  إجمالي قيمة المخزون الحالية: <strong className="text-sm font-bold text-zinc-200 print:text-black">{formatSypMoney(analytics.inventory.totalInventoryValue)}</strong>
                 </span>
                 <h4 className="text-xs font-bold text-zinc-300 print:text-black print:text-sm">حالة جرد المواد الخام وحدود الأمان للمخازن</h4>
               </div>
@@ -548,7 +550,7 @@ export default function ReportsView() {
                           </span>
                         </td>
                         <td className="p-3 font-mono text-zinc-300 print:text-black font-bold">
-                          {formatMoney(m.stockValue)}
+                          {formatSypMoney(m.stockValueSYP ?? m.stockValue)}
                         </td>
                         <td className="p-3 font-mono text-zinc-500 print:text-black">
                           {m.minimumStock} {m.unit}

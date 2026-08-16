@@ -728,7 +728,7 @@ export default function DashboardCharts({
 
                             <div className="flex justify-between items-center text-[8.5px] border-t border-zinc-900/40 pt-1">
                               <span className="font-mono text-zinc-500">
-                                {Math.round(ord.totalPrice * exchangeRate).toLocaleString()} ل.س
+                                {Math.round(Number(ord.totalPrice || 0)).toLocaleString()} ل.س
                               </span>
                               <span className={`px-1.5 py-0.2 rounded-full text-[8.5px] ${
                                 isDelivered 

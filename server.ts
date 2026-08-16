@@ -489,19 +489,19 @@ const ACTIVITY_LOGS: Array<{ id: string; userId: string; action: string; entityT
 ];
 
 const MATERIALS = [
-  { id: "m-1", name: "لوح أكريليك شفاف 3 ملم", category: "الأكريليك", subCategory: "acrylic", thickness: 3, color: "transparent", width: 1220, height: 2440, unit: "sheet", pricePerUnit: 10, minimumStock: 10, supplierId: "s-1", notes: "ألواح كورية ممتازة حماية ورقية", status: "active", qualityStatus: "inspected" },
-  { id: "m-2", name: "لوح أكريليك أسود 5 ملم", category: "الأكريليك", subCategory: "acrylic", thickness: 5, color: "black", width: 1220, height: 2440, unit: "sheet", pricePerUnit: 45, minimumStock: 8, supplierId: "s-1", notes: "مقاوم للخدوش ومثالي للحروف البارزة", status: "active", qualityStatus: "inspected" },
-  { id: "m-3", name: "لوح خشب زان طبيعي 4 ملم", category: "الأخشاب", subCategory: "wood", thickness: 4, color: "natural", width: 600, height: 1200, unit: "sheet", pricePerUnit: 20, minimumStock: 15, supplierId: "s-2", notes: "وجهين مصقولين بجودة عالية", status: "active", qualityStatus: "in_preparation" },
-  { id: "m-4", name: "لوح خشب مضغوط MDF 6 ملم", category: "الأخشاب", subCategory: "wood", thickness: 6, color: "brown", width: 1220, height: 2440, unit: "sheet", pricePerUnit: 12, minimumStock: 20, supplierId: "s-2", notes: "صناعة رومانية ممتاز للحفر", status: "active", qualityStatus: "defective" },
-  { id: "m-5", name: "جلد طبيعي مرن 2 ملم", category: "الجلود", subCategory: "leather", thickness: 2, color: "tan", width: 1000, height: 1000, unit: "piece", pricePerUnit: 35, minimumStock: 5, supplierId: "s-3", notes: "جلد بقر طبيعي مدبوغ نباتياً", status: "active", qualityStatus: "inspected" }
+  { id: "m-1", name: "لوح أكريليك شفاف 3 ملم", category: "الأكريليك", subCategory: "acrylic", thickness: 3, color: "transparent", width: 1220, height: 2440, unit: "sheet", pricePerUnit: 1350, minimumStock: 10, supplierId: "s-1", notes: "ألواح كورية ممتازة حماية ورقية", status: "active", qualityStatus: "inspected" },
+  { id: "m-2", name: "لوح أكريليك أسود 5 ملم", category: "الأكريليك", subCategory: "acrylic", thickness: 5, color: "black", width: 1220, height: 2440, unit: "sheet", pricePerUnit: 6075, minimumStock: 8, supplierId: "s-1", notes: "مقاوم للخدوش ومثالي للحروف البارزة", status: "active", qualityStatus: "inspected" },
+  { id: "m-3", name: "لوح خشب زان طبيعي 4 ملم", category: "الأخشاب", subCategory: "wood", thickness: 4, color: "natural", width: 600, height: 1200, unit: "sheet", pricePerUnit: 2700, minimumStock: 15, supplierId: "s-2", notes: "وجهين مصقولين بجودة عالية", status: "active", qualityStatus: "in_preparation" },
+  { id: "m-4", name: "لوح خشب مضغوط MDF 6 ملم", category: "الأخشاب", subCategory: "wood", thickness: 6, color: "brown", width: 1220, height: 2440, unit: "sheet", pricePerUnit: 1620, minimumStock: 20, supplierId: "s-2", notes: "صناعة رومانية ممتاز للحفر", status: "active", qualityStatus: "defective" },
+  { id: "m-5", name: "جلد طبيعي مرن 2 ملم", category: "الجلود", subCategory: "leather", thickness: 2, color: "tan", width: 1000, height: 1000, unit: "piece", pricePerUnit: 4725, minimumStock: 5, supplierId: "s-3", notes: "جلد بقر طبيعي مدبوغ نباتياً", status: "active", qualityStatus: "inspected" }
 ];
 
-const LEGACY_MATERIAL_PRICES_USD: Record<string, number> = {
-  "m-1": 10,
-  "m-2": 45,
-  "m-3": 20,
-  "m-4": 12,
-  "m-5": 35,
+const LEGACY_MATERIAL_PRICES_SYP_CANONICAL: Record<string, number> = {
+  "m-1": 1350,
+  "m-2": 6075,
+  "m-3": 2700,
+  "m-4": 1620,
+  "m-5": 4725,
 };
 const LEGACY_MATERIAL_PRICES_SYP: Record<string, number> = {
   "m-1": 362500,
@@ -513,9 +513,9 @@ const LEGACY_MATERIAL_PRICES_SYP: Record<string, number> = {
 function normalizeLegacyMaterialPrices() {
   for (const material of MATERIALS) {
     const oldValue = LEGACY_MATERIAL_PRICES_SYP[material.id];
-    const targetUsd = LEGACY_MATERIAL_PRICES_USD[material.id];
-    if (oldValue !== undefined && targetUsd !== undefined && Number(material.pricePerUnit) === oldValue) {
-      material.pricePerUnit = targetUsd;
+    const targetSyp = LEGACY_MATERIAL_PRICES_SYP_CANONICAL[material.id];
+    if (oldValue !== undefined && targetSyp !== undefined && Number(material.pricePerUnit) === oldValue) {
+      material.pricePerUnit = targetSyp;
     }
   }
 }
@@ -1295,6 +1295,37 @@ async function refreshWarehouseCache() {
       description: p.description || "", stock: p.stock,
     })));
 
+    const legacyUsdToSypByMaterialId: Record<number, { usd: number; syp: number }> = {
+      1: { usd: 10, syp: 1350 },
+      2: { usd: 45, syp: 6075 },
+      3: { usd: 20, syp: 2700 },
+      4: { usd: 12, syp: 1620 },
+      5: { usd: 35, syp: 4725 },
+    };
+    for (const row of matRows) {
+      const migration = legacyUsdToSypByMaterialId[row.id];
+      if (migration && Number(row.pricePerUnit) === migration.usd) {
+        await db.update(materialsTable).set({ pricePerUnit: migration.syp }).where(eq(materialsTable.id, row.id));
+        row.pricePerUnit = migration.syp;
+      }
+    }
+    const legacySupplierPricesUSD = new Set([10.5, 12, 18.2, 19, 20, 22.8, 25, 26.5, 32, 35, 41.5, 43, 45]);
+    for (const row of [...sqRows, ...soRows] as Array<any>) {
+      const price = Number(row.pricePerUnit ?? row.unitPrice);
+      if (legacySupplierPricesUSD.has(price)) {
+        const migratedPrice = Math.round(price * 135);
+        if ("minOrderQuantity" in row) {
+          await db.update(supplierQuotesTable).set({ pricePerUnit: migratedPrice }).where(eq(supplierQuotesTable.id, row.id));
+        } else {
+          await db.update(supplyOrdersTable).set({ unitPrice: migratedPrice, totalPrice: migratedPrice * Number(row.quantity || 0) }).where(eq(supplyOrdersTable.id, row.id));
+        }
+        row.pricePerUnit = migratedPrice;
+        if ("unitPrice" in row) {
+          row.unitPrice = migratedPrice;
+          row.totalPrice = migratedPrice * Number(row.quantity || 0);
+        }
+      }
+    }
     MATERIALS.length = 0;
     MATERIALS.push(...matRows.map(m => ({
       id: "m-" + m.id, name: m.name, category: m.category, subCategory: m.subCategory,
@@ -7545,12 +7576,11 @@ Role Guidelines:
   app.get("/api/reports/analytics", (req, res) => {
     // 1. Sales & Orders
     const totalOrdersCount = ORDERS.length;
-    const orderValueUSD = (order: any) => {
-      const historicalRate = Number(order.exchangeRateAtCreation) > 0 ? Number(order.exchangeRateAtCreation) : 135;
-      return sypToUsd(order.totalPrice, historicalRate);
-    };
-    const totalOrdersValue = ORDERS.reduce((sum, ord) => sum + orderValueUSD(ord), 0);
-    const avgOrderValue = totalOrdersCount > 0 ? (totalOrdersValue / totalOrdersCount) : 0;
+    const orderValueSYP = (order: any) => Math.round(Number(order.totalPrice) || 0);
+    const totalOrdersValueSYP = ORDERS.reduce((sum, ord) => sum + orderValueSYP(ord), 0);
+    const avgOrderValueSYP = totalOrdersCount > 0 ? (totalOrdersValueSYP / totalOrdersCount) : 0;
+    const currentRate = Number(SETTINGS.exchangeRate) > 0 ? Number(SETTINGS.exchangeRate) : 135;
+    const totalOrdersValueUSD = sypToUsd(totalOrdersValueSYP, currentRate);
     
     const ordersByStatus: Record<string, number> = {};
     ORDERS.forEach(ord => {
@@ -7560,7 +7590,7 @@ Role Guidelines:
     // Top Customers by spending
     const customerSpending: Record<string, number> = {};
     ORDERS.forEach(ord => {
-      customerSpending[ord.customerId] = (customerSpending[ord.customerId] || 0) + orderValueUSD(ord);
+      customerSpending[ord.customerId] = (customerSpending[ord.customerId] || 0) + orderValueSYP(ord);
     });
     
     const topCustomers = Object.entries(customerSpending).map(([id, totalSpent]) => {
@@ -7569,7 +7599,9 @@ Role Guidelines:
         id,
         name: cust ? cust.name : "عميل غير معروف",
         company: cust ? (cust.company || "أفراد") : "أفراد",
-        totalSpent
+        totalSpent,
+        totalSpentSYP: totalSpent,
+        totalSpentUSD: sypToUsd(totalSpent, currentRate)
       };
     }).sort((a, b) => b.totalSpent - a.totalSpent).slice(0, 5);
 
@@ -7623,7 +7655,9 @@ Role Guidelines:
         minimumStock: minStock,
         unit: m.unit,
         isLowStock,
-        stockValue: stockQty * materialPriceUSD(m.pricePerUnit, SETTINGS.exchangeRate)
+        stockValue: stockQty * Math.round(Number(m.pricePerUnit) || 0),
+        stockValueSYP: stockQty * Math.round(Number(m.pricePerUnit) || 0),
+        stockValueUSD: sypToUsd(stockQty * Math.round(Number(m.pricePerUnit) || 0), currentRate)
       };
     });
 
@@ -7660,8 +7694,13 @@ Role Guidelines:
       analytics: {
         sales: {
           totalOrdersCount,
-          totalOrdersValue,
-          avgOrderValue,
+          totalOrdersValue: totalOrdersValueSYP,
+          totalOrdersValueSYP,
+          totalOrdersValueUSD,
+          avgOrderValue: avgOrderValueSYP,
+          avgOrderValueSYP,
+          avgOrderValueUSD: sypToUsd(avgOrderValueSYP, currentRate),
+          exchangeRate: currentRate,
           ordersByStatus,
           topCustomers
         },

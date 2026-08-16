@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { DEFAULT_EXCHANGE_RATE } from "../lib/currency";
-import { materialPriceUSD } from "../lib/materials";
+import { materialPriceSYP, materialPriceUSD } from "../lib/materials";
 import {
   GitCompare,
   DollarSign,
@@ -111,7 +111,7 @@ export default function SupplierPriceComparisonModal({
 
   const generateDefaultQuotes = () => {
     if (!material) return;
-    const basePrice = materialPriceUSD(material.pricePerUnit, exchangeRate) || 25;
+    const basePrice = materialPriceSYP(material.pricePerUnit) || 1350;
     const primarySupName = material.supplier?.name || "الشركة الوطنية للاكريليك";
 
     const defaultList: SupplierQuote[] = [
@@ -211,7 +211,7 @@ export default function SupplierPriceComparisonModal({
   };
 
   const handleSetPrimarySupplier = async (quote: SupplierQuote) => {
-    if (!window.confirm(`هل تريد اعتماد المورد (${quote.supplierName}) كمورد رئيسي وسعره ($${quote.pricePerUnit.toFixed(2)}) لهذه الخامة؟`)) return;
+    if (!window.confirm(`هل تريد اعتماد المورد (${quote.supplierName}) كمورد رئيسي وسعره (${quote.pricePerUnit.toLocaleString()} ل.س) لهذه الخامة؟`)) return;
 
     try {
       await fetch(`/api/materials/${material.id}/set-primary-supplier`, {
@@ -237,7 +237,7 @@ export default function SupplierPriceComparisonModal({
       material.id,
       orderQty,
       orderModalQuote.pricePerUnit,
-      orderNotes || `طلب توريد بناءً على مقارنة الأسعار - سعر الوحدة المتفق عليه $${orderModalQuote.pricePerUnit}`
+      orderNotes || `طلب توريد بناءً على مقارنة الأسعار - سعر الوحدة المتفق عليه ${orderModalQuote.pricePerUnit.toLocaleString()} ل.س`
     );
     setOrderModalQuote(null);
   };

@@ -173,10 +173,10 @@ export default function DashboardPage(props: Record<string, any>) {
                               <div>
                                 <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-mono block mb-1">قيمة الطلبات قيد الانتظار</span>
                                 <div className="text-lg font-mono text-amber-400 font-bold">
-                                  {(pendingOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0) * exchangeRate).toLocaleString()} ل.س
+                                  {Math.round(pendingOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0)).toLocaleString()} ل.س
                                 </div>
                                 <span className="text-[10px] text-zinc-400 font-sans block mt-1 font-medium">
-                                  المكافئ بالدولار: ${pendingOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0).toFixed(2)}
+                                  المكافئ بالدولار: ${(pendingOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0) / (exchangeRate || 135)).toFixed(2)}
                                 </span>
                               </div>
                               <div className="w-10 h-10 rounded-lg bg-amber-950/40 border border-amber-900/30 flex items-center justify-center">
@@ -597,20 +597,20 @@ export default function DashboardPage(props: Record<string, any>) {
                                           </td>
                                           <td className="p-3 text-right font-mono">
                                             <div className="font-bold text-[#c59257]">
-                                              {(ord.totalPrice * exchangeRate).toLocaleString()} ل.س
+                                              {Math.round(Number(ord.totalPrice || 0)).toLocaleString()} ل.س
                                             </div>
                                             <div className="text-[10px] text-zinc-500 font-normal">
-                                              ${ord.totalPrice.toFixed(2)}
+                                              ${(Number(ord.totalPrice || 0) / (exchangeRate || 135)).toFixed(2)} USD
                                             </div>
                                           </td>
                                           <td className="p-3 text-right font-mono">
                                             {ord.remaining > 0 ? (
                                               <>
                                                 <div className="font-bold text-rose-400">
-                                                  {(ord.remaining * exchangeRate).toLocaleString()} ل.س
+                                                  {Math.round(Number(ord.remaining || 0)).toLocaleString()} ل.س
                                                 </div>
                                                 <div className="text-[10px] text-zinc-500 font-normal">
-                                                  ${ord.remaining.toFixed(2)}
+                                                  ${(Number(ord.remaining || 0) / (exchangeRate || 135)).toFixed(2)} USD
                                                 </div>
                                               </>
                                             ) : (
