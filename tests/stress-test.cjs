@@ -16,6 +16,13 @@ const token = jwt.sign(
   { algorithm: "HS256", expiresIn: "20m", issuer: "axislab-api", audience: "axislab-web" },
 );
 const headers = { "content-type": "application/json", authorization: `Bearer ${token}` };
+const scale = Number(process.env.STRESS_SCALE || "1");
+if (!Number.isFinite(scale) || scale <= 0) throw new Error(`Invalid STRESS_SCALE: ${process.env.STRESS_SCALE}`);
+const readPerWave = Math.max(1, Math.round(100 * scale));
+const readWaves = 5;
+const orderWriteWaves = 2;
+const ordersPerWave = Math.max(1, Math.round(100 * scale));
+const rateWriteCount = Math.max(1, Math.round(10 * scale));
 let child;
 let logs = "";
 
@@ -130,13 +137,15 @@ async function runRateWave(values) {
     await waitHealth();
 
     const readTimes = [];
-    for (let wave = 0; wave < 5; wave++) readTimes.push(...await runReadWave(100));
+    for (let wave = 0; wave < readWaves; wave++) readTimes.push(...await runReadWave(readPerWave));
 
     const writeTimes = [];
-    writeTimes.push(...await runOrderWriteWave(100, 0));
-    writeTimes.push(...await runOrderWriteWave(100, 100));
+    for (let wave = 0; wave < orderWriteWaves; wave++) writeTimes.push(...await runOrderWriteWave(ordersPerWave, wave * ordersPerWave));
 
-    const rateTimes = await runRateWave([135, 200, 145, 180, 155, 210, 165, 190, 175, 200]);
+    const rateSequence = [135, 200, 145, 180, 155, 210, 165, 190, 175, 200];
+    const rateValues = Array.from({ length: rateWriteCount }, (_, index) => rateSequence[index % rateSequence.length]);
+    rateValues[rateValues.length - 1] = 200;
+    const rateTimes = await runRateWave(rateValues);
     const finalRate = await request("/api/exchange-rate");
     assert(finalRate.response.ok && Number(finalRate.body?.exchangeRate) === 200, `final rate mismatch: ${JSON.stringify(finalRate.body)}`);
 
@@ -157,7 +166,8 @@ async function runRateWave(values) {
     const schemaVersion = String(db.exec("SELECT value FROM local_metadata WHERE key = 'schema_version'")[0].values[0][0]);
     db.close();
     assert(integrity === "ok", `SQLite integrity failed: ${integrity}`);
-    assert(orderCountBefore >= 200, `stress orders missing before restart: ${orderCountBefore}`);
+    const expectedOrderCount = 4 + orderWriteWaves * ordersPerWave;
+    assert(orderCountBefore >= expectedOrderCount, `stress orders missing before restart: expected at least ${expectedOrderCount}, found ${orderCountBefore}`);
     assert(uniqueActivityIds.size === activityIds.length, `activity log IDs collided: total=${activityIds.length}, unique=${uniqueActivityIds.size}`);
 
     await stop();
@@ -172,7 +182,7 @@ async function runRateWave(values) {
     console.log(JSON.stringify({
       status: "PASS",
       durationMs: Date.now() - startedAt,
-      load: { readRequests: readTimes.length, orderWrites: writeTimes.length, rateWrites: rateTimes.length, totalRequests: readTimes.length + writeTimes.length + rateTimes.length + 2 },
+      load: { scale, readRequests: readTimes.length, orderWrites: writeTimes.length, rateWrites: rateTimes.length, totalRequests: readTimes.length + writeTimes.length + rateTimes.length + 2 },
       performanceMs: { reads: stats(readTimes), orderWrites: stats(writeTimes), rateWrites: stats(rateTimes) },
       persistence: { schemaVersion, integrity, sizeBytes, orderCountBefore, orderCountAfterRestart: afterRestart.body.length, activityLogCount: activityIds.length, uniqueActivityLogIds: uniqueActivityIds.size, finalRate: 200 },
     }, null, 2));

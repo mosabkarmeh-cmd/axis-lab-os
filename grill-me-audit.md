@@ -101,3 +101,11 @@ Measured timings were: reads p50 `82.89 ms`, p95 `159.26 ms`; order writes p50 `
 ## Post-stress Windows validation
 
 After the activity-log ID fix, Windows Installer QA run [31941624140](https://github.com/mosabkarmeh-cmd/axis-lab-os/actions/runs/31941624140) completed successfully on commit `1a4944b7f85a78f05e2be92910e566151b16a7cf`. Current User and All Users installers both built, installed, and launched successfully, and backend validation passed in the same workflow.
+
+## 150% stress rerun
+
+The stress harness now accepts `STRESS_SCALE` and was rerun with `STRESS_SCALE=1.5` through the documented npm command. The run passed with **1,067 total requests**: 750 reads, 300 order writes, and 15 exchange-rate writes. SQLite integrity remained `ok`, schema version remained `5`, 304 orders persisted before and after restart, the final exchange rate remained `200`, and all 303 activity-log IDs were unique.
+
+The latest 150% measurements were: reads p50 `121.93 ms`, p95 `235.82 ms`, maximum `302.99 ms`; order writes p50 `264.54 ms`, p95 `436.97 ms`, maximum `437.09 ms`; exchange-rate writes p50 `11.98 ms`, p95 `19.88 ms`, maximum `19.88 ms`. The result is a successful tolerance run, not a formal maximum-capacity guarantee.
+
+README.md was rewritten to document setup, SQLite isolation, currency rules, smoke tests, stress scaling, PowerShell syntax, Windows packaging, troubleshooting, and release workflow.
