@@ -2443,6 +2443,10 @@ async function startServer() {
       res.status(404).json({ error: "الطلب غير موجود" });
       return;
     }
+    if (order.currencyFinalizedAt && (items !== undefined || paidAmount !== undefined || taxPercent !== undefined || discount !== undefined)) {
+      res.status(409).json({ error: "الطلب نهائي ومثبت مالياً؛ لا يمكن تعديل البنود أو المبالغ بعد التسليم الكامل." });
+      return;
+    }
 
     // 1. Snapshot previous state for precise audit diff
     const oldState = {
@@ -2723,6 +2727,10 @@ async function startServer() {
       res.status(404).json({ error: "الطلب غير موجود" });
       return;
     }
+    if (order.currencyFinalizedAt) {
+      res.status(409).json({ error: "الطلب نهائي ومثبت مالياً؛ لا يمكن تسجيل دفعة جديدة بعد التسليم." });
+      return;
+    }
 
     const payAmtUSD = Number(amount) || 0;
     const orderExchangeRate = Number(order.exchangeRateAtCreation) > 0 ? Number(order.exchangeRateAtCreation) : 135;
@@ -2799,6 +2807,10 @@ async function startServer() {
     const order = ORDERS.find(o => o.id === orderId);
     if (!order) {
       res.status(404).json({ error: "الطلب غير موجود" });
+      return;
+    }
+    if (order.currencyFinalizedAt) {
+      res.status(409).json({ error: "الطلب نهائي ومثبت مالياً؛ لا يمكن حذف دفعاته بعد التسليم." });
       return;
     }
 
@@ -7219,6 +7231,10 @@ Role Guidelines:
       res.status(404).json({ success: false, message: "الفاتورة غير موجودة" });
       return;
     }
+    if (inv.currencyFinalizedAt) {
+      res.status(409).json({ success: false, message: "الفاتورة نهائية ومثبتة؛ لا يمكن تعديل دفعاتها بعد التسليم." });
+      return;
+    }
 
     const payAmt = Number(amount) || 0;
     if (payAmt <= 0) {
@@ -7307,6 +7323,10 @@ Role Guidelines:
 
     const { notes, dueDate, items, taxPercent, discount, totalPrice } = req.body;
     const oldData = JSON.parse(JSON.stringify(inv));
+    if (inv.currencyFinalizedAt && (items !== undefined || taxPercent !== undefined || discount !== undefined || totalPrice !== undefined)) {
+      res.status(409).json({ success: false, message: "الفاتورة نهائية ومثبتة؛ لا يمكن تعديل قيمتها بعد التسليم الكامل." });
+      return;
+    }
 
     if (dueDate) inv.dueDate = dueDate;
     if (notes !== undefined) inv.notes = notes;

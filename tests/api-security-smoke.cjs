@@ -176,6 +176,12 @@ const assert = (condition, message) => {
     assert(finalizedInvoice && finalizedInvoice.totalPrice === 45 && finalizedInvoice.totalPriceSYP === 6075 && finalizedInvoice.totalPriceUSD === 45 && finalizedInvoice.exchangeRateAtFinalization === 135, `Finalized invoice changed after exchange-rate update: ${JSON.stringify(finalizedInvoice)}`);
     const finalInvoicePdf = await fetch(`http://127.0.0.1:${port}/api/accounting/invoices/${finalizedInvoice.id}/pdf`, { headers });
     assert(finalInvoicePdf.ok && (finalInvoicePdf.headers.get("content-type") || "").includes("application/pdf"), `Final invoice PDF was not generated: ${finalInvoicePdf.status}`);
+    const lockedOrderUpdate = await request(`/api/orders/${finalizedOrderId}`, { method: "PUT", body: JSON.stringify({ items: [{ productName: "Blocked edit", quantity: 1, unitPrice: 9999 }] }) });
+    assert(lockedOrderUpdate.response.status === 409, "Finalized order accepted a financial/item edit");
+    const lockedOrderPayment = await request(`/api/orders/${finalizedOrderId}/payments`, { method: "POST", body: JSON.stringify({ amount: 1 }) });
+    assert(lockedOrderPayment.response.status === 409, "Finalized order accepted a new payment");
+    const lockedInvoiceUpdate = await request(`/api/accounting/invoices/${finalizedInvoice.id}`, { method: "PUT", body: JSON.stringify({ totalPrice: 999 }) });
+    assert(lockedInvoiceUpdate.response.status === 409, "Finalized invoice accepted a total edit");
     await request("/api/exchange-rate", { method: "PUT", body: JSON.stringify({ exchangeRate: 135 }) });
 
     const calculatedOrder = await request("/api/orders", {
