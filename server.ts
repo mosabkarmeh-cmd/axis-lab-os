@@ -1544,6 +1544,11 @@ async function loadPersistedState(): Promise<number> {
         }
         restored++;
       }
+      for (const [key, target] of Object.entries(LOCAL_PERSISTED_COLLECTIONS)) {
+        if (!snapshotKeys.has(key) && Array.isArray(target) && !NORMALIZED_LOCAL_COLLECTIONS.includes(key as typeof NORMALIZED_LOCAL_COLLECTIONS[number]) && !NORMALIZED_FINANCIAL_COLLECTIONS.includes(key as typeof NORMALIZED_FINANCIAL_COLLECTIONS[number])) {
+          target.length = 0;
+        }
+      }
       let migrated = false;
       for (const collection of NORMALIZED_LOCAL_COLLECTIONS) {
         const target = LOCAL_PERSISTED_COLLECTIONS[collection];
@@ -1560,6 +1565,8 @@ async function loadPersistedState(): Promise<number> {
           target.length = 0;
           target.push(...entityValues.map(([payload]) => JSON.parse(String(payload))));
           restored++;
+        } else {
+          target.length = 0;
         }
         if (snapshotKeys.has(collection)) {
           sqlite.run("DELETE FROM app_state WHERE key = ?", [collection]);

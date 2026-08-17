@@ -62,7 +62,6 @@ async function normalizeMaterialCurrency(rows: any[]) {
 // 1. Get all materials
 router.get("/materials", async (req, res) => {
   try {
-    await ensureDemoLowPriceMaterials();
     const list = await db.select().from(materials).orderBy(materials.id);
     await normalizeMaterialCurrency(list);
     const mapped = list.map(m => ({
