@@ -28,6 +28,8 @@ import {
   List
 } from 'lucide-react';
 import { ProductionJob, Machine, Order } from '../types';
+import { DEFAULT_EXCHANGE_RATE } from '../lib/currency';
+import { materialPriceUSD } from '../lib/materials';
 
 interface MaterialItem {
   id: string;
@@ -35,6 +37,7 @@ interface MaterialItem {
   category: string;
   price?: number;
   unitPrice?: number;
+  pricePerUnit?: number;
   costPerUnit?: number;
   unit?: string;
   thickness?: number;
@@ -63,7 +66,7 @@ export const ProductionJobView: React.FC<ProductionJobViewProps> = ({
   materials = [],
   machines = [],
   orders = [],
-  exchangeRate = 15000,
+  exchangeRate = DEFAULT_EXCHANGE_RATE,
   onUpdateJob,
   onStartJob,
   onPauseJob,
@@ -243,9 +246,12 @@ export const ProductionJobView: React.FC<ProductionJobViewProps> = ({
   const getMaterialUnitPrice = (matId: string, fallbackPrice?: number): number => {
     const mat = materials.find(m => m.id === matId);
     if (mat) {
-      return mat.unitPrice ?? mat.price ?? mat.costPerUnit ?? fallbackPrice ?? 0;
+      // Material prices are stored in SYP; production costing is stored in USD.
+      const storedSyp = mat.pricePerUnit ?? mat.unitPrice ?? mat.price ?? mat.costPerUnit;
+      if (storedSyp !== undefined) return materialPriceUSD(storedSyp, exchangeRate);
     }
-    return fallbackPrice ?? 0;
+    // Existing production jobs already store materialPricePerUnit in USD.
+    return Number(fallbackPrice) || 0;
   };
 
   const openWasteCalculator = (job: ProductionJob) => {
