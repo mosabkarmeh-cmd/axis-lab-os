@@ -55,5 +55,10 @@ jobs:
           $allUsers = Get-ChildItem -Path dist-all-users -Filter '*AllUsers*.exe' -Recurse | Select-Object -First 1
           if (-not $latest) { throw 'electron-builder did not produce latest*.yml; auto-update metadata is missing.' }
           if (-not $allUsers) { throw 'All Users installer was not produced.' }
-          gh release create $env:GITHUB_REF_NAME $installer.FullName $blockmap.FullName $latest.FullName $allUsers.FullName --generate-notes --title "AXIS LAB OS $env:GITHUB_REF_NAME"
+          $tag = $env:GITHUB_REF_NAME
+          $release = gh release view $tag --json tagName 2>$null | ConvertFrom-Json
+          if (-not $release) {
+            gh release create $tag --generate-notes --title "AXIS LAB OS $tag"
+          }
+          gh release upload $tag $installer.FullName $blockmap.FullName $latest.FullName $allUsers.FullName --clobber
 
