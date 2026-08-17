@@ -7,6 +7,8 @@ files:
   - package.json
   - assets/icon.ico
   - node_modules/**/*
+asarUnpack:
+  - node_modules/**/*
 extraResources:
   - from: dist/server.cjs
     to: server.cjs
