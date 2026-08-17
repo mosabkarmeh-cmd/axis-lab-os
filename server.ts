@@ -1726,10 +1726,17 @@ async function startServer() {
   // once at boot so the very first request already sees correct data.
   await refreshWarehouseCache();
 
+  // The warehouse cache is loaded from SQLite after the legacy snapshot restore.
+  // Re-run the idempotent material-price migration after that load, then persist it;
+  // otherwise the old database values would overwrite the corrected in-memory values.
+  normalizeInventoryState();
+  normalizeLegacyMaterialPrices();
+  if (USE_POSTGRES || USE_SQLITE) await persistStateNow();
+
   // Keep the warehouse cache in sync with the real tables on every API request - cheap
   // for a single-workshop's data volume, and means every one of the ~100 read call sites
-  // across this file (dashboards, reports, order/production lookups, ...) that use the
-  // MATERIALS/INVENTORY/SUPPLIERS/... arrays always sees what's actually in the database,
+  // across this file (dashboards, reports, order/production lookups, ...) that use
+  // the MATERIALS/INVENTORY/SUPPLIERS/... arrays always sees what's actually in the database,
   // regardless of whether the last write came from materials.ts's routes or from this file.
   app.use((req, res, next) => {
     if (USE_POSTGRES && req.path.startsWith("/api/")) {
