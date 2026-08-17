@@ -1545,7 +1545,7 @@ async function loadPersistedState(): Promise<number> {
         restored++;
       }
       for (const [key, target] of Object.entries(LOCAL_PERSISTED_COLLECTIONS)) {
-        if (!snapshotKeys.has(key) && Array.isArray(target) && !NORMALIZED_LOCAL_COLLECTIONS.includes(key as typeof NORMALIZED_LOCAL_COLLECTIONS[number]) && !NORMALIZED_FINANCIAL_COLLECTIONS.includes(key as typeof NORMALIZED_FINANCIAL_COLLECTIONS[number])) {
+        if (key !== "USERS" && !snapshotKeys.has(key) && Array.isArray(target) && !NORMALIZED_LOCAL_COLLECTIONS.includes(key as typeof NORMALIZED_LOCAL_COLLECTIONS[number]) && !NORMALIZED_FINANCIAL_COLLECTIONS.includes(key as typeof NORMALIZED_FINANCIAL_COLLECTIONS[number])) {
           target.length = 0;
         }
       }
@@ -1587,6 +1587,8 @@ async function loadPersistedState(): Promise<number> {
         INVOICES.length = 0;
         INVOICES.push(...invoiceRows[0].values.map(([payload]) => JSON.parse(String(payload))));
         restored++;
+      } else {
+        INVOICES.length = 0;
       }
       const expenseRows = sqlite.exec("SELECT payload FROM local_expenses ORDER BY updated_at, id");
       if (snapshotKeys.has("EXPENSES")) {
@@ -1601,6 +1603,8 @@ async function loadPersistedState(): Promise<number> {
         EXPENSES.length = 0;
         EXPENSES.push(...expenseRows[0].values.map(([payload]) => JSON.parse(String(payload))));
         restored++;
+      } else {
+        EXPENSES.length = 0;
       }
       if (migrated || financialMigrated) {
         if (migrated) syncNormalizedLocalEntities(sqlite);

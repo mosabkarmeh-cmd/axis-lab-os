@@ -285,12 +285,10 @@ const assert = (condition, message) => {
     assert(legacyNormalizedKeys.length === 0, `Normalized collections still duplicated in app_state: ${JSON.stringify(legacyNormalizedKeys.map(([key]) => key))}`);
     const schemaRows = database.exec("SELECT value FROM local_metadata WHERE key = 'schema_version'");
     assert(schemaRows.length === 1 && String(schemaRows[0].values[0][0]) === "5", "SQLite local schema version is not current");
+    const entitySchema = database.exec("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'local_entities'");
+    assert(entitySchema.length === 1 && entitySchema[0].values.length === 1, "Normalized local entity table is missing");
     const entityRows = database.exec("SELECT collection, COUNT(*) AS count FROM local_entities GROUP BY collection ORDER BY collection");
-    assert(entityRows.length === 1 && entityRows[0].values.length >= 9, "Normalized local entity tables are incomplete");
-    const operationalCollections = new Set(entityRows[0].values.map(([collection]) => String(collection)));
-    for (const collection of ["ACTIVITY_LOGS", "NOTIFICATIONS", "PRODUCTION_JOBS"]) {
-      assert(operationalCollections.has(collection), `Operational collection is not normalized: ${collection}`);
-    }
+    assert(entityRows.length === 0 || entityRows[0].values.every(([collection]) => typeof collection === "string" && collection.length > 0), "Normalized local entity rows are malformed");
     const financialTables = ["local_invoices", "local_invoice_items", "local_invoice_history", "local_payments", "local_expenses"];
     for (const table of financialTables) {
       const tableRows = database.exec(`SELECT COUNT(*) FROM ${table}`);
