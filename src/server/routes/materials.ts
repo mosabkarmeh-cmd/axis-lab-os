@@ -23,6 +23,32 @@ const LEGACY_USD_VALUES: Record<number, number> = {
   5: 35,
 };
 
+const DEMO_LOW_PRICE_MATERIALS = [
+  { name: "لوح أكريليك أبيض 2 ملم", category: "الأكريليك", subCategory: "acrylic", thickness: 2, color: "white", width: 1220, height: 2440, unit: "sheet", pricePerUnit: 540, minimumStock: 10, supplierId: 1 },
+  { name: "لوح PVC خفيف 3 ملم", category: "البلاستيك", subCategory: "pvc", thickness: 3, color: "white", width: 1220, height: 2440, unit: "sheet", pricePerUnit: 405, minimumStock: 8, supplierId: 1 },
+  { name: "خشب MDF رقيق 3 ملم", category: "الأخشاب", subCategory: "wood", thickness: 3, color: "brown", width: 1220, height: 2440, unit: "sheet", pricePerUnit: 337, minimumStock: 12, supplierId: 2 },
+  { name: "فوم بورد 5 ملم", category: "الفوم", subCategory: "foam", thickness: 5, color: "white", width: 700, height: 1000, unit: "sheet", pricePerUnit: 270, minimumStock: 15, supplierId: 1 },
+  { name: "جلد صناعي للحفر", category: "الجلود", subCategory: "leather", thickness: 1, color: "black", width: 1000, height: 1000, unit: "piece", pricePerUnit: 202, minimumStock: 20, supplierId: 3 },
+];
+const DEMO_LOW_PRICE_QUANTITIES = [20, 15, 25, 30, 40];
+let demoMaterialSeedPromise: Promise<void> | null = null;
+async function ensureDemoLowPriceMaterials() {
+  if (demoMaterialSeedPromise) return demoMaterialSeedPromise;
+  demoMaterialSeedPromise = (async () => {
+    const existing = await db.select().from(materials);
+    for (let index = 0; index < DEMO_LOW_PRICE_MATERIALS.length; index++) {
+      const seed = DEMO_LOW_PRICE_MATERIALS[index];
+      if (existing.some((row: any) => row.name === seed.name)) continue;
+      const inserted = await db.insert(materials).values({ ...seed, notes: "مادة اختبارية منخفضة السعر", status: "active" }).returning();
+      const materialId = inserted[0]?.id;
+      if (materialId) {
+        await db.insert(inventory).values({ materialId, quantity: DEMO_LOW_PRICE_QUANTITIES[index], reservedQuantity: 0, availableQuantity: DEMO_LOW_PRICE_QUANTITIES[index], location: `مستودع اختباري ${index + 1}` });
+      }
+    }
+  })().catch(error => { demoMaterialSeedPromise = null; throw error; });
+  return demoMaterialSeedPromise;
+}
+
 async function normalizeMaterialCurrency(rows: any[]) {
   for (const row of rows) {
     if (LEGACY_USD_VALUES[row.id] !== undefined && Number(row.pricePerUnit) === LEGACY_USD_VALUES[row.id]) {
@@ -36,6 +62,7 @@ async function normalizeMaterialCurrency(rows: any[]) {
 // 1. Get all materials
 router.get("/materials", async (req, res) => {
   try {
+    await ensureDemoLowPriceMaterials();
     const list = await db.select().from(materials).orderBy(materials.id);
     await normalizeMaterialCurrency(list);
     const mapped = list.map(m => ({
