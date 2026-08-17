@@ -538,11 +538,29 @@ const LEGACY_MATERIAL_PRICES_SYP: Record<string, number> = {
   "m-5": 507500,
 };
 function normalizeLegacyMaterialPrices() {
+  // Material prices are canonical SYP values. Convert only known legacy values;
+  // exact matching makes this migration idempotent across every restart.
   for (const material of MATERIALS) {
     const oldValue = LEGACY_MATERIAL_PRICES_SYP[material.id];
     const targetSyp = LEGACY_MATERIAL_PRICES_SYP_CANONICAL[material.id];
     if (oldValue !== undefined && targetSyp !== undefined && Number(material.pricePerUnit) === oldValue) {
       material.pricePerUnit = targetSyp;
+    }
+  }
+
+  // Supplier quotes and supply orders were seeded in USD in older builds.
+  // They are material purchasing prices, so migrate them to the same SYP unit.
+  const legacySupplierPricesUSD = new Set([10.5, 12, 18.2, 19, 20, 22.8, 24.5, 25, 26.5, 32, 33, 35, 41.5, 43, 45]);
+  for (const quote of SUPPLIER_QUOTES as any[]) {
+    const price = Number(quote.pricePerUnit);
+    if (legacySupplierPricesUSD.has(price)) quote.pricePerUnit = Math.round(price * 135);
+  }
+  for (const order of SUPPLY_ORDERS as any[]) {
+    const price = Number(order.unitPrice);
+    if (legacySupplierPricesUSD.has(price)) {
+      const migratedPrice = Math.round(price * 135);
+      order.unitPrice = migratedPrice;
+      order.totalPrice = migratedPrice * Number(order.quantity || 0);
     }
   }
 }
