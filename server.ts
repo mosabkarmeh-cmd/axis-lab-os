@@ -4291,6 +4291,22 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
     }
 
     try {
+      if (USE_SQLITE) {
+        const nextId = SUPPLIERS.reduce((max, supplier) => Math.max(max, idNum(supplier.id, "s-") || 0), 0) + 1;
+        const newSup = {
+          id: `s-${nextId}`,
+          name: String(name).trim(),
+          phone: phone || "",
+          email: email || "",
+          address: address || "",
+          notes: notes || "",
+          createdAt: new Date().toISOString(),
+        };
+        SUPPLIERS.push(newSup);
+        schedulePersist();
+        res.status(201).json({ success: true, supplier: newSup });
+        return;
+      }
       const inserted = await db.insert(suppliersTable).values({
         name, phone: phone || null, email: email || null, address: address || null, notes: notes || null,
       }).returning();
@@ -4422,14 +4438,16 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
           inv.availableQuantity = afterQty - inv.reservedQuantity;
 
           const invId = idNum(inv.id, "inv-");
-          if (invId) {
-            await db.update(inventoryTable).set({ quantity: afterQty, availableQuantity: inv.availableQuantity }).where(eq(inventoryTable.id, invId));
+          if (USE_POSTGRES) {
+            if (invId) {
+              await db.update(inventoryTable).set({ quantity: afterQty, availableQuantity: inv.availableQuantity }).where(eq(inventoryTable.id, invId));
+            }
+            await db.insert(inventoryTransactionsTable).values({
+              materialId: matId, type: "purchase", quantity: order.quantity, beforeQty, afterQty,
+              referenceType: "purchase_order", referenceId: order.id,
+              reason: `توريد تلقائي عبر استلام الطلبية ${order.id}`,
+            });
           }
-          await db.insert(inventoryTransactionsTable).values({
-            materialId: matId, type: "purchase", quantity: order.quantity, beforeQty, afterQty,
-            referenceType: "purchase_order", referenceId: order.id,
-            reason: `توريد تلقائي عبر استلام الطلبية ${order.id}`,
-          });
 
           const newTx = {
             id: "tx-" + (INVENTORY_TRANSACTIONS.length + 1),
@@ -4448,12 +4466,13 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
         }
       }
 
-      if (soId) {
+      if (soId && USE_POSTGRES) {
         await db.update(supplyOrdersTable).set({
           status: normalizedStatus,
           actualDeliveryDate: order.actualDeliveryDate || null,
         }).where(eq(supplyOrdersTable.id, soId));
       }
+      if (USE_SQLITE) schedulePersist();
 
       ACTIVITY_LOGS.unshift({
         id: nextActivityLogId(),
