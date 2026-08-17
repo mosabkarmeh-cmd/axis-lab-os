@@ -4271,19 +4271,33 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
     const expDelivery = expectedDeliveryDate || new Date(Date.now() + 3600000 * 24 * 5).toISOString().split('T')[0];
 
     try {
-      const inserted = await db.insert(supplyOrdersTable).values({
-        supplierId: supId, materialId: matId, quantity: qty, unitPrice: price,
-        totalPrice: qty * price, status: "pending", orderDate, expectedDeliveryDate: expDelivery,
-        notes: notes || null,
-      }).returning();
-      const row = inserted[0];
-      const newOrder = {
-        id: "so-" + row.id, supplierId: "s-" + row.supplierId, materialId: "m-" + row.materialId,
-        quantity: row.quantity, unitPrice: row.unitPrice, totalPrice: row.totalPrice, status: row.status,
-        orderDate: row.orderDate, expectedDeliveryDate: row.expectedDeliveryDate || "",
-        actualDeliveryDate: row.actualDeliveryDate || "", notes: row.notes || "",
-      };
-      SUPPLY_ORDERS.push(newOrder);
+      let newOrder: any;
+      if (USE_SQLITE) {
+        // The packaged desktop build uses the in-process SQLite persistence queue.
+        // Do not call the Postgres Drizzle adapter here; it produces a 500 in offline mode.
+        newOrder = {
+          id: `so-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          supplierId: `s-${supId}`, materialId: `m-${matId}`, quantity: qty, unitPrice: price,
+          totalPrice: qty * price, status: "pending", orderDate, expectedDeliveryDate: expDelivery,
+          actualDeliveryDate: "", notes: notes || "",
+        };
+        SUPPLY_ORDERS.push(newOrder);
+        await persistMutationWithFastDurability();
+      } else {
+        const inserted = await db.insert(supplyOrdersTable).values({
+          supplierId: supId, materialId: matId, quantity: qty, unitPrice: price,
+          totalPrice: qty * price, status: "pending", orderDate, expectedDeliveryDate: expDelivery,
+          notes: notes || null,
+        }).returning();
+        const row = inserted[0];
+        newOrder = {
+          id: "so-" + row.id, supplierId: "s-" + row.supplierId, materialId: "m-" + row.materialId,
+          quantity: row.quantity, unitPrice: row.unitPrice, totalPrice: row.totalPrice, status: row.status,
+          orderDate: row.orderDate, expectedDeliveryDate: row.expectedDeliveryDate || "",
+          actualDeliveryDate: row.actualDeliveryDate || "", notes: row.notes || "",
+        };
+        SUPPLY_ORDERS.push(newOrder);
+      }
 
       ACTIVITY_LOGS.unshift({
         id: nextActivityLogId(),
