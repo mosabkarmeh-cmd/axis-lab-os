@@ -1723,6 +1723,50 @@ function schedulePersist() {
   }, 400);
 }
 
+const RESETTABLE_BUSINESS_COLLECTIONS = [
+  FILES, ORDERS, ACTIVITY_LOGS, EXPENSES, INVOICE_HISTORY, NOTIFICATIONS,
+  DELETED_ITEMS, INVOICES, BACKUPS, PRODUCTION_JOBS, CUSTOMERS, PRODUCTS,
+  MATERIALS, INVENTORY, INVENTORY_TRANSACTIONS, REMNANTS, SUPPLIERS,
+  SUPPLY_ORDERS, SUPPLIER_QUOTES, MACHINES,
+];
+
+async function resetBusinessData() {
+  if (persistTimer) {
+    clearTimeout(persistTimer);
+    persistTimer = null;
+  }
+  await persistStateNow();
+  for (const collection of RESETTABLE_BUSINESS_COLLECTIONS) collection.length = 0;
+  if (USE_SQLITE) {
+    const sqlite = await initLocalSqlite();
+    await withSqliteBusyRetry(async () => {
+      sqlite.run("BEGIN TRANSACTION");
+      try {
+        sqlite.run("DELETE FROM local_invoice_items");
+        sqlite.run("DELETE FROM local_invoice_history");
+        sqlite.run("DELETE FROM local_payments");
+        sqlite.run("DELETE FROM local_invoices");
+        sqlite.run("DELETE FROM local_expenses");
+        sqlite.run("DELETE FROM local_entities");
+        sqlite.run("DELETE FROM app_state WHERE key IN (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+          "FILES", "ORDERS", "ACTIVITY_LOGS", "EXPENSES", "INVOICE_HISTORY", "NOTIFICATIONS",
+          "DELETED_ITEMS", "INVOICES", "BACKUPS", "PRODUCTION_JOBS", "CUSTOMERS", "PRODUCTS",
+          "MATERIALS", "INVENTORY", "INVENTORY_TRANSACTIONS", "REMNANTS", "SUPPLIERS",
+          "SUPPLY_ORDERS", "SUPPLIER_QUOTES", "MACHINES",
+        ]);
+        sqlite.run("COMMIT");
+      } catch (error) {
+        try { sqlite.run("ROLLBACK"); } catch {}
+        throw error;
+      }
+      await flushLocalSqlite();
+    });
+  }
+  await persistStateNow();
+  await new Promise((resolve) => setTimeout(resolve, 75));
+  await persistStateNow();
+}
+
 async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT || 3000);
@@ -1781,7 +1825,7 @@ async function startServer() {
   // The warehouse cache is loaded from SQLite after the legacy snapshot restore.
   // Re-run the idempotent material-price migration after that load, then persist it;
   // otherwise the old database values would overwrite the corrected in-memory values.
-  ensureDemoLowPriceMaterials();
+  // Demo materials are never re-seeded automatically. Real installations must remain empty after Safe Reset.
   normalizeInventoryState();
   normalizeLegacyMaterialPrices();
   if (USE_POSTGRES || USE_SQLITE) await persistStateNow();
@@ -1890,6 +1934,22 @@ async function startServer() {
       }
     }
     next();
+  });
+
+  // Safe reset: business data only. System settings, admin users, numbering and statuses remain.
+  app.post("/api/admin/reset-business-data", async (req, res) => {
+    const user = getRequestUser(req);
+    if (!user || user.role !== "admin") {
+      res.status(403).json({ success: false, message: "هذه العملية متاحة لمدير النظام فقط" });
+      return;
+    }
+    try {
+      await resetBusinessData();
+      res.json({ success: true, message: "تم تصفير بيانات الأعمال مع الحفاظ على الإعدادات والحساب الإداري" });
+    } catch (error) {
+      console.error("[RESET] Business data reset failed:", error);
+      res.status(500).json({ success: false, message: "تعذر تصفير بيانات الأعمال بأمان" });
+    }
   });
 
   // API - Auth Login

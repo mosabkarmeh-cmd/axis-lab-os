@@ -18,10 +18,11 @@ const waitForHealth = async () => { const deadline = Date.now() + 15000; while (
   try {
     child = spawn(process.execPath, [path.resolve("dist/server.cjs")], { cwd: process.cwd(), env, stdio: "ignore" });
     await waitForHealth();
-    const materials = await request("/api/materials");
-    const stocked = (materials.body.materials || []).find(material => Number(material.inventory?.quantity) >= 2 && material.id);
-    assert(stocked, `No material with enough stock for guard test: ${JSON.stringify(materials.body)}`);
-    const materialId = stocked.id;
+    const createdMaterial = await request("/api/materials", { method: "POST", body: JSON.stringify({ name: "Inventory guard smoke material", category: "Test", subCategory: "test", unit: "sheet", pricePerUnit: 135, minimumStock: 1 }) });
+    assert(createdMaterial.response.status === 201 && createdMaterial.body.material?.id, `Inventory smoke material creation failed: ${JSON.stringify(createdMaterial.body)}`);
+    const materialId = createdMaterial.body.material.id;
+    const stockSetup = await request(`/api/inventory/${materialId}/update`, { method: "POST", body: JSON.stringify({ quantity: 5, type: "purchase", reason: "Inventory guard smoke stock" }) });
+    assert(stockSetup.response.ok, `Inventory smoke stock setup failed: ${JSON.stringify(stockSetup.body)}`);
     const negativeUpdate = await request(`/api/inventory/${materialId}/update`, { method: "POST", body: JSON.stringify({ quantity: -999999, type: "adjustment" }) });
     assert(negativeUpdate.response.status === 400, `Negative stock update was accepted: ${JSON.stringify(negativeUpdate.body)}`);
     const negativeReserve = await request(`/api/inventory/${materialId}/reserve`, { method: "POST", body: JSON.stringify({ quantity: -1, referenceId: "negative-reservation" }) });

@@ -321,7 +321,26 @@ const assert = (condition, message) => {
     assert(recoveredInvoices.response.ok && recoveredInvoices.body.invoices.some((item) => item.id === restoredInvoice.id && item.paidAmount === 50), `SQLite did not recover the financial invoice ledger after corruption: target=${restoredInvoice.id}, invoices=${JSON.stringify(recoveredInvoices.body.invoices)}, backupInvoiceState=${JSON.stringify(backupInvoiceState)}, serverLog=${serverLog}`);
     assert(fs.readdirSync(tempDir).some((name) => name.startsWith("axis-data.sqlite.corrupt-")), "Corrupt SQLite file was not preserved");
 
-    console.log("api-security-and-financial-persistence-smoke: PASS (persistence, integrity, restore, corruption recovery, normalized entities)");
+    const rateBeforeReset = await request("/api/exchange-rate");
+    const reset = await request("/api/admin/reset-business-data", { method: "POST" });
+    assert(reset.response.ok && reset.body.success, `Safe Reset failed: ${JSON.stringify(reset.body)}`);
+    const resetInvoices = await request("/api/accounting/invoices");
+    const resetExpenses = await request("/api/accounting/expenses");
+    const resetMaterials = await request("/api/materials");
+    assert(resetInvoices.response.ok && resetInvoices.body.invoices.length === 0, `Invoices remained after Safe Reset: ${JSON.stringify(resetInvoices.body)}`);
+    assert(resetExpenses.response.ok && resetExpenses.body.expenses.length === 0, `Expenses remained after Safe Reset: ${JSON.stringify(resetExpenses.body)}`);
+    assert(resetMaterials.response.ok && Array.isArray(resetMaterials.body.materials) && resetMaterials.body.materials.length === 0, `Materials remained after Safe Reset: ${JSON.stringify(resetMaterials.body)}`);
+    const preservedRate = await request("/api/exchange-rate");
+    assert(preservedRate.response.ok && Number(preservedRate.body.exchangeRate) === Number(rateBeforeReset.body.exchangeRate), `Safe Reset changed exchange-rate settings: before=${JSON.stringify(rateBeforeReset.body)}, after=${JSON.stringify(preservedRate.body)}`);
+    await stop();
+    start();
+    await waitForHealth();
+    const resetInvoicesAfterRestart = await request("/api/accounting/invoices");
+    const resetExpensesAfterRestart = await request("/api/accounting/expenses");
+    const resetMaterialsAfterRestart = await request("/api/materials");
+    assert(resetInvoicesAfterRestart.body.invoices.length === 0 && resetExpensesAfterRestart.body.expenses.length === 0 && Array.isArray(resetMaterialsAfterRestart.body.materials) && resetMaterialsAfterRestart.body.materials.length === 0, `Business data returned after restart following Safe Reset: invoices=${JSON.stringify(resetInvoicesAfterRestart.body)}, expenses=${JSON.stringify(resetExpensesAfterRestart.body)}, materials=${JSON.stringify(resetMaterialsAfterRestart.body)}`);
+
+    console.log("api-security-and-financial-persistence-smoke: PASS (persistence, integrity, restore, safe reset, corruption recovery, normalized entities)");
   } finally {
     await stop();
     fs.rmSync(tempDir, { recursive: true, force: true });

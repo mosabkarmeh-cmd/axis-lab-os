@@ -23,9 +23,14 @@ const waitForHealth = async () => { const deadline = Date.now() + 15000; while (
     const missingCompletion = await request(`/api/production/jobs/${missingJob.body.job.id}/complete`, { method: "POST", body: JSON.stringify({}) });
     assert(missingCompletion.response.status === 409 && missingCompletion.body.code === "INSUFFICIENT_STOCK", `missing stock was not rejected: ${JSON.stringify(missingCompletion.body)}`);
 
+    const createdMaterial = await request("/api/materials", { method: "POST", body: JSON.stringify({ name: "Production smoke material", category: "Test", subCategory: "test", unit: "sheet", pricePerUnit: 135, minimumStock: 1 }) });
+    assert(createdMaterial.response.status === 201 && createdMaterial.body.material?.id, `Smoke material creation failed: ${JSON.stringify(createdMaterial.body)}`);
+    const stockedMaterialId = createdMaterial.body.material.id;
+    const inventoryUpdate = await request(`/api/inventory/${stockedMaterialId}/update`, { method: "POST", body: JSON.stringify({ quantity: 5, type: "purchase", reason: "Production smoke stock" }) });
+    assert(inventoryUpdate.response.ok, `Smoke material stock creation failed: ${JSON.stringify(inventoryUpdate.body)}`);
     const materials = await request("/api/materials");
-    const stockedMaterial = (materials.body.materials || []).find(material => Number(material.inventory?.quantity) > 0 && material.id);
-    assert(stockedMaterial, `No stocked material available for duplicate completion test: ${JSON.stringify(materials.body)}`);
+    const stockedMaterial = (materials.body.materials || []).find(material => material.id === stockedMaterialId && Number(material.inventory?.quantity) > 0);
+    assert(stockedMaterial, `No stocked material available after explicit setup: ${JSON.stringify(materials.body)}`);
     const job = await request("/api/production/jobs", { method: "POST", body: JSON.stringify({ itemName: "Duplicate completion guard", materialId: stockedMaterial.id, estTimeSec: 60 }) });
     assert(job.response.status === 201, `stocked job create failed: ${JSON.stringify(job.body)}`);
     const first = await request(`/api/production/jobs/${job.body.job.id}/complete`, { method: "POST", body: JSON.stringify({}) });

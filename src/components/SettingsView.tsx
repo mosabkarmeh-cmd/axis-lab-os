@@ -682,6 +682,25 @@ export default function SettingsView({
     }
   };
 
+  const handleSafeReset = async () => {
+    const confirmation = window.prompt("للتأكيد اكتب: تصفير كامل");
+    if (confirmation !== "تصفير كامل") {
+      setBackupStatus({ type: "error", message: "تم إلغاء التصفير: عبارة التأكيد غير مطابقة." });
+      return;
+    }
+    setBackupStatus(null);
+    try {
+      const res = await fetch("/api/admin/reset-business-data", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || "فشل تصفير بيانات الأعمال");
+      setBackups([]);
+      setBackupStatus({ type: "success", message: "تم تصفير المواد والفواتير والمصاريف وكل بيانات الأعمال مع الحفاظ على الإعدادات والحساب الإداري." });
+      setTimeout(() => window.location.reload(), 900);
+    } catch (err: any) {
+      setBackupStatus({ type: "error", message: "فشل التصفير الآمن: " + err.message });
+    }
+  };
+
   // -----------------------------------------------------------------
   // STRESS TEST IMPLEMENTATION SUITE
   // -----------------------------------------------------------------
@@ -2685,6 +2704,17 @@ export default function SettingsView({
                     </tbody>
                   </table>
                 </div>
+              </div>
+
+              <div className="bg-red-950/20 border border-red-900/60 rounded-xl p-5 space-y-3">
+                <div className="flex items-start gap-3">
+                  <Trash2 className="w-5 h-5 text-red-400 mt-0.5 shrink-0" />
+                  <div>
+                    <h3 className="text-sm font-bold text-red-300">تصفير بيانات الأعمال</h3>
+                    <p className="text-xs text-red-200/70 mt-1 leading-relaxed">يمسح المواد، المخزون، الموردين، العملاء، الطلبات، الفواتير، الدفعات، المصاريف، الإنتاج، الإشعارات والنسخ التجريبية. لا يمسح الإعدادات أو سعر الصرف أو حسابات المستخدمين أو إعدادات الترقيم.</p>
+                  </div>
+                </div>
+                <button type="button" onClick={handleSafeReset} className="bg-red-700 hover:bg-red-600 text-white font-bold text-xs px-4 py-2 rounded-lg border border-red-500 transition-colors cursor-pointer">تصفير كامل لبدء إدخال البيانات الحقيقية</button>
               </div>
 
               {/* Developer Monitoring Visibility Controls */}
