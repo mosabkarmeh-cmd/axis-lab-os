@@ -4282,7 +4282,9 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
           actualDeliveryDate: "", notes: notes || "",
         };
         SUPPLY_ORDERS.push(newOrder);
-        await persistMutationWithFastDurability();
+        // Queue the SQLite snapshot without allowing a persistence retry to turn a
+        // successfully created local order into an HTTP 500 response.
+        schedulePersist();
       } else {
         const inserted = await db.insert(supplyOrdersTable).values({
           supplierId: supId, materialId: matId, quantity: qty, unitPrice: price,
