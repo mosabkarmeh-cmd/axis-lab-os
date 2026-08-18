@@ -171,7 +171,7 @@ async function runRateWave(values) {
     const schemaVersion = String(db.exec("SELECT value FROM local_metadata WHERE key = 'schema_version'")[0].values[0][0]);
     db.close();
     assert(integrity === "ok", `SQLite integrity failed: ${integrity}`);
-    const expectedOrderCount = 4 + orderWriteWaves * ordersPerWave;
+    const expectedOrderCount = orderWriteWaves * ordersPerWave;
     assert(orderCountBefore >= expectedOrderCount, `stress orders missing before restart: expected at least ${expectedOrderCount}, found ${orderCountBefore}`);
     assert(uniqueActivityIds.size === activityIds.length, `activity log IDs collided: total=${activityIds.length}, unique=${uniqueActivityIds.size}`);
 

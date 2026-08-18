@@ -155,8 +155,6 @@ export default function InventoryPage(props: Record<string, any>) {
     orders,
     productionJobs,
     exchangeRate,
-    lowStockAlertItems,
-    lowStockItems,
     refreshInventoryData,
     addTerminalLog,
     handleAiClassifyMaterial,

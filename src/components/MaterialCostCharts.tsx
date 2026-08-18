@@ -99,6 +99,7 @@ export default function MaterialCostCharts({
         totalItemsCount: 0,
         categoryData: [],
         topValueMaterials: [],
+        topUtilizedMaterials: [],
         qualityData: [],
         atRiskValueUSD: 0,
         atRiskValueSYP: 0,

@@ -2,6 +2,7 @@ import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import { NotificationProvider } from './components/NotificationProvider.tsx';
+import AppErrorBoundary from './components/AppErrorBoundary.tsx';
 import './index.css';
 
 // Intercept and ignore Vite's benign WebSocket connection failures in sandboxed environment
@@ -69,8 +70,10 @@ try {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <NotificationProvider>
-      <App />
-    </NotificationProvider>
+    <AppErrorBoundary>
+      <NotificationProvider>
+        <App />
+      </NotificationProvider>
+    </AppErrorBoundary>
   </StrictMode>,
 );

@@ -38,9 +38,42 @@ import {
 import MaterialCostCharts from "./MaterialCostCharts";
 import { DEFAULT_EXCHANGE_RATE, fetchExchangeRate, sanitizeExchangeRate, usdToSyp } from "../lib/currency";
 
+const EMPTY_ANALYTICS = {
+  financial: {
+    netProfit: 0,
+    netProfitSYP: 0,
+    profitMargin: 0,
+    expenseBreakdown: [] as any[],
+    recentTransactions: [] as any[],
+  },
+  sales: {
+    avgOrderValue: 0,
+    avgOrderValueSYP: 0,
+    topCustomers: [] as any[],
+    totalOrdersCount: 0,
+  },
+  inventory: {
+    lowStockCount: 0,
+    stockStatus: [] as any[],
+    totalInventoryValue: 0,
+  },
+  machines: [] as any[],
+};
+
+function normalizeAnalytics(value: any) {
+  return {
+    ...EMPTY_ANALYTICS,
+    ...(value && typeof value === "object" ? value : {}),
+    financial: { ...EMPTY_ANALYTICS.financial, ...(value?.financial || {}) },
+    sales: { ...EMPTY_ANALYTICS.sales, ...(value?.sales || {}) },
+    inventory: { ...EMPTY_ANALYTICS.inventory, ...(value?.inventory || {}) },
+    machines: Array.isArray(value?.machines) ? value.machines : [],
+  };
+}
+
 export default function ReportsView() {
   const [activeTab, setActiveTab] = useState<"financial" | "sales" | "inventory" | "machines">("financial");
-  const [analytics, setAnalytics] = useState<any>(null);
+  const [analytics, setAnalytics] = useState<any>(EMPTY_ANALYTICS);
   const [isLoading, setIsLoading] = useState(true);
   const [dateRange, setDateRange] = useState("all"); // all, month, year
   const [searchQuery, setSearchQuery] = useState("");
@@ -52,7 +85,9 @@ export default function ReportsView() {
       const res = await fetch("/api/reports/analytics");
       const data = await res.json();
       if (data.success) {
-        setAnalytics(data.analytics);
+        setAnalytics(normalizeAnalytics(data.analytics));
+      } else {
+        setAnalytics(EMPTY_ANALYTICS);
       }
     } catch (err) {
       console.error("Failed to load reports analytics:", err);
