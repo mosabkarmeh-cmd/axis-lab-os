@@ -33,7 +33,8 @@ export default function HelpCenter() {
     { id: "products", name: "مكتبة المنتجات", icon: "📦" },
     { id: "inventory", name: "المواد والمخزون", icon: "🪵" },
     { id: "production", name: "الإنتاج والماكينات", icon: "⚡" },
-    { id: "accounting", name: "المحاسبة والفواتير", icon: "💰" }
+    { id: "accounting", name: "المحاسبة والفواتير", icon: "💰" },
+    { id: "settings", name: "التثبيت والشبكة", icon: "🖥️" }
   ];
 
   // Filter topics based on search query and category
