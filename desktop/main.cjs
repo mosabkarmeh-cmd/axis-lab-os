@@ -7,6 +7,33 @@ const fs = require('node:fs');
 const crypto = require('node:crypto');
 
 const PORT = Number(process.env.AXIS_PORT || 3210);
+let REMOTE_SERVER_URL = String(process.env.AXIS_REMOTE_URL || '').replace(/\/+$/, '');
+let IS_REMOTE_CLIENT = Boolean(REMOTE_SERVER_URL);
+
+function isValidRemoteUrl(value) {
+  try {
+    const parsed = new URL(value);
+    return ['http:', 'https:'].includes(parsed.protocol) && Boolean(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function loadRemoteServerUrl() {
+  if (isValidRemoteUrl(REMOTE_SERVER_URL)) return REMOTE_SERVER_URL;
+  try {
+    const configPath = path.join(app.getPath('userData'), 'network-config.json');
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    const configuredUrl = String(config.serverUrl || '').replace(/\/+$/, '');
+    return isValidRemoteUrl(configuredUrl) ? configuredUrl : '';
+  } catch {
+    return '';
+  }
+}
+
+function serverBaseUrl() {
+  return REMOTE_SERVER_URL || `http://127.0.0.1:${PORT}`;
+}
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
   app.quit();
@@ -146,6 +173,10 @@ function waitForServer(url, timeoutMs = 30000) {
 }
 
 function startServer() {
+  if (IS_REMOTE_CLIENT) {
+    console.log(`[AXIS CLIENT] Remote server mode: ${REMOTE_SERVER_URL}`);
+    return;
+  }
   const root = projectRoot();
   serverProcess = spawn(process.execPath, [serverPath()], {
     cwd: root,
@@ -184,7 +215,7 @@ function startServer() {
 const appIcon = app.isPackaged ? path.join(process.resourcesPath, 'icon.ico') : path.join(__dirname, '..', 'assets', 'icon.ico');
 
 async function createWindow() {
-  await waitForServer(`http://127.0.0.1:${PORT}/api/health`);
+  await waitForServer(`${serverBaseUrl()}/api/health`);
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 920,
@@ -201,7 +232,7 @@ async function createWindow() {
       sandbox: true,
     },
   });
-  await mainWindow.loadURL(`http://127.0.0.1:${PORT}`);
+  await mainWindow.loadURL(serverBaseUrl());
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//.test(url)) shell.openExternal(url);
     return { action: 'deny' };
@@ -216,6 +247,8 @@ app.on('second-instance', () => {
 
 app.whenReady().then(async () => {
   try {
+    REMOTE_SERVER_URL = loadRemoteServerUrl();
+    IS_REMOTE_CLIENT = Boolean(REMOTE_SERVER_URL);
     startServer();
     await createWindow();
     if (bootstrapPasswordCreated && mainWindow && !mainWindow.isDestroyed()) {
