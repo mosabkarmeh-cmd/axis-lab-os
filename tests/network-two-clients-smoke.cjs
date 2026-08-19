@@ -36,6 +36,8 @@ function start() {
   });
   server.stdout.on("data", (chunk) => { logs += chunk.toString(); });
   server.stderr.on("data", (chunk) => { logs += chunk.toString(); });
+  server.on("error", (error) => { logs += `[SPAWN_ERROR] ${error.stack || error}\n`; });
+  server.on("exit", (code, signal) => { logs += `[SERVER_EXIT] code=${code} signal=${signal}\n`; });
 }
 
 function stop() {
