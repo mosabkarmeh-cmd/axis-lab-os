@@ -86,6 +86,12 @@ function getInstallScope() {
 }
 
 function setupAutoUpdater() {
+  // The repository is private and updates are distributed manually by the owner.
+  // Opt-in auto-update remains available only for a dedicated authenticated feed.
+  if (process.env.AXIS_ENABLE_AUTO_UPDATE !== 'true') {
+    console.log('[AXIS UPDATER] Manual update mode: automatic GitHub checks are disabled.');
+    return;
+  }
   if (getInstallScope() === 'all-users') {
     console.log('[AXIS UPDATER] All Users installation detected; automatic updates are disabled until a dedicated machine-wide update channel is available.');
     return;
