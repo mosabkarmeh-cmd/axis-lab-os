@@ -3286,6 +3286,8 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
   const { handleRecordPaymentSubmit, handleDeletePayment, handleSettleRemainingAndDeliver } = useAccountingActions({
     selectedOrder,
     newPaymentAmount,
+    newPaymentSYPAmount,
+    paymentInputCurrency,
     newPaymentNotes,
     selectedPaymentMethod,
     currentUserId: currentUser?.id,

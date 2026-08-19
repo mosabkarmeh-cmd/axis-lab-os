@@ -4,6 +4,8 @@ import type { Order } from "../types";
 type AccountingActionsOptions = {
   selectedOrder: Order | null;
   newPaymentAmount: string;
+  newPaymentSYPAmount: string;
+  paymentInputCurrency: "USD" | "SYP";
   newPaymentNotes: string;
   selectedPaymentMethod: string;
   currentUserId?: string;
@@ -21,6 +23,8 @@ type AccountingActionsOptions = {
 export function useAccountingActions({
   selectedOrder,
   newPaymentAmount,
+  newPaymentSYPAmount,
+  paymentInputCurrency,
   newPaymentNotes,
   selectedPaymentMethod,
   currentUserId,
@@ -43,7 +47,7 @@ export function useAccountingActions({
       const res = await fetch(`/api/orders/${selectedOrder.id}/payments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: Number(newPaymentAmount), notes: newPaymentNotes, paymentMethod: selectedPaymentMethod, changedById }),
+        body: JSON.stringify({ amount: paymentInputCurrency === "SYP" ? Number(newPaymentSYPAmount) / 135 : Number(newPaymentAmount), notes: newPaymentNotes, paymentMethod: selectedPaymentMethod, changedById }),
       });
       if (res.ok) {
         const updated = await res.json() as Order;
