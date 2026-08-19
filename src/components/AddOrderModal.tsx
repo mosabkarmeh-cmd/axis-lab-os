@@ -909,7 +909,7 @@ export default function AddOrderModal({
                           type="number"
                           required
                           min="0"
-                          step="500"
+                          step="1"
                           placeholder="السعر"
                           value={item.price}
                           onChange={(e) => updateOrderDraftItem(idx, 'price', Number(e.target.value))}
