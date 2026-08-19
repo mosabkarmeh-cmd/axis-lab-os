@@ -1,7 +1,7 @@
 {
   "name": "axis-lab-os",
   "private": true,
-  "version": "0.13.20",
+  "version": "0.13.21",
   "description": "AXIS LAB OS - نظام تشغيل ورش القص والنقش بالليزر",
   "author": "AXIS LAB",
   "type": "module",

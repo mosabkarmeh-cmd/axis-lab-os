@@ -6,9 +6,16 @@ const http = require('node:http');
 const fs = require('node:fs');
 const crypto = require('node:crypto');
 
-const PORT = Number(process.env.AXIS_PORT || 3210);
+const args = process.argv.slice(2);
+function argValue(name) {
+  const index = args.indexOf(name);
+  return index >= 0 ? args[index + 1] : undefined;
+}
+const IS_CENTRAL_SERVER = args.includes('--central-server');
+const PORT = Number(argValue('--port') || process.env.AXIS_PORT || 3210);
+const CLI_DATA_DIR = argValue('--data-dir');
 let REMOTE_SERVER_URL = String(process.env.AXIS_REMOTE_URL || '').replace(/\/+$/, '');
-let IS_REMOTE_CLIENT = Boolean(REMOTE_SERVER_URL);
+let IS_REMOTE_CLIENT = Boolean(REMOTE_SERVER_URL) && !IS_CENTRAL_SERVER;
 
 function isValidRemoteUrl(value) {
   try {
@@ -192,12 +199,12 @@ function startServer() {
           ].join(path.delimiter)
         : path.join(projectRoot(), 'node_modules'),
       DB_MODE: 'sqlite',
-      AXIS_DATA_FILE: path.join(app.getPath('userData'), 'axis-data.sqlite'),
-      AXIS_LEGACY_DATA_FILE: path.join(app.getPath('userData'), 'axis-data.json'),
+      AXIS_DATA_FILE: process.env.AXIS_DATA_FILE || path.join(process.env.AXIS_DATA_DIR || CLI_DATA_DIR || app.getPath('userData'), 'axis-data.sqlite'),
+      AXIS_LEGACY_DATA_FILE: process.env.AXIS_LEGACY_DATA_FILE || path.join(process.env.AXIS_DATA_DIR || CLI_DATA_DIR || app.getPath('userData'), 'axis-data.json'),
       SQLITE_WASM_PATH: app.isPackaged ? path.join(process.resourcesPath, 'sql-wasm.wasm') : path.join(projectRoot(), 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
       PORT: String(PORT),
-      APP_URL: `http://127.0.0.1:${PORT}`,
-      SERVER_HOST: '127.0.0.1',
+      APP_URL: process.env.AXIS_APP_URL || `http://${IS_CENTRAL_SERVER ? 'localhost' : '127.0.0.1'}:${PORT}`,
+      SERVER_HOST: process.env.AXIS_SERVER_HOST || (IS_CENTRAL_SERVER ? '0.0.0.0' : '127.0.0.1'),
       ALLOW_PUBLIC_REGISTRATION: 'false',
       BOOTSTRAP_ADMIN_PASSWORD: getBootstrapAdminPassword(),
       JWT_SECRET: getDesktopJwtSecret(),
@@ -248,10 +255,15 @@ app.on('second-instance', () => {
 app.whenReady().then(async () => {
   try {
     REMOTE_SERVER_URL = loadRemoteServerUrl();
-    IS_REMOTE_CLIENT = Boolean(REMOTE_SERVER_URL);
+    IS_REMOTE_CLIENT = Boolean(REMOTE_SERVER_URL) && !IS_CENTRAL_SERVER;
     startServer();
+    if (IS_CENTRAL_SERVER) {
+      await waitForServer(`http://127.0.0.1:${PORT}/api/health`);
+      console.log(`[AXIS CENTRAL] Ready on 0.0.0.0:${PORT}`);
+      return;
+    }
     await createWindow();
-    if (bootstrapPasswordCreated && mainWindow && !mainWindow.isDestroyed()) {
+    if (!IS_CENTRAL_SERVER && bootstrapPasswordCreated && mainWindow && !mainWindow.isDestroyed()) {
       await dialog.showMessageBox(mainWindow, {
         type: 'info',
         title: 'بيانات المسؤول لأول تشغيل',
@@ -267,7 +279,7 @@ app.whenReady().then(async () => {
   }
 });
 
-app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+app.on('window-all-closed', () => { if (!IS_CENTRAL_SERVER && process.platform !== 'darwin') app.quit(); });
 app.on('before-quit', () => {
   app.isQuitting = true;
   if (serverProcess && !serverProcess.killed) serverProcess.kill();

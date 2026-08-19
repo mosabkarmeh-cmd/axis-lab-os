@@ -3855,7 +3855,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
             {/* Bottom Credits & System Specs */}
             <div className="pt-6 mt-6 border-t border-zinc-850/80 flex flex-wrap items-center justify-between text-[10px] font-mono text-zinc-500 gap-2">
               <div className="flex items-center gap-3">
-                <span className="text-zinc-400 font-bold">AXIS LAB v0.13.20</span>
+                <span className="text-zinc-400 font-bold">AXIS LAB v0.13.21</span>
                 <span>•</span>
                 <span>SQLite Local ERP Engine</span>
               </div>
@@ -4230,7 +4230,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
           <AxisLabLogo size={28} src={companySettings?.logo} className="transform hover:rotate-12 transition-transform duration-300" />
           <h1 className="font-semibold text-xs tracking-tight text-zinc-100 flex items-center gap-1.5">
             <span className="text-[#c59257] font-bold">AXIS</span><span>LAB OS</span> 
-            <span className="text-zinc-500 font-mono text-[10px] hidden sm:inline">/ v0.13.20 (Interactive)</span>
+            <span className="text-zinc-500 font-mono text-[10px] hidden sm:inline">/ v0.13.21 (Interactive)</span>
           </h1>
         </div>
 

@@ -6,9 +6,14 @@ const { spawn } = require("node:child_process");
 
 const root = path.resolve(__dirname, "..");
 const appData = process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming");
-const dataDir = process.env.AXIS_DATA_DIR || path.join(appData, "axis-lab-os-central");
-const port = Number(process.env.AXIS_PORT || process.env.PORT || 3210);
-const host = process.env.AXIS_SERVER_HOST || process.env.SERVER_HOST || "0.0.0.0";
+const args = process.argv.slice(2);
+function argValue(name) {
+  const index = args.indexOf(name);
+  return index >= 0 ? args[index + 1] : undefined;
+}
+const dataDir = argValue("--data-dir") || process.env.AXIS_DATA_DIR || path.join(appData, "axis-lab-os-central");
+const port = Number(argValue("--port") || process.env.AXIS_PORT || process.env.PORT || 3210);
+const host = argValue("--host") || process.env.AXIS_SERVER_HOST || process.env.SERVER_HOST || "0.0.0.0";
 
 fs.mkdirSync(dataDir, { recursive: true });
 function persistentSecret(fileName, bytes = 48) {
