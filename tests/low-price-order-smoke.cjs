@@ -63,7 +63,7 @@ async function request(pathname, options = {}) {
 
     const customers = await request('/api/customers');
     const customerId = customers?.[0]?.id || 'cust-1';
-    const prices = [1, 50, 100];
+    const prices = [1, 35, 50, 70, 100];
     for (const price of prices) {
       const order = await request('/api/orders', {
         method: 'POST',
