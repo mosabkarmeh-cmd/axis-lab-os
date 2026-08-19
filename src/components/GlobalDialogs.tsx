@@ -1379,13 +1379,13 @@ export default function GlobalDialogs(props: Record<string, any>) {
                           <button
                             type="button"
                             onClick={() => {
-                              const half = Number(selectedOrder.totalPrice || 0) * 0.5;
+                              const half = Math.max(0, Number(selectedOrder.remaining || 0)) * 0.5;
                               setNewPaymentAmount((half / (exchangeRate || 135)).toFixed(2));
                               setNewPaymentSYPAmount(Math.round(half).toString());
                             }}
                             className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 rounded font-mono cursor-pointer"
                           >
-                            🪙 50% عربون ({Math.round(Number(selectedOrder.totalPrice || 0) * 0.5).toLocaleString()} ل.س)
+                            🪙 50% من المتبقي ({Math.round(Math.max(0, Number(selectedOrder.remaining || 0)) * 0.5).toLocaleString()} ل.س)
                           </button>
                           {[500000, 1000000, 2000000].map(sypVal => (
                             <button
@@ -1467,7 +1467,8 @@ export default function GlobalDialogs(props: Record<string, any>) {
                                   type="number"
                                   required
                                   min="1"
-                                  step="1000"
+                                  step="1"
+                                  max={Math.round(Math.max(0, Number(selectedOrder.remaining || 0)))}
                                   value={newPaymentSYPAmount}
                                   onChange={(e) => {
                                     const syp = e.target.value;

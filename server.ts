@@ -2948,8 +2948,13 @@ async function startServer() {
       res.status(400).json({ error: "مبلغ الدفعة يجب أن يكون أكبر من الصفر" });
       return;
     }
-    if (payAmtSYP > order.remaining + 1) {
-      res.status(400).json({ error: "مبلغ الدفعة يتجاوز المبلغ المتبقي" });
+    const currentRemainingSYP = Math.max(0, Number(order.totalPrice || 0) - Number(order.paidAmount || 0));
+    if (payAmtSYP > currentRemainingSYP + 1) {
+      res.status(400).json({
+        error: `مبلغ الدفعة يتجاوز المبلغ المتبقي. المتبقي: ${Math.round(currentRemainingSYP).toLocaleString()} ل.س`,
+        remainingSYP: currentRemainingSYP,
+        remainingUSD: currentRemainingSYP / orderExchangeRate
+      });
       return;
     }
     if (paymentId && order.payments?.some((payment: any) => payment.id === String(paymentId))) {
