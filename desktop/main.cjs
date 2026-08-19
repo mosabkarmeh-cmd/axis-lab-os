@@ -86,10 +86,10 @@ function getInstallScope() {
 }
 
 function setupAutoUpdater() {
-  // The repository is private and updates are distributed manually by the owner.
-  // Opt-in auto-update remains available only for a dedicated authenticated feed.
-  if (process.env.AXIS_ENABLE_AUTO_UPDATE !== 'true') {
-    console.log('[AXIS UPDATER] Manual update mode: automatic GitHub checks are disabled.');
+  // Temporary production policy: automatic updates are enabled while remaining fixes are distributed.
+  // Set AXIS_ENABLE_AUTO_UPDATE=false to disable them explicitly.
+  if (process.env.AXIS_ENABLE_AUTO_UPDATE === 'false') {
+    console.log('[AXIS UPDATER] Manual update override active; automatic checks are disabled.');
     return;
   }
   if (getInstallScope() === 'all-users') {
