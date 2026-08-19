@@ -38,6 +38,8 @@ const start = () => {
   });
   server.stdout.on("data", (chunk) => { serverLog += chunk.toString(); });
   server.stderr.on("data", (chunk) => { serverLog += chunk.toString(); });
+  server.on("error", (error) => { serverLog += `[SPAWN_ERROR] ${error.stack || error}\n`; });
+  server.on("exit", (code, signal) => { serverLog += `[SERVER_EXIT] code=${code} signal=${signal}\n`; });
 };
 const stop = () => new Promise((resolve) => {
   if (!server || server.killed) return resolve();
@@ -62,7 +64,7 @@ const waitForHealth = async () => {
     } catch {}
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error("Server did not become healthy");
+  throw new Error(`Server did not become healthy on port ${port}. Logs: ${serverLog}`);
 };
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
