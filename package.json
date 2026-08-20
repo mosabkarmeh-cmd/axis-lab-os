@@ -1,7 +1,7 @@
 {
   "name": "axis-lab-os",
   "private": true,
-  "version": "0.13.28",
+  "version": "0.13.29",
   "description": "AXIS LAB OS - نظام تشغيل ورش القص والنقش بالليزر",
   "author": "AXIS LAB",
   "type": "module",
@@ -12,7 +12,7 @@
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test:smoke": "npm run build && npx tsx tests/currency-conversion-smoke.ts && node tests/api-security-smoke.cjs && node tests/first-run-password-smoke.cjs && node tests/api-coverage-smoke.cjs && node tests/sqlite-migration-smoke.cjs && node tests/sqlite-crash-recovery-smoke.cjs && node tests/sqlite-concurrency-stability-smoke.cjs && node tests/production-completion-smoke.cjs && node tests/report-monthly-smoke.cjs && node tests/inventory-guards-smoke.cjs && node tests/workflow-material-supply-smoke.cjs",
+    "test:smoke": "npm run build && npx tsx tests/currency-conversion-smoke.ts && node tests/api-security-smoke.cjs && node tests/first-run-password-smoke.cjs && node tests/api-coverage-smoke.cjs && node tests/sqlite-migration-smoke.cjs && node tests/sqlite-crash-recovery-smoke.cjs && node tests/sqlite-concurrency-stability-smoke.cjs && node tests/production-completion-smoke.cjs && node tests/report-monthly-smoke.cjs && node tests/inventory-guards-smoke.cjs && node tests/workflow-material-supply-smoke.cjs && node tests/payment-gcode-regression-smoke.cjs",
     "db:generate": "drizzle-kit generate --config=src/db/drizzle.config.ts",
     "db:migrate": "drizzle-kit migrate --config=src/db/drizzle.config.ts",
     "start:prod": "NODE_ENV=production node dist/server.cjs",

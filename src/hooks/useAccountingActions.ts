@@ -42,16 +42,28 @@ export function useAccountingActions({
 
   const handleRecordPaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedOrder || !newPaymentAmount) return;
+    const rawInput = paymentInputCurrency === "SYP" ? newPaymentSYPAmount : newPaymentAmount;
+    const numericInput = Number(rawInput);
+    if (!selectedOrder || !Number.isFinite(numericInput) || numericInput <= 0) return;
+    const orderExchangeRate = Number((selectedOrder as any).exchangeRateAtCreation) > 0
+      ? Number((selectedOrder as any).exchangeRateAtCreation)
+      : 135;
     try {
       const res = await fetch(`/api/orders/${selectedOrder.id}/payments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: paymentInputCurrency === "SYP" ? Number(newPaymentSYPAmount) / 135 : Number(newPaymentAmount), notes: newPaymentNotes, paymentMethod: selectedPaymentMethod, changedById }),
+        body: JSON.stringify({
+          amount: numericInput,
+          currency: paymentInputCurrency,
+          notes: newPaymentNotes,
+          paymentMethod: selectedPaymentMethod,
+          changedById,
+        }),
       });
       if (res.ok) {
         const updated = await res.json() as Order;
-        addTerminalLog("DB", `Recorded payment of $${newPaymentAmount} (${selectedPaymentMethod}) for order ${selectedOrder.orderNumber}`);
+        const amountSYP = paymentInputCurrency === "SYP" ? numericInput : Math.round(numericInput * orderExchangeRate);
+        addTerminalLog("DB", `تم تسجيل دفعة ${amountSYP.toLocaleString()} ل.س (${paymentInputCurrency === "SYP" ? "ليرة سورية" : "$" + numericInput.toFixed(2)}) للطلب ${selectedOrder.orderNumber}`);
         setNewPaymentAmount("");
         setNewPaymentSYPAmount("");
         setNewPaymentNotes("");
@@ -98,7 +110,13 @@ export function useAccountingActions({
         const payRes = await fetch(`/api/orders/${ordToDeliver.id}/payments`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ amount: ordToDeliver.remaining, notes: "تسديد تلقائي كامل للمتبقي عند استلام العميل وتسليم الطلب", paymentMethod: selectedPaymentMethod, changedById }),
+          body: JSON.stringify({
+            amount: Math.max(0, Number(ordToDeliver.remaining || 0)),
+            currency: "SYP",
+            notes: "تسديد تلقائي كامل للمتبقي عند استلام العميل وتسليم الطلب",
+            paymentMethod: selectedPaymentMethod,
+            changedById,
+          }),
         });
         if (!payRes.ok) {
           const errJson = await payRes.json().catch(() => ({}));

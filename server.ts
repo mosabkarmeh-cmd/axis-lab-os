@@ -2946,7 +2946,7 @@ async function startServer() {
 
   // API - Record Payment
   app.post("/api/orders/:id/payments", async (req, res) => {
-    const { amount, notes, paymentMethod, changedById, paymentId } = req.body;
+    const { amount, currency = "USD", notes, paymentMethod, changedById, paymentId } = req.body;
     const order = ORDERS.find(o => o.id === req.params.id);
     if (!order) {
       res.status(404).json({ error: "الطلب غير موجود" });
@@ -2957,10 +2957,15 @@ async function startServer() {
       return;
     }
 
-    const payAmtUSD = Number(amount) || 0;
+    const inputAmount = Number(amount) || 0;
     const orderExchangeRate = Number(order.exchangeRateAtCreation) > 0 ? Number(order.exchangeRateAtCreation) : 135;
-    const payAmtSYP = Math.round(payAmtUSD * orderExchangeRate);
-    if (payAmtUSD <= 0) {
+    const payAmtSYP = currency === "SYP"
+      ? Math.round(inputAmount)
+      : Math.round(inputAmount * orderExchangeRate);
+    const payAmtUSD = currency === "SYP"
+      ? payAmtSYP / orderExchangeRate
+      : inputAmount;
+    if (!Number.isFinite(inputAmount) || inputAmount <= 0 || payAmtSYP <= 0) {
       res.status(400).json({ error: "مبلغ الدفعة يجب أن يكون أكبر من الصفر" });
       return;
     }
@@ -2977,8 +2982,11 @@ async function startServer() {
       res.status(409).json({ error: "هذه الدفعة مسجلة مسبقاً" });
       return;
     }
-    order.paidAmount += payAmtSYP;
-    order.remaining = Math.max(0, order.totalPrice - order.paidAmount);
+    order.paidAmount = Math.min(
+      Number(order.totalPrice || 0),
+      (order.payments || []).reduce((sum: number, payment: any) => sum + Number(payment.amountSYP ?? Math.round(Number(payment.amountUSD || 0) * orderExchangeRate)), 0) + payAmtSYP
+    );
+    order.remaining = Math.max(0, Number(order.totalPrice || 0) - order.paidAmount);
 
     if (!order.payments) {
       order.payments = [];
@@ -2992,6 +3000,7 @@ async function startServer() {
       amountUSD: payAmtUSD,
       amountSYP: payAmtSYP,
       exchangeRate: orderExchangeRate,
+      currency: "SYP",
       paymentMethod: paymentMethod || "cash",
       notes: notes || "دفعة مقبوضة للطلب",
       recordedBy: changedById || "u-1",
@@ -3054,19 +3063,25 @@ async function startServer() {
     const removedPayment = order.payments[pIndex];
     order.payments.splice(pIndex, 1);
 
-    // Re-calculate paidAmount
-    order.paidAmount = Math.max(0, order.paidAmount - (removedPayment.amountUSD || 0));
-    order.remaining = Math.max(0, order.totalPrice - order.paidAmount);
+    const orderExchangeRate = Number(order.exchangeRateAtCreation) > 0 ? Number(order.exchangeRateAtCreation) : 135;
+    order.paidAmount = Math.min(
+      Number(order.totalPrice || 0),
+      order.payments.reduce((sum: number, payment: any) => sum + Number(payment.amountSYP ?? Math.round(Number(payment.amountUSD || 0) * orderExchangeRate)), 0)
+    );
+    order.remaining = Math.max(0, Number(order.totalPrice || 0) - order.paidAmount);
 
-    // Sync matching Invoice
+    // Keep a linked invoice in USD, while the order remains in SYP.
     const matchingInv2 = INVOICES.find(inv => inv.orderId === order.id);
     if (matchingInv2) {
-      matchingInv2.paidAmount = order.paidAmount;
-      matchingInv2.remaining = order.remaining;
-      matchingInv2.status = order.remaining === 0 ? "paid" : order.paidAmount > 0 ? "partially_paid" : "unpaid";
+      matchingInv2.paidAmount = Math.min(
+        Number(matchingInv2.totalPrice || 0),
+        matchingInv2.payments?.reduce((sum: number, payment: any) => sum + Number(payment.amountUSD || 0), 0) || 0
+      );
+      matchingInv2.remaining = Math.max(0, Number(matchingInv2.totalPrice || 0) - matchingInv2.paidAmount);
+      matchingInv2.status = matchingInv2.remaining === 0 ? "paid" : matchingInv2.paidAmount > 0 ? "partially_paid" : "unpaid";
     }
 
-    const delPayDetails = `إلغاء وحذف سند قبض بقيمة $${(removedPayment.amountUSD || 0).toFixed(2)} | المتبقي الجديد: $${order.remaining.toFixed(2)}`;
+    const delPayDetails = `إلغاء وحذف سند قبض بقيمة ${(removedPayment.amountSYP || Math.round(Number(removedPayment.amountUSD || 0) * orderExchangeRate)).toLocaleString()} ل.س | المتبقي الجديد: ${order.remaining.toLocaleString()} ل.س`;
 
     order.statusHistory.unshift({
       oldStatus: order.status,
@@ -5064,10 +5079,12 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
     }
 
     const fallbackGcode = () => {
-      const cleanName = promptText.trim();
-      const cleanMaterial = material || "Acrylic 5mm";
-      const cleanSpeed = speed || "45";
-      const cleanPower = power || "80";
+      const cleanName = String(promptText).trim();
+      const cleanMaterial = String(material || "Acrylic 5mm");
+      const parsedSpeed = Number.parseFloat(String(speed ?? "45").replace(/[^0-9.\-]/g, ""));
+      const parsedPower = Number.parseFloat(String(power ?? "80").replace(/[^0-9.\-]/g, ""));
+      const cleanSpeed = Number.isFinite(parsedSpeed) ? Math.max(1, parsedSpeed) : 45;
+      const cleanPower = Number.isFinite(parsedPower) ? Math.min(100, Math.max(0, parsedPower)) : 80;
 
       let pathCount = 10;
       if (cleanName.includes("دائرة") || cleanName.includes("circle")) pathCount = 12;
@@ -7572,14 +7589,25 @@ Role Guidelines:
     };
     if (!inv.payments) inv.payments = [];
     inv.payments.unshift(invoicePayment);
-    // If linked to an order, sync the order payment
+    // If linked to an order, sync the order payment while preserving SYP storage.
     if (inv.orderId) {
       const ord = ORDERS.find(o => o.id === inv.orderId);
       if (ord) {
-        ord.paidAmount = inv.paidAmount;
-        ord.remaining = inv.remaining;
+        const orderExchangeRate = Number(ord.exchangeRateAtCreation) > 0 ? Number(ord.exchangeRateAtCreation) : 135;
+        const orderPayment = {
+          ...invoicePayment,
+          orderId: ord.id,
+          amountSYP: Math.round(payAmt * orderExchangeRate),
+          exchangeRate: orderExchangeRate,
+          currency: "USD",
+        };
         if (!ord.payments) ord.payments = [];
-        if (!ord.payments.some((payment: any) => payment.id === invoicePayment.id)) ord.payments.unshift(invoicePayment);
+        if (!ord.payments.some((payment: any) => payment.id === orderPayment.id)) ord.payments.unshift(orderPayment);
+        ord.paidAmount = Math.min(
+          Number(ord.totalPrice || 0),
+          ord.payments.reduce((sum: number, payment: any) => sum + Number(payment.amountSYP ?? Math.round(Number(payment.amountUSD || 0) * orderExchangeRate)), 0)
+        );
+        ord.remaining = Math.max(0, Number(ord.totalPrice || 0) - ord.paidAmount);
         ord.statusHistory.unshift({
           oldStatus: ord.status,
           newStatus: ord.status,
