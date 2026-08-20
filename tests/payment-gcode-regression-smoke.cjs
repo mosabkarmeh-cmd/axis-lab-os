@@ -20,7 +20,16 @@ const request = async (url, options = {}) => {
 const waitForHealth = async () => {
   const deadline = Date.now() + 15000;
   while (Date.now() < deadline) {
-    try { const response = await fetch(`http://127.0.0.1:${port}/api/health`); if (response.ok) return; } catch {}
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/api/health`);
+      if (response.ok) {
+        const body = await response.json();
+        if (body.database !== "sqlite" || body.sqliteIntegrity !== "ok" || body.schemaVersion !== 5) throw new Error(`health diagnostics failed: ${JSON.stringify(body)}`);
+        return;
+      }
+    } catch (error) {
+      if (String(error?.message || "").includes("health diagnostics failed")) throw error;
+    }
     await new Promise(resolve => setTimeout(resolve, 200));
   }
   throw new Error("server health timeout");

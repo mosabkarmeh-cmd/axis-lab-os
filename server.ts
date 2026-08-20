@@ -1874,9 +1874,36 @@ async function startServer() {
     next();
   });
 
-  // API Health Check Route
-  app.get("/api/health", (req, res) => {
-    res.json({ success: true, status: "ok", database: USE_POSTGRES ? "postgres" : USE_SQLITE ? "sqlite" : "memory" });
+  // API Health Check Route. This is intentionally safe for LAN diagnostics:
+  // expose only the database type, basename, schema version, and integrity result.
+  app.get("/api/health", async (req, res) => {
+    const database = USE_POSTGRES ? "postgres" : USE_SQLITE ? "sqlite" : "memory";
+    let status = "ok";
+    let sqliteIntegrity: string | null = null;
+    let schemaVersion: number | null = null;
+    if (USE_SQLITE) {
+      try {
+        const databaseHandle = await initLocalSqlite();
+        const integrityResult = databaseHandle.exec("PRAGMA integrity_check");
+        sqliteIntegrity = String(integrityResult[0]?.values?.[0]?.[0] || "unknown");
+        const schemaResult = databaseHandle.exec("SELECT value FROM local_metadata WHERE key = 'schema_version' LIMIT 1");
+        const parsedVersion = Number(schemaResult[0]?.values?.[0]?.[0]);
+        schemaVersion = Number.isFinite(parsedVersion) ? parsedVersion : null;
+        if (sqliteIntegrity !== "ok") status = "degraded";
+      } catch (error) {
+        status = "degraded";
+        sqliteIntegrity = "error";
+        console.error("[HEALTH] SQLite integrity check failed:", error);
+      }
+    }
+    res.status(status === "ok" ? 200 : 503).json({
+      success: status === "ok",
+      status,
+      database,
+      databaseFile: USE_SQLITE ? path.basename(LOCAL_DATA_FILE) : null,
+      sqliteIntegrity,
+      schemaVersion,
+    });
   });
 
   app.get("/api/diagnostics/benchmarks", (req, res) => {
