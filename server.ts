@@ -7577,7 +7577,7 @@ Role Guidelines:
 
   // Record Payment on Invoice
   app.post("/api/accounting/invoices/:id/payments", async (req, res) => {
-    const { amount, notes, paymentMethod, changedById, paymentId } = req.body;
+    const { amount, currency = "USD", notes, paymentMethod, changedById, paymentId } = req.body;
     const inv = INVOICES.find(i => i.id === req.params.id);
     if (!inv) {
       res.status(404).json({ success: false, message: "الفاتورة غير موجودة" });
@@ -7588,30 +7588,45 @@ Role Guidelines:
       return;
     }
 
-    const payAmt = Number(amount);
-    const invoiceTotal = Number(inv.totalPrice) || 0;
-    const currentPaid = Number.isFinite(Number(inv.paidAmount)) ? Math.max(0, Number(inv.paidAmount)) : 0;
-    const currentRemaining = Math.max(0, invoiceTotal - currentPaid);
-    if (!Number.isFinite(payAmt) || payAmt <= 0) {
+    const payInput = Number(amount);
+    const invoiceRate = Number(inv.exchangeRateAtFinalization || inv.exchangeRateAtIssue || (inv.orderId ? ORDERS.find(o => o.id === inv.orderId)?.exchangeRateAtCreation : 0) || SETTINGS.exchangeRate || 135);
+    const rate = Number.isFinite(invoiceRate) && invoiceRate > 0 ? invoiceRate : 135;
+    const invoiceTotalUSD = Number(inv.totalPriceUSD ?? inv.totalPrice) || 0;
+    const invoiceTotalSYP = Math.round(Number(inv.totalPriceSYP ?? (invoiceTotalUSD * rate)));
+    const currentPaidUSD = Number.isFinite(Number(inv.paidAmountUSD ?? inv.paidAmount)) ? Math.max(0, Number(inv.paidAmountUSD ?? inv.paidAmount)) : 0;
+    const currentPaidSYP = Math.round(Number(inv.paidAmountSYP ?? (currentPaidUSD * rate)));
+    const currentRemainingSYP = Math.max(0, invoiceTotalSYP - currentPaidSYP);
+    const payAmtSYP = currency === "SYP" ? Math.round(payInput) : Math.round(payInput * rate);
+    const payAmtUSD = currency === "SYP" ? payAmtSYP / rate : payInput;
+    if (!Number.isFinite(payInput) || payInput <= 0 || payAmtSYP <= 0) {
       res.status(400).json({ success: false, message: "مبلغ الدفعة يجب أن يكون رقمًا أكبر من الصفر" });
       return;
     }
-    if (payAmt > currentRemaining + 0.01) {
-      res.status(400).json({ success: false, message: `مبلغ القسط يتجاوز المتبقي. المتبقي: ${currentRemaining.toFixed(2)} $` });
+    if (payAmtSYP > currentRemainingSYP + 1) {
+      res.status(400).json({ success: false, message: `مبلغ القسط يتجاوز المتبقي. المتبقي: ${currentRemainingSYP.toLocaleString()} ل.س` });
       return;
     }
     if (paymentId && inv.payments?.some((payment: any) => payment.id === String(paymentId))) {
       res.status(409).json({ success: false, message: "هذه الدفعة مسجلة مسبقاً" });
       return;
     }
-    inv.paidAmount = Math.min(invoiceTotal, currentPaid + payAmt);
-    inv.remaining = Math.max(0, invoiceTotal - inv.paidAmount);
+    inv.totalPriceUSD = invoiceTotalUSD;
+    inv.totalPriceSYP = invoiceTotalSYP;
+    inv.paidAmountUSD = Math.min(invoiceTotalUSD, currentPaidUSD + payAmtUSD);
+    inv.paidAmountSYP = Math.min(invoiceTotalSYP, currentPaidSYP + payAmtSYP);
+    inv.paidAmount = inv.paidAmountUSD;
+    inv.remainingUSD = Math.max(0, invoiceTotalUSD - inv.paidAmountUSD);
+    inv.remainingSYP = Math.max(0, invoiceTotalSYP - inv.paidAmountSYP);
+    inv.remaining = inv.remainingUSD;
     inv.status = inv.remaining === 0 ? "paid" : inv.paidAmount > 0 ? "partially_paid" : "unpaid";
     const invoicePayment = {
       id: paymentId ? String(paymentId) : "pay_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
       invoiceId: inv.id,
       orderId: inv.orderId,
-      amountUSD: payAmt,
+      amountUSD: payAmtUSD,
+      amountSYP: payAmtSYP,
+      exchangeRate: rate,
+      currency: "SYP",
       paymentMethod: paymentMethod || "cash",
       notes: notes || "دفعة فاتورة",
       recordedBy: changedById || "u-1",
@@ -7627,9 +7642,9 @@ Role Guidelines:
         const orderPayment = {
           ...invoicePayment,
           orderId: ord.id,
-          amountSYP: Math.round(payAmt * orderExchangeRate),
+          amountSYP: payAmtSYP,
           exchangeRate: orderExchangeRate,
-          currency: "USD",
+          currency: "SYP",
         };
         if (!ord.payments) ord.payments = [];
         if (!ord.payments.some((payment: any) => payment.id === orderPayment.id)) ord.payments.unshift(orderPayment);
@@ -7641,7 +7656,7 @@ Role Guidelines:
         ord.statusHistory.unshift({
           oldStatus: ord.status,
           newStatus: ord.status,
-          notes: `تم تسديد دفعة مالية عبر الفاتورة بقيمة $${payAmt.toFixed(2)}. ${notes || ""}`,
+          notes: `تم تسديد دفعة مالية عبر الفاتورة بقيمة ${payAmtSYP.toLocaleString()} ل.س ($${payAmtUSD.toFixed(2)}). ${notes || ""}`,
           changedAt: new Date().toISOString()
         });
       }

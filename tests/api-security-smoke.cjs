@@ -139,6 +139,10 @@ const assert = (condition, message) => {
     const invoicePayment = await request(`/api/accounting/invoices/${restoredInvoice.id}/payments`, { method: "POST", body: JSON.stringify({ amount: 25, paymentId: "smoke-invoice-payment-1", paymentMethod: "cash" }) });
     assert(invoicePayment.response.ok && invoicePayment.body.invoice.paidAmount === 50, "Invoice payment ledger write failed");
     assert(invoicePayment.body.invoice.payments?.some((payment) => payment.id === "smoke-invoice-payment-1"), `Invoice payment was not appended to the in-memory ledger: ${JSON.stringify(invoicePayment.body.invoice)}`);
+    const sypInvoicePayment = await request(`/api/accounting/invoices/${restoredInvoice.id}/payments`, { method: "POST", body: JSON.stringify({ amount: 1350, currency: "SYP", paymentId: "smoke-invoice-syp-payment-1", paymentMethod: "cash" }) });
+    assert(sypInvoicePayment.response.ok, `SYP invoice installment failed: ${JSON.stringify(sypInvoicePayment.body)}`);
+    assert(sypInvoicePayment.body.invoice.paidAmountSYP === 8100 && sypInvoicePayment.body.invoice.paidAmount === 60 && sypInvoicePayment.body.invoice.remainingSYP === 5400, `SYP invoice installment was converted incorrectly: ${JSON.stringify(sypInvoicePayment.body.invoice)}`);
+    assert(sypInvoicePayment.body.invoice.payments?.some((payment) => payment.id === "smoke-invoice-syp-payment-1" && payment.amountSYP === 1350 && payment.currency === "SYP"), "SYP payment ledger fields were not persisted");
     const duplicateInvoicePayment = await request(`/api/accounting/invoices/${restoredInvoice.id}/payments`, { method: "POST", body: JSON.stringify({ amount: 25, paymentId: "smoke-invoice-payment-1" }) });
     assert(duplicateInvoicePayment.response.status === 409, "Duplicate invoice payment was not rejected");
 
@@ -320,7 +324,7 @@ const assert = (condition, message) => {
     });
     assert(recoveredOrders.response.ok && recoveredOrders.body.some((item) => item.id === orderId), `SQLite did not recover the order from a valid backup after corruption: orderId=${orderId}, orders=${JSON.stringify(recoveredOrders.body)}, candidates=${JSON.stringify(recoveryCandidates)}, serverLog=${serverLog}`);
     const recoveredInvoices = await request("/api/accounting/invoices");
-    assert(recoveredInvoices.response.ok && recoveredInvoices.body.invoices.some((item) => item.id === restoredInvoice.id && item.paidAmount === 50), `SQLite did not recover the financial invoice ledger after corruption: target=${restoredInvoice.id}, invoices=${JSON.stringify(recoveredInvoices.body.invoices)}, backupInvoiceState=${JSON.stringify(backupInvoiceState)}, serverLog=${serverLog}`);
+    assert(recoveredInvoices.response.ok && recoveredInvoices.body.invoices.some((item) => item.id === restoredInvoice.id && item.paidAmount === 60 && item.paidAmountSYP === 8100 && item.remainingSYP === 5400), `SQLite did not recover the financial invoice ledger after corruption: target=${restoredInvoice.id}, invoices=${JSON.stringify(recoveredInvoices.body.invoices)}, backupInvoiceState=${JSON.stringify(backupInvoiceState)}, serverLog=${serverLog}`);
     assert(fs.readdirSync(tempDir).some((name) => name.startsWith("axis-data.sqlite.corrupt-")), "Corrupt SQLite file was not preserved");
 
     const rateBeforeReset = await request("/api/exchange-rate");

@@ -210,6 +210,7 @@ export default function AccountingView({ customers, onRefreshOrders, currentUser
   // Payment Form state
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentNotes, setPaymentNotes] = useState("");
+  const [paymentCurrency, setPaymentCurrency] = useState<"SYP" | "USD">("SYP");
   const [paymentError, setPaymentError] = useState("");
 
   // Common expense categories
@@ -405,13 +406,19 @@ export default function AccountingView({ customers, onRefreshOrders, currentUser
       return;
     }
     const amount = Number(paymentAmount);
-    const remaining = Number(recordingPaymentInvoice.remaining) || 0;
+    const invoiceRate = Number(recordingPaymentInvoice.exchangeRateAtFinalization || recordingPaymentInvoice.exchangeRateAtIssue || exchangeRate || 135);
+    const rate = Number.isFinite(invoiceRate) && invoiceRate > 0 ? invoiceRate : 135;
+    const remainingUSD = Number(recordingPaymentInvoice.remainingUSD ?? recordingPaymentInvoice.remaining) || 0;
+    const remainingSYP = Number(recordingPaymentInvoice.remainingSYP ?? Math.round(remainingUSD * rate)) || 0;
+    const maxAmount = paymentCurrency === "SYP" ? remainingSYP : remainingUSD;
     if (!Number.isFinite(amount) || amount <= 0) {
       setPaymentError("قيمة القسط يجب أن تكون رقمًا أكبر من الصفر.");
       return;
     }
-    if (amount > remaining + 0.01) {
-      setPaymentError(`القسط يتجاوز المتبقي. الحد الأقصى هو ${remaining.toFixed(2)} $.`);
+    if (amount > maxAmount + (paymentCurrency === "SYP" ? 1 : 0.01)) {
+      setPaymentError(paymentCurrency === "SYP"
+        ? `القسط يتجاوز المتبقي. الحد الأقصى هو ${Math.round(remainingSYP).toLocaleString()} ل.س.`
+        : `القسط يتجاوز المتبقي. الحد الأقصى هو ${remainingUSD.toFixed(2)} $.`);
       return;
     }
 
@@ -419,7 +426,9 @@ export default function AccountingView({ customers, onRefreshOrders, currentUser
       const res = await fetch(`/api/accounting/invoices/${recordingPaymentInvoice.id}/payments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount, notes: paymentNotes })
+        body: JSON.stringify({           amount,
+          currency: paymentCurrency,
+          notes: paymentNotes })
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) {
@@ -429,6 +438,7 @@ export default function AccountingView({ customers, onRefreshOrders, currentUser
       setRecordingPaymentInvoice(null);
       setPaymentAmount("");
       setPaymentNotes("");
+      setPaymentCurrency("SYP");
       setPaymentError("");
       fetchData();
       if (onRefreshOrders) onRefreshOrders();
@@ -2088,14 +2098,20 @@ export default function AccountingView({ customers, onRefreshOrders, currentUser
                   </div>
                 )}
                 <div>
-                  <label className="text-xs text-zinc-500 font-bold block mb-1">المبلغ المدفوع حالياً ($) *</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs text-zinc-500 font-bold">مبلغ القسط *</label>
+                    <div className="flex gap-1">
+                      <button type="button" onClick={() => { setPaymentCurrency("SYP"); setPaymentAmount(""); }} className={`px-2 py-0.5 rounded text-[10px] font-bold ${paymentCurrency === "SYP" ? "bg-amber-500/20 text-amber-300 border border-amber-500/50" : "bg-zinc-800 text-zinc-400"}`}>ل.س</button>
+                      <button type="button" onClick={() => { setPaymentCurrency("USD"); setPaymentAmount(""); }} className={`px-2 py-0.5 rounded text-[10px] font-bold ${paymentCurrency === "USD" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/50" : "bg-zinc-800 text-zinc-400"}`}>$</button>
+                    </div>
+                  </div>
                   <input
                     type="number"
                     required
-                    min="0.1"
-                    max={recordingPaymentInvoice.remaining}
-                    step="0.01"
-                    placeholder="0.00"
+                    min={paymentCurrency === "SYP" ? "1" : "0.01"}
+                    max={paymentCurrency === "SYP" ? (Number(recordingPaymentInvoice.remainingSYP ?? Math.round((Number(recordingPaymentInvoice.remaining) || 0) * (Number(recordingPaymentInvoice.exchangeRateAtFinalization || recordingPaymentInvoice.exchangeRateAtIssue || exchangeRate || 135)))) || 0) : (Number(recordingPaymentInvoice.remainingUSD ?? recordingPaymentInvoice.remaining) || 0)}
+                    step={paymentCurrency === "SYP" ? "1" : "0.01"}
+                    placeholder={paymentCurrency === "SYP" ? "0" : "0.00"}
                     value={paymentAmount}
                     onChange={(e) => setPaymentAmount(e.target.value)}
                     className="w-full bg-black border border-zinc-850 rounded-lg p-2.5 text-xs text-zinc-200 placeholder-zinc-800 focus:outline-none focus:border-emerald-600 font-mono text-left"

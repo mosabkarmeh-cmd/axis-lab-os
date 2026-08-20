@@ -578,7 +578,7 @@ export default function App() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderDetailsTab, setOrderDetailsTab] = useState<'items' | 'payments' | 'gcode' | 'timeline' | 'files'>("items");
   const [newPaymentAmount, setNewPaymentAmount] = useState<string>("");
-  const [paymentInputCurrency, setPaymentInputCurrency] = useState<'USD' | 'SYP'>("USD");
+  const [paymentInputCurrency, setPaymentInputCurrency] = useState<'USD' | 'SYP'>("SYP");
   const [newPaymentSYPAmount, setNewPaymentSYPAmount] = useState<string>("");
   const [newPaymentNotes, setNewPaymentNotes] = useState<string>("");
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'cash' | 'transfer' | 'card'>("cash");
