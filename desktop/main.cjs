@@ -111,7 +111,12 @@ function setupAutoUpdater() {
   autoUpdater.autoInstallOnAppQuit = true;
 
   const githubToken = getGitHubUpdaterToken();
+  let updaterConfigured = false;
   if (githubToken && !process.env.AXIS_UPDATE_TEST_URL) {
+    // electron-updater supports private GitHub releases through its API provider.
+    // Set the header explicitly as well so a missing/invalid provider option can
+    // never silently fall back to the public releases.atom endpoint.
+    autoUpdater.requestHeaders = { authorization: `token ${githubToken}` };
     autoUpdater.setFeedURL({
       provider: 'github',
       owner: 'mosabkarmeh-cmd',
@@ -120,9 +125,10 @@ function setupAutoUpdater() {
       token: githubToken,
       releaseType: 'release',
     });
+    updaterConfigured = true;
     console.log('[AXIS UPDATER] Private GitHub update channel enabled.');
   } else if (!process.env.AXIS_UPDATE_TEST_URL) {
-    console.warn('[AXIS UPDATER] No private GitHub token found; update check may fail for the private repository.');
+    console.warn('[AXIS UPDATER] No private GitHub token found; automatic check skipped safely.');
   }
 
   if (process.env.AXIS_UPDATE_TEST_URL) {
@@ -130,8 +136,11 @@ function setupAutoUpdater() {
       provider: 'generic',
       url: process.env.AXIS_UPDATE_TEST_URL,
     });
+    updaterConfigured = true;
     console.log('[AXIS UPDATER] Local test feed:', process.env.AXIS_UPDATE_TEST_URL);
   }
+
+  if (!updaterConfigured) return;
 
   autoUpdater.on('error', (error) => {
     console.error('[AXIS UPDATER]', error);
