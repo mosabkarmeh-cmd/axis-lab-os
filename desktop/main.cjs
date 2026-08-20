@@ -85,6 +85,17 @@ function getInstallScope() {
   }
 }
 
+function getGitHubUpdaterToken() {
+  const fromEnvironment = String(process.env.AXIS_GITHUB_TOKEN || '').trim();
+  if (fromEnvironment) return fromEnvironment;
+  try {
+    const tokenPath = path.join(app.getPath('userData'), 'github-update-token.txt');
+    return fs.readFileSync(tokenPath, 'utf8').trim();
+  } catch {
+    return '';
+  }
+}
+
 function setupAutoUpdater() {
   // Temporary production policy: automatic updates are enabled while remaining fixes are distributed.
   // Set AXIS_ENABLE_AUTO_UPDATE=false to disable them explicitly.
@@ -98,6 +109,21 @@ function setupAutoUpdater() {
 
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
+
+  const githubToken = getGitHubUpdaterToken();
+  if (githubToken && !process.env.AXIS_UPDATE_TEST_URL) {
+    autoUpdater.setFeedURL({
+      provider: 'github',
+      owner: 'mosabkarmeh-cmd',
+      repo: 'axis-lab-os',
+      private: true,
+      token: githubToken,
+      releaseType: 'release',
+    });
+    console.log('[AXIS UPDATER] Private GitHub update channel enabled.');
+  } else if (!process.env.AXIS_UPDATE_TEST_URL) {
+    console.warn('[AXIS UPDATER] No private GitHub token found; update check may fail for the private repository.');
+  }
 
   if (process.env.AXIS_UPDATE_TEST_URL) {
     autoUpdater.setFeedURL({
