@@ -7588,21 +7588,24 @@ Role Guidelines:
       return;
     }
 
-    const payAmt = Number(amount) || 0;
-    if (payAmt <= 0) {
-      res.status(400).json({ success: false, message: "مبلغ الدفعة يجب أن يكون أكبر من الصفر" });
+    const payAmt = Number(amount);
+    const invoiceTotal = Number(inv.totalPrice) || 0;
+    const currentPaid = Number.isFinite(Number(inv.paidAmount)) ? Math.max(0, Number(inv.paidAmount)) : 0;
+    const currentRemaining = Math.max(0, invoiceTotal - currentPaid);
+    if (!Number.isFinite(payAmt) || payAmt <= 0) {
+      res.status(400).json({ success: false, message: "مبلغ الدفعة يجب أن يكون رقمًا أكبر من الصفر" });
       return;
     }
-    if (payAmt > inv.remaining + 0.01) {
-      res.status(400).json({ success: false, message: "مبلغ الدفعة يتجاوز المبلغ المتبقي" });
+    if (payAmt > currentRemaining + 0.01) {
+      res.status(400).json({ success: false, message: `مبلغ القسط يتجاوز المتبقي. المتبقي: ${currentRemaining.toFixed(2)} $` });
       return;
     }
     if (paymentId && inv.payments?.some((payment: any) => payment.id === String(paymentId))) {
       res.status(409).json({ success: false, message: "هذه الدفعة مسجلة مسبقاً" });
       return;
     }
-    inv.paidAmount += payAmt;
-    inv.remaining = Math.max(0, inv.totalPrice - inv.paidAmount);
+    inv.paidAmount = Math.min(invoiceTotal, currentPaid + payAmt);
+    inv.remaining = Math.max(0, invoiceTotal - inv.paidAmount);
     inv.status = inv.remaining === 0 ? "paid" : inv.paidAmount > 0 ? "partially_paid" : "unpaid";
     const invoicePayment = {
       id: paymentId ? String(paymentId) : "pay_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),

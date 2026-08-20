@@ -210,6 +210,7 @@ export default function AccountingView({ customers, onRefreshOrders, currentUser
   // Payment Form state
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentNotes, setPaymentNotes] = useState("");
+  const [paymentError, setPaymentError] = useState("");
 
   // Common expense categories
   const expenseCategories = ["رواتب", "صيانة", "كهرباء ومرافق", "خامات ومواد", "إيجار", "أخرى"];
@@ -398,28 +399,42 @@ export default function AccountingView({ customers, onRefreshOrders, currentUser
   // Handle recording payment on invoice
   const handleRecordPayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!recordingPaymentInvoice || !paymentAmount) return;
+    setPaymentError("");
+    if (!recordingPaymentInvoice || !paymentAmount) {
+      setPaymentError("أدخل قيمة القسط أولًا.");
+      return;
+    }
+    const amount = Number(paymentAmount);
+    const remaining = Number(recordingPaymentInvoice.remaining) || 0;
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setPaymentError("قيمة القسط يجب أن تكون رقمًا أكبر من الصفر.");
+      return;
+    }
+    if (amount > remaining + 0.01) {
+      setPaymentError(`القسط يتجاوز المتبقي. الحد الأقصى هو ${remaining.toFixed(2)} $.`);
+      return;
+    }
 
     try {
       const res = await fetch(`/api/accounting/invoices/${recordingPaymentInvoice.id}/payments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: Number(paymentAmount),
-          notes: paymentNotes
-        })
+        body: JSON.stringify({ amount, notes: paymentNotes })
       });
-
-      const data = await res.json();
-      if (data.success) {
-        setRecordingPaymentInvoice(null);
-        setPaymentAmount("");
-        setPaymentNotes("");
-        fetchData();
-        if (onRefreshOrders) onRefreshOrders();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        setPaymentError(String(data.message || data.error || "تعذر تسجيل القسط. تحقق من أن الفاتورة غير نهائية وأن المبلغ ضمن المتبقي."));
+        return;
       }
+      setRecordingPaymentInvoice(null);
+      setPaymentAmount("");
+      setPaymentNotes("");
+      setPaymentError("");
+      fetchData();
+      if (onRefreshOrders) onRefreshOrders();
     } catch (err) {
       console.error("Failed to record payment:", err);
+      setPaymentError("تعذر الاتصال بالخادم. لم يتم تسجيل القسط.");
     }
   };
 
@@ -2037,7 +2052,7 @@ export default function AccountingView({ customers, onRefreshOrders, currentUser
               className="bg-zinc-950 border border-zinc-800 p-6 rounded-2xl w-full max-w-sm relative text-right shadow-2xl"
             >
               <button
-                onClick={() => setRecordingPaymentInvoice(null)}
+                onClick={() => { setPaymentError(""); setRecordingPaymentInvoice(null); }}
                 className="absolute top-4 left-4 p-1 text-zinc-600 hover:text-zinc-400 bg-zinc-900 rounded-full border border-zinc-850 cursor-pointer"
               >
                 <X className="w-4 h-4" />
@@ -2067,6 +2082,11 @@ export default function AccountingView({ customers, onRefreshOrders, currentUser
               </div>
 
               <form onSubmit={handleRecordPayment} className="space-y-4">
+                {paymentError && (
+                  <div role="alert" className="rounded-lg border border-rose-800/60 bg-rose-950/30 px-3 py-2 text-xs font-bold text-rose-300">
+                    {paymentError}
+                  </div>
+                )}
                 <div>
                   <label className="text-xs text-zinc-500 font-bold block mb-1">المبلغ المدفوع حالياً ($) *</label>
                   <input
