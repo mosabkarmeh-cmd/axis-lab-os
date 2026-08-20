@@ -92,10 +92,8 @@ function setupAutoUpdater() {
     console.log('[AXIS UPDATER] Manual update override active; automatic checks are disabled.');
     return;
   }
-  if (getInstallScope() === 'all-users') {
-    console.log('[AXIS UPDATER] All Users installation detected; automatic updates are disabled until a dedicated machine-wide update channel is available.');
-    return;
-  }
+  // Updates are enabled for both current-user and All Users installations.
+  // quitAndInstall may request elevation when the application is machine-wide.
   if (!app.isPackaged && process.env.AXIS_UPDATE_TEST !== '1') return;
 
   autoUpdater.autoDownload = false;

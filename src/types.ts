@@ -232,3 +232,14 @@ export interface Expense {
   status: 'paid' | 'pending';
   createdById?: string;
 }
+
+/** Profit distribution configuration persisted with the application settings snapshot. */
+export interface PartnerShareHistoryEntry {
+  effectiveFrom: string;
+  percent: number;
+}
+
+export interface Settings {
+  partnerSharePercent: number;
+  partnerShareHistory?: PartnerShareHistoryEntry[];
+}

@@ -1001,6 +1001,10 @@ const SETTINGS = {
   // NOTE: 135 is the current demo value on the new Syrian pound scale
   // (post-redenomination). It is a default only and can be changed from Settings.
   exchangeRate: 135,
+  // Profit-sharing settings. The history is append-only so changing the
+  // current percentage does not rewrite previously configured periods.
+  partnerSharePercent: 0,
+  partnerShareHistory: [{ effectiveFrom: new Date().toISOString(), percent: 0 }],
   company: {
     name: "مجمع المحور والورش الذكية - AxisLab ERP",
     address: "عمان، الأردن - شارع مكة",
@@ -1059,6 +1063,18 @@ function publicSettings() {
       hasPassword: Boolean(SETTINGS.smtp.pass)
     }
   };
+}
+
+function getPartnerSharePercentAt(dateValue?: string | Date) {
+  const history = Array.isArray((SETTINGS as any).partnerShareHistory)
+    ? (SETTINGS as any).partnerShareHistory
+        .filter((entry: any) => Number.isFinite(Number(entry.percent)) && entry.effectiveFrom)
+        .sort((a: any, b: any) => new Date(a.effectiveFrom).getTime() - new Date(b.effectiveFrom).getTime())
+    : [];
+  const target = dateValue ? new Date(dateValue).getTime() : Date.now();
+  const match = history.filter((entry: any) => new Date(entry.effectiveFrom).getTime() <= target).pop();
+  const value = match ? Number(match.percent) : Number((SETTINGS as any).partnerSharePercent);
+  return Math.min(100, Math.max(0, Number.isFinite(value) ? value : 0));
 }
 
 function mergeSmtpSettings(input: any) {
@@ -8190,6 +8206,11 @@ Role Guidelines:
           netProfit,
           netProfitSYP,
           profitMargin,
+          partnerSharePercent: getPartnerSharePercentAt(),
+          partnerProfit: netProfit * (getPartnerSharePercentAt() / 100),
+          partnerProfitSYP: netProfitSYP * (getPartnerSharePercentAt() / 100),
+          workshopProfit: netProfit * (1 - getPartnerSharePercentAt() / 100),
+          workshopProfitSYP: netProfitSYP * (1 - getPartnerSharePercentAt() / 100),
           expenseBreakdown,
           recentTransactions
         },
@@ -8251,7 +8272,7 @@ Role Guidelines:
   });
 
   app.put("/api/settings", (req, res) => {
-    const { company, smtp, pricing, production, inventory, backup, autoArchive, exchangeRate } = req.body;
+    const { company, smtp, pricing, production, inventory, backup, autoArchive, exchangeRate, partnerSharePercent } = req.body;
     if (company) SETTINGS.company = { ...SETTINGS.company, ...company };
     if (smtp) mergeSmtpSettings(smtp);
     if (pricing) SETTINGS.pricing = { ...SETTINGS.pricing, ...pricing };
@@ -8259,6 +8280,21 @@ Role Guidelines:
     if (inventory) SETTINGS.inventory = { ...SETTINGS.inventory, ...inventory };
     if (backup) SETTINGS.backup = { ...SETTINGS.backup, ...backup };
     if (autoArchive) SETTINGS.autoArchive = { ...SETTINGS.autoArchive, ...autoArchive };
+    if (partnerSharePercent !== undefined) {
+      const nextPartnerPercent = Number(partnerSharePercent);
+      if (!Number.isFinite(nextPartnerPercent) || nextPartnerPercent < 0 || nextPartnerPercent > 100) {
+        res.status(400).json({ success: false, message: "نسبة الشريك يجب أن تكون بين 0 و100%" });
+        return;
+      }
+      const previousPartnerPercent = Number((SETTINGS as any).partnerSharePercent ?? 0);
+      if (nextPartnerPercent !== previousPartnerPercent) {
+        (SETTINGS as any).partnerShareHistory = Array.isArray((SETTINGS as any).partnerShareHistory)
+          ? (SETTINGS as any).partnerShareHistory
+          : [];
+        (SETTINGS as any).partnerShareHistory.push({ effectiveFrom: new Date().toISOString(), percent: nextPartnerPercent });
+      }
+      (SETTINGS as any).partnerSharePercent = nextPartnerPercent;
+    }
     if (exchangeRate !== undefined) {
       const nextExchangeRate = Number(exchangeRate);
       if (!Number.isFinite(nextExchangeRate) || nextExchangeRate <= 0) {

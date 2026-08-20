@@ -28,6 +28,7 @@ import {
   Activity, 
   FileText, 
   Users, 
+  Building2,
   CheckCircle, 
   AlertTriangle, 
   Search, 
@@ -43,6 +44,11 @@ const EMPTY_ANALYTICS = {
     netProfit: 0,
     netProfitSYP: 0,
     profitMargin: 0,
+    partnerSharePercent: 0,
+    partnerProfit: 0,
+    partnerProfitSYP: 0,
+    workshopProfit: 0,
+    workshopProfitSYP: 0,
     expenseBreakdown: [] as any[],
     recentTransactions: [] as any[],
   },
@@ -208,7 +214,7 @@ export default function ReportsView() {
       </div>
 
       {/* KPI Cards section (Hides during printing of clean tables if needed) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 print:grid-cols-4 print:gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 print:grid-cols-6 print:gap-2">
         
         {/* KPI 1 */}
         <div className="bg-zinc-950 p-5 rounded-2xl border border-zinc-850 relative overflow-hidden flex flex-col justify-between min-h-[110px] print:border-black print:bg-white print:text-black">
@@ -246,6 +252,38 @@ export default function ReportsView() {
             <span>الأرباح بعد خصم المصروفات الإدارية</span>
             <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
           </div>
+        </div>
+
+        {/* Partner share KPI */}
+        <div className="bg-zinc-950 p-5 rounded-2xl border border-indigo-900/40 relative overflow-hidden flex flex-col justify-between min-h-[110px] print:border-black print:bg-white print:text-black">
+          <div className="flex justify-between items-start">
+            <span className="p-2 bg-indigo-950/20 text-indigo-400 border border-indigo-900/30 rounded-xl print:hidden">
+              <Users className="w-4 h-4" />
+            </span>
+            <div className="text-right">
+              <span className="text-[10px] text-zinc-500 font-bold block mb-1">حصة الشريك</span>
+              <strong className="text-xl font-mono text-indigo-300 print:text-black">
+                {formatFixedFinancialMoney(analytics.financial.partnerProfitSYP ?? 0, analytics.financial.partnerProfit ?? 0)}
+              </strong>
+            </div>
+          </div>
+          <div className="text-[10px] text-zinc-500 mt-2 text-right">نسبة {Number(analytics.financial.partnerSharePercent ?? 0).toFixed(1)}% من صافي الربح</div>
+        </div>
+
+        {/* Workshop share KPI */}
+        <div className="bg-zinc-950 p-5 rounded-2xl border border-emerald-900/40 relative overflow-hidden flex flex-col justify-between min-h-[110px] print:border-black print:bg-white print:text-black">
+          <div className="flex justify-between items-start">
+            <span className="p-2 bg-emerald-950/20 text-emerald-400 border border-emerald-900/30 rounded-xl print:hidden">
+              <Building2 className="w-4 h-4" />
+            </span>
+            <div className="text-right">
+              <span className="text-[10px] text-zinc-500 font-bold block mb-1">حصة الورشة</span>
+              <strong className="text-xl font-mono text-emerald-300 print:text-black">
+                {formatFixedFinancialMoney(analytics.financial.workshopProfitSYP ?? 0, analytics.financial.workshopProfit ?? 0)}
+              </strong>
+            </div>
+          </div>
+          <div className="text-[10px] text-zinc-500 mt-2 text-right">المتبقي من صافي الربح</div>
         </div>
 
         {/* KPI 3 */}

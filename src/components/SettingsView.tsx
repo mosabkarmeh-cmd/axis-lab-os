@@ -1802,6 +1802,23 @@ export default function SettingsView({
                     <span className="text-[10px] text-zinc-500 mt-1 block">أعمال التجميع اليدوي وساعات عمل الفني اليدوية.</span>
                   </div>
                 </div>
+                <div className="mt-4 border-t border-zinc-900 pt-4">
+                  <label className="text-zinc-400 block mb-1 text-xs">نسبة الشريك من صافي الربح (%)</label>
+                  <div className="relative max-w-xs">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      required
+                      value={settings.partnerSharePercent ?? 0}
+                      onChange={e => setSettings({ ...settings, partnerSharePercent: Math.min(100, Math.max(0, Number(e.target.value))) })}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2.5 pr-8 text-zinc-100 font-mono focus:border-indigo-500 focus:outline-none transition-colors"
+                    />
+                    <Percent className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-3.5" />
+                  </div>
+                  <span className="text-[10px] text-zinc-500 mt-1 block">تُحسب حصة الشريك تلقائيًا من صافي الربح، وتُحفظ نسبة كل تغيير كسجل تاريخي.</span>
+                </div>
               </div>
             )}
 
