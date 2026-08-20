@@ -3361,8 +3361,13 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     setIsCompilingOrderGcode(true);
     setOrderGcodeResult(null);
     
-    // Create prompt from order items
-    const itemsDescription = selectedOrder.items.map(it => `${it.quantity}x ${it.productName}`).join(" and ");
+    // Orders from LAN clients may arrive before their item payload is hydrated.
+    // Never let an undefined/non-array items value prevent the G-code button
+    // from running; use a safe order-level prompt instead.
+    const orderItems = Array.isArray(selectedOrder.items) ? selectedOrder.items : [];
+    const itemsDescription = orderItems.length > 0
+      ? orderItems.map(it => `${it.quantity}x ${it.productName}`).join(" and ")
+      : `الطلب رقم ${selectedOrder.orderNumber}`;
     const prompt = `قص وتشكيل القطع التالية بالليزر: ${itemsDescription}. مع مراعاة الملاحظات التشغيلية: ${selectedOrder.notes || "لا توجد ملاحظات"}`;
     
     addTerminalLog("LASER", `Compiling order ${selectedOrder.orderNumber} blueprint: "${prompt}"`);
