@@ -938,6 +938,18 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     }
   };
 
+  // Keep LAN clients synchronized without changing authorization. The server
+  // remains the source of truth and applies the current user's role to every
+  // response; polling only refreshes what that user is already allowed to see.
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible" && currentUser) {
+        void fetchOrders();
+      }
+    }, 5000);
+    return () => window.clearInterval(interval);
+  }, [currentUser?.id]);
+
   const fetchLogs = async () => {
     const data = await safeApiFetch("/api/logs");
     if (data && Array.isArray(data)) setLogs(data);
