@@ -19,6 +19,7 @@
     "network:server": "node scripts/start-central-server.cjs",
     "network:client": "node scripts/start-network-client.cjs",
     "test:network": "npm run build && node tests/network-two-clients-smoke.cjs",
+    "test:excel-import": "npm run build && node tests/excel-import-preview-smoke.cjs",
     "desktop:build": "npm run build",
     "desktop:preview": "npm run desktop:build && electron desktop/main.cjs",
     "desktop:package:win": "npm run desktop:build && electron-builder --win nsis --config electron-builder.yml",
@@ -52,7 +53,8 @@
     "react-dom": "^19.0.1",
     "react-markdown": "^10.1.0",
     "recharts": "^3.9.2",
-    "sql.js": "^1.14.1"
+    "sql.js": "^1.14.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",

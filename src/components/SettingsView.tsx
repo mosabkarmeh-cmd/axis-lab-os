@@ -174,10 +174,11 @@ export default function SettingsView({
   const [loadingNumberings, setLoadingNumberings] = useState(false);
 
   // Bulk Import states
-  const [importType, setImportType] = useState<"customers" | "products" | "materials">("materials");
+  const [importType, setImportType] = useState<"customers" | "products" | "materials" | "suppliers" | "inventory">("materials");
   const [importText, setImportText] = useState("");
   const [importPreview, setImportPreview] = useState<any[]>([]);
   const [importStatus, setImportStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [isExcelUploading, setIsExcelUploading] = useState(false);
 
   // Load all Settings and Backup history
   const loadSettingsAndBackups = async () => {
@@ -459,6 +460,28 @@ export default function SettingsView({
       setImportStatus({ type: "success", message: `تم تحليل عدد ${parsed.length} أسطر بنجاح! راجع جدول المعاينة أدناه ثم انقر تأكيد الحفظ.` });
     } catch (e: any) {
       setImportStatus({ type: "error", message: "فشل التحليل: " + e.message });
+    }
+  };
+
+  const handleExcelUpload = async (file: File) => {
+    setIsExcelUploading(true);
+    setImportStatus(null);
+    setImportPreview([]);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const response = await fetch("/api/import/excel/preview", { method: "POST", body: form });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || "فشل قراءة ملف Excel");
+      const preferred = data.sheets?.find((sheet: any) => sheet.kind === importType) || data.sheets?.find((sheet: any) => ["suppliers", "materials", "inventory"].includes(sheet.kind)) || data.sheets?.[0];
+      if (!preferred) throw new Error("لم يتم العثور على ورقة بيانات صالحة");
+      if (["suppliers", "materials", "inventory"].includes(preferred.kind)) setImportType(preferred.kind);
+      setImportPreview(preferred.rows || []);
+      setImportStatus({ type: "success", message: `تمت معاينة ورقة «${preferred.name}» وعددها ${preferred.rows?.length || 0} صفًا. راجع البيانات ثم اضغط تأكيد الحفظ.` });
+    } catch (error: any) {
+      setImportStatus({ type: "error", message: "فشل قراءة Excel: " + error.message });
+    } finally {
+      setIsExcelUploading(false);
     }
   };
 
@@ -3395,7 +3418,9 @@ export default function SettingsView({
                 {/* Sub-tabs for import type */}
                 <div className="flex bg-zinc-900/40 p-1 rounded-lg border border-zinc-850 w-fit gap-1 mr-auto" dir="rtl">
                   {[
+                    { id: "suppliers", label: "الموردون" },
                     { id: "materials", label: "خامات ومواد المستودع" },
+                    { id: "inventory", label: "المخزون الافتتاحي" },
                     { id: "customers", label: "دفتر حسابات العملاء" },
                     { id: "products", label: "مكتبة المنتجات والتصاميم" }
                   ].map(tab => (
@@ -3447,8 +3472,14 @@ export default function SettingsView({
                   <div className="text-[10px] text-zinc-500 leading-relaxed space-y-1">
                     <div>• يمكنك اللصق مباشرة من جدول Excel (افتح جدولك، ظلل الأعمدة، انسخها Ctrl+C والصقها هنا).</div>
                     <div>• السطر الأول يجب أن يحتوي على أسماء الأعمدة بدقة.</div>
+                    {importType === "suppliers" && (
+                      <div className="text-amber-400 font-semibold">• الأعمدة المطلوبة: كود المورد، اسم المورد. اختياري: الهاتف، البريد، العنوان، الملاحظات.</div>
+                    )}
                     {importType === "materials" && (
-                      <div className="text-[#c59257] font-semibold">• الأعمدة المطلوبة: name (الاسم)، pricePerUnit (سعر المفرد). اختياري: category, thickness, color, stock (الكمية الأولية).</div>
+                      <div className="text-[#c59257] font-semibold">• الأعمدة المطلوبة: كود المادة، اسم المادة، التصنيف، الوحدة، سعر الشراء (ل.س). اختياري: السماكة، الحد الأدنى، كود المورد.</div>
+                    )}
+                    {importType === "inventory" && (
+                      <div className="text-emerald-400 font-semibold">• الأعمدة المطلوبة: كود المادة، المستودع، الكمية الافتتاحية. اختياري: الموقع/الرف، حالة الجودة، رقم الدفعة.</div>
                     )}
                     {importType === "customers" && (
                       <div className="text-blue-400 font-semibold">• الأعمدة المطلوبة: name (الاسم الثنائي/الشركة). اختياري: phone, company, address, notes.</div>
@@ -3456,6 +3487,15 @@ export default function SettingsView({
                     {importType === "products" && (
                       <div className="text-purple-400 font-semibold">• الأعمدة المطلوبة: name (الاسم)، price (سعر البيع). اختياري: code, category, description, stock.</div>
                     )}
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 border border-dashed border-indigo-700/50 bg-indigo-950/20 rounded-lg p-3">
+                    <div className="text-[10px] text-zinc-400">اختر القالب الرسمي بصيغة XLSX لقراءة الورقة ومعاينتها قبل الحفظ.</div>
+                    <label className="px-4 py-2 bg-sky-700 hover:bg-sky-600 text-white font-bold text-xs rounded-lg cursor-pointer inline-flex items-center gap-2">
+                      <FileSpreadsheet className="w-4 h-4" />
+                      {isExcelUploading ? "جارٍ قراءة الملف..." : "اختيار ملف Excel"}
+                      <input type="file" accept=".xlsx,.xls" className="hidden" disabled={isExcelUploading} onChange={event => { const file = event.target.files?.[0]; if (file) void handleExcelUpload(file); event.currentTarget.value = ""; }} />
+                    </label>
                   </div>
 
                   {/* Input Text Area */}
