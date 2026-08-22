@@ -12,6 +12,7 @@ type SettingsPageProps = {
   setSelectedFileId: (value: string) => void;
   pageVariants: Variants;
   pageTransition: Transition;
+  currentUserRole?: string;
 };
 
 export default function SettingsPage({
@@ -24,6 +25,7 @@ export default function SettingsPage({
   setSelectedFileId,
   pageVariants,
   pageTransition,
+  currentUserRole,
 }: SettingsPageProps) {
   return (
     <motion.div
@@ -49,6 +51,7 @@ export default function SettingsPage({
         virtualFiles={virtualFiles}
         selectedFileId={selectedFileId}
         setSelectedFileId={setSelectedFileId}
+        currentUserRole={currentUserRole}
       />
     </motion.div>
   );

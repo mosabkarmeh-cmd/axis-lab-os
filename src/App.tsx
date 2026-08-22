@@ -4930,7 +4930,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
                     <p className="text-sm text-zinc-500 mt-2 max-w-md leading-relaxed">لوحة التحكم وإعدادات النظام الحساسة متاحة فقط لمدير النظام (Admin).</p>
                   </div>
                 ) : (
-                  <SettingsPage {...{ showTerminalLogs, setShowTerminalLogs, showJwtHud, setShowJwtHud, virtualFiles, selectedFileId, setSelectedFileId, pageVariants, pageTransition }} />
+                  <SettingsPage {...{ showTerminalLogs, setShowTerminalLogs, showJwtHud, setShowJwtHud, virtualFiles, selectedFileId, setSelectedFileId, pageVariants, pageTransition, currentUserRole: currentUser?.role }} />
                 )
               )}
               {/* 🤖 AXIS LAB AI HUB - INTELLIGENT AI COMPANION & DEEPBRAIN WORKSPACE */}

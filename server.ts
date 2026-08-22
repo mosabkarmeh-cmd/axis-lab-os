@@ -3014,6 +3014,8 @@ async function startServer() {
       (order.payments || []).reduce((sum: number, payment: any) => sum + Number(payment.amountSYP ?? Math.round(Number(payment.amountUSD || 0) * orderExchangeRate)), 0) + payAmtSYP
     );
     order.remaining = Math.max(0, Number(order.totalPrice || 0) - order.paidAmount);
+    order.paidAmountSYP = Math.round(order.paidAmount);
+    order.remainingSYP = Math.round(order.remaining);
 
     if (!order.payments) {
       order.payments = [];
@@ -3139,12 +3141,14 @@ async function startServer() {
       return;
     }
 
-    // Strict Delivery Blocking: Prevent transition to 'delivered' if remaining balance > 0
-    if (status === "delivered" && order.remaining > 0.01) {
+    // Orders are stored in SYP. Block delivery only when at least one whole lira remains.
+    const deliveryRemainingSYP = Math.max(0, Math.round(Number(order.remainingSYP ?? order.remaining ?? 0)));
+    if (status === "delivered" && deliveryRemainingSYP > 0) {
+      const deliveryRate = Number(order.exchangeRateAtCreation) > 0 ? Number(order.exchangeRateAtCreation) : 135;
       res.status(400).json({ 
         error: "حظر التسليم: لا يمكن تسليم الطلب للعميل قبل استيفاء وتسديد كامل المبلغ المتبقي المستحق.",
-        remainingUSD: order.remaining,
-        remainingSYP: Math.round(order.remaining * SETTINGS.exchangeRate),
+        remainingUSD: deliveryRemainingSYP / deliveryRate,
+        remainingSYP: deliveryRemainingSYP,
         orderNumber: order.orderNumber
       });
       return;

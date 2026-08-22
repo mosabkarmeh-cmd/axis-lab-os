@@ -1207,7 +1207,7 @@ export default function AddOrderModal({
                 <input
                   type="number"
                   min="0"
-                  step="500"
+                  step="1"
                   value={orderDiscountAmount}
                   onChange={(e) => setOrderDiscountAmount(e.target.value)}
                   placeholder="0"
@@ -1222,7 +1222,7 @@ export default function AddOrderModal({
                 <input
                   type="number"
                   min="0"
-                  step="500"
+                  step="1"
                   value={orderPaid}
                   onChange={(e) => setOrderPaid(e.target.value)}
                   placeholder="0"

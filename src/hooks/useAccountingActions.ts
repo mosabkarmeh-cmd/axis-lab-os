@@ -106,21 +106,26 @@ export function useAccountingActions({
   const handleSettleRemainingAndDeliver = async (ordToDeliver: Order) => {
     setIsProcessingQuickFullPay(true);
     try {
-      if (ordToDeliver.remaining > 0.001) {
+      const remainingSYP = Math.max(0, Math.round(Number((ordToDeliver as any).remainingSYP ?? ordToDeliver.remaining ?? 0)));
+      if (remainingSYP > 0) {
         const payRes = await fetch(`/api/orders/${ordToDeliver.id}/payments`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            amount: Math.max(0, Number(ordToDeliver.remaining || 0)),
+            amount: remainingSYP,
             currency: "SYP",
             notes: "تسديد تلقائي كامل للمتبقي عند استلام العميل وتسليم الطلب",
             paymentMethod: selectedPaymentMethod,
             changedById,
           }),
         });
+        const payJson = await payRes.json().catch(() => ({}));
         if (!payRes.ok) {
-          const errJson = await payRes.json().catch(() => ({}));
-          alert(`فشل استيفاء الدفعة: ${errJson.error || "خطأ غير معروف"}`);
+          alert(`فشل استيفاء الدفعة: ${payJson.error || payJson.message || "خطأ غير معروف"}`);
+          return;
+        }
+        if (Number((payJson as any).remainingSYP ?? (payJson as any).remaining ?? 0) > 1) {
+          alert(`لم يكتمل قبض المتبقي. الرصيد المتبقي: ${Number((payJson as any).remainingSYP ?? payJson.remaining).toLocaleString()} ل.س`);
           return;
         }
       }
@@ -136,7 +141,7 @@ export function useAccountingActions({
         await fetchLogs();
       } else {
         const errJson = await statusRes.json().catch(() => ({}));
-        alert(`فشل تحويل حالة الطلب: ${errJson.error || "خطأ"}`);
+        alert(`فشل تحويل حالة الطلب: ${errJson.error || errJson.message || "خطأ"}`);
       }
     } catch {
       addTerminalLog("ERROR", "Failed to settle & deliver order");

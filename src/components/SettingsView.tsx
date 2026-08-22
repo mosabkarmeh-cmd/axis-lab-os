@@ -62,6 +62,7 @@ interface SettingsViewProps {
   virtualFiles?: any[];
   selectedFileId?: string;
   setSelectedFileId?: (id: string) => void;
+  currentUserRole?: string;
 }
 
 export default function SettingsView({
@@ -71,7 +72,8 @@ export default function SettingsView({
   setShowJwtHud,
   virtualFiles = [],
   selectedFileId = "",
-  setSelectedFileId
+  setSelectedFileId,
+  currentUserRole = ""
 }: SettingsViewProps) {
   const [activeTab, setActiveTab] = useState<"company" | "smtp" | "pricing" | "production" | "inventory" | "backup" | "stress_test" | "network" | "recycle_bin" | "numbering" | "custom_statuses" | "bulk_import" | "explorer" | "users" | "auto_archive">("company");
   const selectedFileObj = virtualFiles.find(f => f.id === selectedFileId);
@@ -683,14 +685,14 @@ export default function SettingsView({
   };
 
   const handleSafeReset = async () => {
-    const confirmation = window.prompt("للتأكيد اكتب: تصفير كامل");
-    if (confirmation !== "تصفير كامل") {
-      setBackupStatus({ type: "error", message: "تم إلغاء التصفير: عبارة التأكيد غير مطابقة." });
+    const confirmed = window.confirm("تحذير نهائي: سيتم حذف الطلبات والفواتير والدفعات والمصاريف والعملاء والمواد والمخزون والبيانات التجريبية. سيتم الحفاظ على الإعدادات وسعر الصرف ونسبة الشريك وحسابات المستخدمين. هل تريد المتابعة؟");
+    if (!confirmed) {
+      setBackupStatus({ type: "error", message: "تم إلغاء عملية التصفير." });
       return;
     }
-    setBackupStatus(null);
+    setBackupStatus({ type: "success", message: "جارٍ تصفير بيانات الأعمال، يرجى الانتظار..." });
     try {
-      const res = await fetch("/api/admin/reset-business-data", { method: "POST" });
+      const res = await fetch("/api/admin/reset-business-data", { method: "POST", credentials: "include" });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message || "فشل تصفير بيانات الأعمال");
       setBackups([]);
@@ -2723,6 +2725,7 @@ export default function SettingsView({
                 </div>
               </div>
 
+              {currentUserRole === "admin" && (
               <div className="bg-red-950/20 border border-red-900/60 rounded-xl p-5 space-y-3">
                 <div className="flex items-start gap-3">
                   <Trash2 className="w-5 h-5 text-red-400 mt-0.5 shrink-0" />
@@ -2733,6 +2736,7 @@ export default function SettingsView({
                 </div>
                 <button type="button" onClick={handleSafeReset} className="bg-red-700 hover:bg-red-600 text-white font-bold text-xs px-4 py-2 rounded-lg border border-red-500 transition-colors cursor-pointer">تصفير كامل لبدء إدخال البيانات الحقيقية</button>
               </div>
+              )}
 
               {/* Developer Monitoring Visibility Controls */}
               <div className="bg-zinc-950 border border-zinc-850 rounded-xl p-5 space-y-4">

@@ -236,7 +236,7 @@ export default function DashboardCharts({
                 <div className="border-l border-zinc-800/40 pl-2">
                   <span className="text-[9px] text-zinc-500 block">قمة المبيعات الأسبوعية</span>
                   <span className="text-[11px] font-black text-[#c59257] block truncate">
-                    {peakRevenueDay ? `${peakRevenueDay.day} ($${peakRevenueDay.revenue.toFixed(0)})` : "---"}
+                    {peakRevenueDay ? `${peakRevenueDay.day} (${Math.round(peakRevenueDay.revenue).toLocaleString()} ل.س)` : "---"}
                   </span>
                   <span className="text-[8px] text-zinc-500 font-sans block">اليوم الأكثر إنتاجاً</span>
                 </div>
@@ -244,17 +244,17 @@ export default function DashboardCharts({
                 <div className="border-l border-zinc-800/40 pl-2">
                   <span className="text-[9px] text-zinc-500 block">المعدل اليومي للقص</span>
                   <span className="text-[11px] font-black text-emerald-400 block font-mono">
-                    ${avgDailyRevenue.toFixed(1)}
+                    {Math.round(avgDailyRevenue).toLocaleString()} ل.س
                   </span>
                   <span className="text-[8px] text-zinc-400 block font-mono">
-                    ≈ {Math.round(avgDailyRevenue * exchangeRate).toLocaleString()} ل.س
+                    ≈ ${(avgDailyRevenue / exchangeRate).toFixed(2)}
                   </span>
                 </div>
 
                 <div>
                   <span className="text-[9px] text-zinc-500 block">مجموع التدفقات</span>
                   <span className="text-[11px] font-black text-indigo-400 block font-mono">
-                    ${totalRevenue.toFixed(1)}
+                    {Math.round(totalRevenue).toLocaleString()} ل.س
                   </span>
                   <span className="text-[8.5px] text-zinc-400 block font-sans">
                     {totalOrders} طلبيات مسجلة
@@ -317,7 +317,7 @@ export default function DashboardCharts({
                 const renderLeftYAxis = () => {
                   const isRevenueActive = activeMetric === "combined" || activeMetric === "revenue";
                   const strokeColor = isRevenueActive ? "#10b981" : "#c59257";
-                  const formatter = isRevenueActive ? (val: any) => `$${val}` : (val: any) => `${val} ط`;
+                  const formatter = isRevenueActive ? (val: any) => `${Math.round(Number(val)).toLocaleString()} ل.س` : (val: any) => `${val} ط`;
                   return (
                     <YAxis 
                       yAxisId="left"
@@ -355,7 +355,7 @@ export default function DashboardCharts({
                         strokeDasharray="4 4" 
                         strokeWidth={1}
                         label={{ 
-                          value: `متوسط المبيعات (${Math.round(avgDailyRevenue)}$)`, 
+                          value: `متوسط المبيعات (${Math.round(avgDailyRevenue).toLocaleString()} ل.س)`, 
                           fill: "#10b981", 
                           fontSize: 8, 
                           position: "insideBottomLeft",
@@ -392,10 +392,10 @@ export default function DashboardCharts({
                               <div className="text-left">
                                 <span className="text-zinc-500 block text-[9px] text-right">إجمالي الإيرادات</span>
                                 <span className="font-mono font-bold text-emerald-400 block">
-                                  ${data.revenue.toFixed(2)}
+                                  {Math.round(data.revenue).toLocaleString()} ل.س
                                 </span>
                                 <span className="text-[9.5px] text-zinc-500 block font-mono">
-                                  {Math.round(data.revenue * exchangeRate).toLocaleString()} ل.س
+                                  ≈ ${(data.revenue / exchangeRate).toFixed(2)}
                                 </span>
                               </div>
                             </div>
@@ -410,7 +410,7 @@ export default function DashboardCharts({
                                 <div className="text-[9.5px] text-zinc-400 space-y-0.5 max-h-24 overflow-y-auto">
                                   {ordersList.slice(0, 3).map((ord: any, oIdx: number) => (
                                     <div key={oIdx} className="flex justify-between items-center gap-1">
-                                      <span className="font-mono text-zinc-500">${ord.totalPrice.toFixed(0)}</span>
+                                      <span className="font-mono text-zinc-500">{Math.round(ord.totalPrice).toLocaleString()} ل.س</span>
                                       <span className="truncate max-w-[150px]">{ord.customerName} ({ord.orderNumber})</span>
                                     </div>
                                   ))}
