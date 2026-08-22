@@ -6,7 +6,6 @@ files:
   - desktop/**/*
   - package.json
   - assets/icon.ico
-  - node_modules/**/*
 extraResources:
   - from: dist/server.cjs
     to: server.cjs
@@ -16,6 +15,8 @@ extraResources:
     to: dist/assets
   - from: assets/icon.ico
     to: icon.ico
+  - from: .runtime/node_modules
+    to: node_modules
   - from: node_modules/sql.js/dist/sql-wasm.wasm
     to: sql-wasm.wasm
   - from: dist/logo.jpg
