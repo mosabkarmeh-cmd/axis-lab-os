@@ -1559,6 +1559,11 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     if (!targetOrder) return null;
     const prog = calculateOrderProgress(targetOrder, productionJobs);
 
+    const totalRequiredPieces = prog.itemsBreakdown.reduce((sum: number, item: any) => sum + Math.max(0, Number(item.quantity) || 0), 0);
+    const totalCompletedPieces = prog.itemsBreakdown.reduce((sum: number, item: any) => sum + Math.min(Math.max(0, Number(item.completedQuantity) || 0), Math.max(0, Number(item.quantity) || 0)), 0);
+    const totalRemainingPieces = Math.max(0, totalRequiredPieces - totalCompletedPieces);
+    const completedItemsCount = prog.itemsBreakdown.filter((item: any) => item.isCompleted).length;
+
     return (
       <div className="space-y-4 font-sans text-right">
         {/* Top Total Progress Banner */}
@@ -1591,7 +1596,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
                 title="تحديد كافة القطع كمكتملة 100% (شو يلي انقص = الكلي)"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>إنجاز كافة القطع (100% انقص)</span>
+                <span>إكمال كل القطع</span>
               </button>
 
               <button
@@ -1601,7 +1606,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
                 title="تصفير إنجاز كافة القطع (0 انقص / كامل الكمية لسا)"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                <span>تصفير (0% انقص)</span>
+                <span>إعادة الكل للبداية</span>
               </button>
 
               <button
@@ -1610,7 +1615,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
                 className="px-3 py-1.5 bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-800 font-bold rounded-lg text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>إضافة بند / خامة للقص</span>
+                <span>إضافة بند جديد</span>
               </button>
             </div>
           </div>
@@ -1627,6 +1632,29 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
               }`}
               style={{ width: `${Math.max(prog.percentage, 2)}%` }}
             />
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+            <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 px-3 py-2 text-center">
+              <div className="text-[10px] text-zinc-500">إجمالي القطع المطلوبة</div>
+              <div className="mt-1 text-base font-black font-mono text-zinc-100">{totalRequiredPieces.toLocaleString()}</div>
+              <div className="text-[9px] text-zinc-600">قطعة</div>
+            </div>
+            <div className="rounded-lg border border-emerald-900/60 bg-emerald-950/20 px-3 py-2 text-center">
+              <div className="text-[10px] text-emerald-300/80">القطع المنجزة</div>
+              <div className="mt-1 text-base font-black font-mono text-emerald-400">{totalCompletedPieces.toLocaleString()}</div>
+              <div className="text-[9px] text-emerald-500/70">تم قصها</div>
+            </div>
+            <div className="rounded-lg border border-amber-900/60 bg-amber-950/20 px-3 py-2 text-center">
+              <div className="text-[10px] text-amber-300/80">القطع المتبقية</div>
+              <div className="mt-1 text-base font-black font-mono text-amber-300">{totalRemainingPieces.toLocaleString()}</div>
+              <div className="text-[9px] text-amber-500/70">بانتظار القص</div>
+            </div>
+            <div className="rounded-lg border border-cyan-900/60 bg-cyan-950/20 px-3 py-2 text-center">
+              <div className="text-[10px] text-cyan-300/80">البنود المكتملة</div>
+              <div className="mt-1 text-base font-black font-mono text-cyan-300">{completedItemsCount} / {prog.itemsBreakdown.length}</div>
+              <div className="text-[9px] text-cyan-500/70">بنود الإنتاج</div>
+            </div>
           </div>
         </div>
 
@@ -1722,11 +1750,13 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
                   <tr className="bg-zinc-900 border-b border-zinc-800 text-zinc-400 font-semibold">
                     <th className="p-3 text-right min-w-[160px]">البند والمادة الخام</th>
                     <th className="p-3 text-center min-w-[90px]">الكمية المطلوبة (الكلي)</th>
-                    <th className="p-3 text-center min-w-[210px] bg-emerald-950/20 text-emerald-300 font-bold border-x border-zinc-800">
-                      شو يلي انقص ✅ (القطع المنجزة)
+                        <th className="p-3 text-center min-w-[210px] bg-emerald-950/20 text-emerald-300 font-bold border-x border-zinc-800">
+                      المنجز ✅
+                      <span className="block text-[10px] font-normal text-emerald-400/70 mt-0.5">ما تم قصّه فعليًا</span>
                     </th>
-                    <th className="p-3 text-center min-w-[210px] bg-amber-950/20 text-amber-300 font-bold border-x border-zinc-800">
-                      شو يلي لسا ⚠️ (القطع المتبقية للقص)
+                        <th className="p-3 text-center min-w-[210px] bg-amber-950/20 text-amber-300 font-bold border-x border-zinc-800">
+                      المتبقي ⚠️
+                      <span className="block text-[10px] font-normal text-amber-400/70 mt-0.5">ما يجب قصّه بعد</span>
                     </th>
                     <th className="p-3 text-center min-w-[110px]">نسبة إنجاز البند</th>
                     <th className="p-3 text-center min-w-[100px]">حالة القص</th>
