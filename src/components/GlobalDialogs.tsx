@@ -263,6 +263,11 @@ export default function GlobalDialogs(props: Record<string, any>) {
     updateEditOrderDraftItem,
     updateRate
   } = props;
+
+  const orderPaymentRate = Number(selectedOrder?.exchangeRateAtFinalization || selectedOrder?.exchangeRateAtIssue || exchangeRate || 135);
+  const orderRemainingSYP = Math.max(0, Math.round(Number(selectedOrder?.remainingSYP ?? selectedOrder?.remaining ?? 0)));
+  const orderRemainingUSD = Math.max(0, Number(selectedOrder?.remainingUSD ?? (orderRemainingSYP / orderPaymentRate)));
+
   return (
     <>
       {/* ➕ CREATE NEW ORDER MODAL (REFACTORED WITH CLEAR STATE AND VALIDATIONS) */}
@@ -1368,31 +1373,31 @@ export default function GlobalDialogs(props: Record<string, any>) {
                           <button
                             type="button"
                             onClick={() => {
-                              const rem = Number(selectedOrder.remaining || 0);
-                              setNewPaymentAmount((rem / (exchangeRate || 135)).toFixed(2));
-                              setNewPaymentSYPAmount(Math.round(rem).toString());
+                              const remSYP = orderRemainingSYP;
+                              setNewPaymentAmount((remSYP / orderPaymentRate).toFixed(2));
+                              setNewPaymentSYPAmount(remSYP.toString());
                             }}
                             className="px-2 py-1 bg-amber-950/40 hover:bg-amber-900/60 border border-amber-800/60 text-amber-300 rounded font-mono font-bold cursor-pointer"
                           >
-                            ⚡ كامل المتبقي ({Math.round(Number(selectedOrder.remaining || 0)).toLocaleString()} ل.س)
+                            ⚡ كامل المتبقي ({orderRemainingSYP.toLocaleString()} ل.س)
                           </button>
                           <button
                             type="button"
                             onClick={() => {
-                              const half = Math.max(0, Number(selectedOrder.remaining || 0)) * 0.5;
-                              setNewPaymentAmount((half / (exchangeRate || 135)).toFixed(2));
-                              setNewPaymentSYPAmount(Math.round(half).toString());
+                              const half = Math.round(orderRemainingSYP * 0.5);
+                              setNewPaymentAmount((half / orderPaymentRate).toFixed(2));
+                              setNewPaymentSYPAmount(half.toString());
                             }}
                             className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 rounded font-mono cursor-pointer"
                           >
-                            🪙 50% من المتبقي ({Math.round(Math.max(0, Number(selectedOrder.remaining || 0)) * 0.5).toLocaleString()} ل.س)
+                            🪙 50% من المتبقي ({Math.round(orderRemainingSYP * 0.5).toLocaleString()} ل.س)
                           </button>
                           {[500000, 1000000, 2000000].map(sypVal => (
                             <button
                               key={sypVal}
                               type="button"
                               onClick={() => {
-                                const usdVal = (sypVal / exchangeRate).toFixed(2);
+                                const usdVal = (sypVal / orderPaymentRate).toFixed(2);
                                 setNewPaymentAmount(usdVal);
                                 setNewPaymentSYPAmount(sypVal.toString());
                               }}
@@ -1441,18 +1446,18 @@ export default function GlobalDialogs(props: Record<string, any>) {
                                   required
                                   min="0.01"
                                   step="0.01"
-                                  max={selectedOrder.remaining}
+                                  max={orderRemainingUSD}
                                   value={newPaymentAmount}
                                   onChange={(e) => {
                                     const val = e.target.value;
                                     setNewPaymentAmount(val);
                                     if (val && !isNaN(Number(val))) {
-                                      setNewPaymentSYPAmount(Math.round(Number(val) * exchangeRate).toString());
+                                      setNewPaymentSYPAmount(Math.round(Number(val) * orderPaymentRate).toString());
                                     } else {
                                       setNewPaymentSYPAmount("");
                                     }
                                   }}
-                                  placeholder={`الحد الأقصى $${(Number(selectedOrder.remaining || 0) / (exchangeRate || 135)).toFixed(2)}`}
+                                  placeholder={`الحد الأقصى $${orderRemainingUSD.toFixed(2)}`}
                                   className="w-full bg-black border border-zinc-800 rounded-lg p-2.5 text-zinc-200 text-right font-mono font-bold focus:border-emerald-500 focus:outline-none"
                                 />
                                 {newPaymentAmount && Number(newPaymentAmount) > 0 && (
@@ -1468,13 +1473,13 @@ export default function GlobalDialogs(props: Record<string, any>) {
                                   required
                                   min="1"
                                   step="1"
-                                  max={Math.round(Math.max(0, Number(selectedOrder.remaining || 0)))}
+                                  max={orderRemainingSYP}
                                   value={newPaymentSYPAmount}
                                   onChange={(e) => {
                                     const syp = e.target.value;
                                     setNewPaymentSYPAmount(syp);
                                     if (syp && !isNaN(Number(syp))) {
-                                      const usdVal = (Number(syp) / exchangeRate).toFixed(2);
+                                      const usdVal = (Number(syp) / orderPaymentRate).toFixed(2);
                                       setNewPaymentAmount(usdVal);
                                     } else {
                                       setNewPaymentAmount("");
