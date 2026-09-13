@@ -17,5 +17,8 @@ COPY --from=build /app/src/db ./src/db
 COPY --from=build /app/src/server ./src/server
 COPY --from=build /app/server.ts ./server.ts
 COPY --from=build /app/package.json ./package.json
+RUN groupadd -r axislab && useradd -r -g axislab axislab \
+    && mkdir -p /app/uploads && chown -R axislab:axislab /app
+USER axislab
 EXPOSE 3000
 CMD ["sh", "-c", "npm run db:migrate && npm run start:prod"]

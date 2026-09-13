@@ -21,6 +21,7 @@ import * as XLSX from "xlsx";
 import PDFDocument from "pdfkit";
 import cookieParser from "cookie-parser";
 import cors from "cors";
+import rateLimit from "express-rate-limit";
 import os from "os";
 import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";
@@ -1803,6 +1804,12 @@ async function startServer() {
   });
   app.use(express.json());
   app.use(cookieParser());
+  app.use("/api", rateLimit({
+    windowMs: 60 * 1000,
+    limit: 1000,
+    standardHeaders: true,
+    legacyHeaders: false,
+  }));
 
   // Central API boundary: only health and authentication bootstrap are public.
   // Every business endpoint must have a verified active user before its handler runs.
@@ -1997,7 +2004,15 @@ async function startServer() {
   });
 
   // API - Auth Login
-  app.post("/api/auth/login", async (req, res) => {
+  const loginRateLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "محاولات دخول كثيرة جداً. حاول مرة أخرى بعد 15 دقيقة" }
+  });
+
+  app.post("/api/auth/login", loginRateLimiter, async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) {
       res.status(400).json({ error: "الرجاء إدخال البريد الإلكتروني وكلمة المرور" });
@@ -8643,10 +8658,35 @@ Role Guidelines:
       cb(null, uniqueName);
     }
   });
-  const upload = multer({ storage });
+  const ALLOWED_UPLOAD_EXTENSIONS = new Set([
+    ".dxf", ".dwg", ".svg", ".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp",
+    ".xlsx", ".xls", ".csv", ".doc", ".docx"
+  ]);
+  const upload = multer({
+    storage,
+    limits: { fileSize: 25 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (!ALLOWED_UPLOAD_EXTENSIONS.has(ext)) {
+        cb(new Error("نوع الملف غير مسموح به"));
+        return;
+      }
+      cb(null, true);
+    }
+  });
 
   // File Upload
-  app.post("/api/files/upload", upload.single("file"), (req, res) => {
+  app.post("/api/files/upload", (req, res, next) => {
+    upload.single("file")(req, res, (err: any) => {
+      if (err) {
+        const message = err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE"
+          ? "حجم الملف أكبر من الحد المسموح (25MB)"
+          : err.message || "فشل رفع الملف";
+        return res.status(400).json({ success: false, message });
+      }
+      next();
+    });
+  }, (req, res) => {
     try {
       const file = req.file;
       if (!file) {
