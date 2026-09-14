@@ -308,6 +308,37 @@ function syncNormalizedFinancialEntities(sqlite: any) {
     sqlite.run("INSERT INTO local_expenses (id, category, amount, date, status, payload, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)", [expenseId, String(expense.category || "عام"), Number(expense.amount) || 0, String(expense.date || now), String(expense.status || "paid"), JSON.stringify(expense), now]);
   }
 }
+
+function readFinancialTablesFromSqlite() {
+  if (!USE_SQLITE || !localSqlite) return null;
+  const invoiceRows = localSqlite.exec("SELECT payload FROM local_invoices ORDER BY updated_at, id")[0]?.values || [];
+  const itemRows = localSqlite.exec("SELECT invoice_id, payload FROM local_invoice_items ORDER BY created_at, id")[0]?.values || [];
+  const historyRows = localSqlite.exec("SELECT invoice_id, payload FROM local_invoice_history ORDER BY created_at, id")[0]?.values || [];
+  const paymentRows = localSqlite.exec("SELECT payload FROM local_payments ORDER BY updated_at, id")[0]?.values || [];
+  const expenseRows = localSqlite.exec("SELECT payload FROM local_expenses ORDER BY updated_at, id")[0]?.values || [];
+  const invoices = invoiceRows.map(([payload]: any[]) => JSON.parse(String(payload)));
+  const itemsByInvoice = new Map<string, any[]>();
+  for (const [invoiceId, payload] of itemRows) {
+    const list = itemsByInvoice.get(String(invoiceId)) || [];
+    list.push(JSON.parse(String(payload)));
+    itemsByInvoice.set(String(invoiceId), list);
+  }
+  const historyByInvoice = new Map<string, any[]>();
+  for (const [invoiceId, payload] of historyRows) {
+    const list = historyByInvoice.get(String(invoiceId)) || [];
+    list.push(JSON.parse(String(payload)));
+    historyByInvoice.set(String(invoiceId), list);
+  }
+  for (const invoice of invoices) {
+    invoice.items = itemsByInvoice.get(String(invoice.id)) || invoice.items || [];
+    invoice.history = historyByInvoice.get(String(invoice.id)) || invoice.history || [];
+  }
+  return {
+    invoices,
+    payments: paymentRows.map(([payload]: any[]) => JSON.parse(String(payload))),
+    expenses: expenseRows.map(([payload]: any[]) => JSON.parse(String(payload))),
+  };
+}
 function backupDirectory() {
   return path.join(path.dirname(LOCAL_DATA_FILE), "backups");
 }
@@ -7772,7 +7803,9 @@ Role Guidelines:
 
   // Get Invoices
   app.get("/api/accounting/invoices", (req, res) => {
-    const list = INVOICES.map(inv => {
+    const financialTables = readFinancialTablesFromSqlite();
+    const sourceInvoices = financialTables?.invoices || INVOICES;
+    const list = sourceInvoices.map(inv => {
       const cust = CUSTOMERS.find(c => c.id === inv.customerId);
       const ord = ORDERS.find(o => o.id === inv.orderId);
       return {
@@ -8176,7 +8209,8 @@ Role Guidelines:
 
   // Get Expenses
   app.get("/api/accounting/expenses", (req, res) => {
-    res.json({ success: true, expenses: EXPENSES });
+    const financialTables = readFinancialTablesFromSqlite();
+    res.json({ success: true, expenses: financialTables?.expenses || EXPENSES });
   });
 
   // Create Expense
