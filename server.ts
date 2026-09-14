@@ -2119,7 +2119,7 @@ async function startServer() {
     }
 
     const newUser: UserRecord = {
-      id: "u-" + (USERS.length + 1),
+      id: nextEntityId("u"),
       email: email.toLowerCase(),
       fullName,
       role,
@@ -2197,7 +2197,7 @@ async function startServer() {
     }
 
     const newUser = {
-      id: "u-" + (USERS.length + 1),
+      id: nextEntityId("u"),
       email: email.toLowerCase(),
       fullName,
       role,
@@ -3753,7 +3753,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
     }
 
     const newMat = {
-      id: "m-" + (MATERIALS.length + 1),
+      id: nextEntityId("m"),
       name: name.trim(),
       category,
       subCategory: subCategory || "",
@@ -8059,7 +8059,7 @@ Role Guidelines:
     }
     const safeExpenseRate = Number.isFinite(expenseRate) && expenseRate > 0 ? expenseRate : 135;
     const newExp = {
-      id: "exp-" + (EXPENSES.length + 1),
+      id: nextEntityId("exp"),
       category,
       amount: amountUSD,
       amountUSD,
