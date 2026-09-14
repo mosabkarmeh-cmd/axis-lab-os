@@ -1,4 +1,5 @@
 import type React from "react";
+import { useRef } from "react";
 import type { Order } from "../types";
 
 type AccountingActionsOptions = {
@@ -39,15 +40,22 @@ export function useAccountingActions({
   addTerminalLog,
 }: AccountingActionsOptions) {
   const changedById = currentUserId || "u-1";
+  const isSubmittingPaymentRef = useRef(false);
+  const paymentIdempotencyKeyRef = useRef<string | null>(null);
 
   const handleRecordPaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingPaymentRef.current) return;
     const rawInput = paymentInputCurrency === "SYP" ? newPaymentSYPAmount : newPaymentAmount;
     const numericInput = Number(rawInput);
     if (!selectedOrder || !Number.isFinite(numericInput) || numericInput <= 0) return;
     const orderExchangeRate = Number((selectedOrder as any).exchangeRateAtCreation) > 0
       ? Number((selectedOrder as any).exchangeRateAtCreation)
       : 135;
+    isSubmittingPaymentRef.current = true;
+    if (!paymentIdempotencyKeyRef.current) {
+      paymentIdempotencyKeyRef.current = crypto.randomUUID();
+    }
     try {
       const res = await fetch(`/api/orders/${selectedOrder.id}/payments`, {
         method: "POST",
@@ -58,9 +66,11 @@ export function useAccountingActions({
           notes: newPaymentNotes,
           paymentMethod: selectedPaymentMethod,
           changedById,
+          paymentId: paymentIdempotencyKeyRef.current,
         }),
       });
       if (res.ok) {
+        paymentIdempotencyKeyRef.current = null;
         const updated = await res.json() as Order;
         const amountSYP = paymentInputCurrency === "SYP" ? numericInput : Math.round(numericInput * orderExchangeRate);
         addTerminalLog("DB", `تم تسجيل دفعة ${amountSYP.toLocaleString()} ل.س (${paymentInputCurrency === "SYP" ? "ليرة سورية" : "$" + numericInput.toFixed(2)}) للطلب ${selectedOrder.orderNumber}`);
@@ -76,6 +86,8 @@ export function useAccountingActions({
       }
     } catch {
       addTerminalLog("ERROR", "Failed to record payment");
+    } finally {
+      isSubmittingPaymentRef.current = false;
     }
   };
 

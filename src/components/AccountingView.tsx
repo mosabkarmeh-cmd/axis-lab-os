@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   ResponsiveContainer, 
@@ -398,8 +398,11 @@ export default function AccountingView({ customers, onRefreshOrders, currentUser
   };
 
   // Handle recording payment on invoice
+  const isSubmittingInvoicePaymentRef = useRef(false);
+  const invoicePaymentIdempotencyKeyRef = useRef<string | null>(null);
   const handleRecordPayment = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingInvoicePaymentRef.current) return;
     setPaymentError("");
     if (!recordingPaymentInvoice || !paymentAmount) {
       setPaymentError("أدخل قيمة القسط أولًا.");
@@ -422,19 +425,25 @@ export default function AccountingView({ customers, onRefreshOrders, currentUser
       return;
     }
 
+    isSubmittingInvoicePaymentRef.current = true;
+    if (!invoicePaymentIdempotencyKeyRef.current) {
+      invoicePaymentIdempotencyKeyRef.current = crypto.randomUUID();
+    }
     try {
       const res = await fetch(`/api/accounting/invoices/${recordingPaymentInvoice.id}/payments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({           amount,
           currency: paymentCurrency,
-          notes: paymentNotes })
+          notes: paymentNotes,
+          paymentId: invoicePaymentIdempotencyKeyRef.current })
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) {
         setPaymentError(String(data.message || data.error || "تعذر تسجيل القسط. تحقق من أن الفاتورة غير نهائية وأن المبلغ ضمن المتبقي."));
         return;
       }
+      invoicePaymentIdempotencyKeyRef.current = null;
       setRecordingPaymentInvoice(null);
       setPaymentAmount("");
       setPaymentNotes("");
@@ -445,6 +454,8 @@ export default function AccountingView({ customers, onRefreshOrders, currentUser
     } catch (err) {
       console.error("Failed to record payment:", err);
       setPaymentError("تعذر الاتصال بالخادم. لم يتم تسجيل القسط.");
+    } finally {
+      isSubmittingInvoicePaymentRef.current = false;
     }
   };
 
