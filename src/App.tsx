@@ -156,6 +156,7 @@ export default function App() {
   const [inspectToken, setInspectToken] = useState<any>(null);
   const [firstRunPasswordCurrent, setFirstRunPasswordCurrent] = useState<string | null>(null);
   const [isFirstRunPasswordLoading, setIsFirstRunPasswordLoading] = useState(false);
+  const networkSyncInFlightRef = useRef(false);
 
   // Developer logs and JWT inspect panel visibility states (Hidden by default to keep the UI clean)
   const [showTerminalLogs, setShowTerminalLogs] = useLocalStorage<boolean>("axis_show_terminal_logs", false);
@@ -790,19 +791,14 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     fetchOrderStatuses();
   }, []);
 
-  // Periodic polling mechanism to keep key metrics and states updated without page refreshes
+  // One coordinated LAN sync keeps all clients consistent without overlapping requests.
   useEffect(() => {
     const pollInterval = setInterval(() => {
-      fetchOrders();
-      fetchMachines();
-      fetchProductionJobs();
-      refreshInventoryData();
-      fetchLogs();
-      fetchNotifications();
-    }, 10000); // Poll every 10 seconds
+      if (document.visibilityState === "visible" && currentUser) void refreshNetworkSnapshot();
+    }, 8000);
 
     return () => clearInterval(pollInterval);
-  }, []);
+  }, [currentUser?.id]);
 
   // Auto-verify saved JWT token on mount
   useEffect(() => {
@@ -938,18 +934,6 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     }
   };
 
-  // Keep LAN clients synchronized without changing authorization. The server
-  // remains the source of truth and applies the current user's role to every
-  // response; polling only refreshes what that user is already allowed to see.
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      if (document.visibilityState === "visible" && currentUser) {
-        void fetchOrders();
-      }
-    }, 5000);
-    return () => window.clearInterval(interval);
-  }, [currentUser?.id]);
-
   const fetchLogs = async () => {
     const data = await safeApiFetch("/api/logs");
     if (data && Array.isArray(data)) setLogs(data);
@@ -958,6 +942,23 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
   const fetchNotifications = async () => {
     const data = await safeApiFetch("/api/notifications");
     if (data && data.success) setNotifications(data.notifications);
+  };
+
+  const refreshNetworkSnapshot = async () => {
+    if (networkSyncInFlightRef.current || !currentUser) return;
+    networkSyncInFlightRef.current = true;
+    try {
+      await Promise.all([
+        fetchOrders(),
+        fetchMachines(),
+        fetchProductionJobs(),
+        refreshInventoryData(),
+        fetchLogs(),
+        fetchNotifications(),
+      ]);
+    } finally {
+      networkSyncInFlightRef.current = false;
+    }
   };
 
   const fetchRecycleBin = async () => {
