@@ -8358,24 +8358,24 @@ Role Guidelines:
       const rate = historicalRate > 0 ? historicalRate : 135;
       return Math.round((Number(inv[usdField]) || 0) * rate);
     };
-    const totalRevenue = INVOICES.reduce((sum, inv) => sum + (inv.paidAmount || 0), 0);
-    const totalReceivables = INVOICES.reduce((sum, inv) => sum + (inv.remaining || 0), 0);
-    const totalRevenueSYP = INVOICES.reduce((sum, inv) => sum + invoiceSYP(inv, "paidAmount", "paidAmountSYP"), 0);
-    const totalReceivablesSYP = INVOICES.reduce((sum, inv) => sum + invoiceSYP(inv, "remaining", "remainingSYP"), 0);
+    const totalRevenue = sourceInvoices.reduce((sum, inv) => sum + (inv.paidAmount || 0), 0);
+    const totalReceivables = sourceInvoices.reduce((sum, inv) => sum + (inv.remaining || 0), 0);
+    const totalRevenueSYP = sourceInvoices.reduce((sum, inv) => sum + invoiceSYP(inv, "paidAmount", "paidAmountSYP"), 0);
+    const totalReceivablesSYP = sourceInvoices.reduce((sum, inv) => sum + invoiceSYP(inv, "remaining", "remainingSYP"), 0);
     const expenseSYP = (exp: any) => {
       const fixedSYP = Number(exp.amountSYP);
       if (Number.isFinite(fixedSYP)) return Math.round(fixedSYP);
       const historicalRate = Number(exp.exchangeRateAtCreation);
       return Math.round((Number(exp.amountUSD ?? exp.amount) || 0) * (historicalRate > 0 ? historicalRate : 135));
     };
-    const totalExpenses = EXPENSES.reduce((sum, exp) => sum + (exp.amountUSD ?? exp.amount ?? 0), 0);
-    const totalExpensesSYP = EXPENSES.reduce((sum, exp) => sum + expenseSYP(exp), 0);
+    const totalExpenses = sourceExpenses.reduce((sum, exp) => sum + (exp.amountUSD ?? exp.amount ?? 0), 0);
+    const totalExpensesSYP = sourceExpenses.reduce((sum, exp) => sum + expenseSYP(exp), 0);
     const netProfit = totalRevenue - totalExpenses;
     const netProfitSYP = totalRevenueSYP - totalExpensesSYP;
 
     // Group expenses by category
     const expenseCategories: Record<string, number> = {};
-    EXPENSES.forEach(e => {
+    sourceExpenses.forEach(e => {
       expenseCategories[e.category] = (expenseCategories[e.category] || 0) + (e.amountUSD ?? e.amount);
     });
 
@@ -8396,7 +8396,7 @@ Role Guidelines:
       return new Date(year, month - 1, 1).toLocaleDateString("ar-EG", { month: "short", year: "numeric" });
     };
 
-    INVOICES.forEach(inv => {
+    sourceInvoices.forEach(inv => {
       const monthKey = monthKeyFor(inv.issueDate);
       if (!monthKey) return;
       if (!monthlyData[monthKey]) monthlyData[monthKey] = { revenue: 0, revenueSYP: 0, expenses: 0, expensesSYP: 0 };
@@ -8404,7 +8404,7 @@ Role Guidelines:
       monthlyData[monthKey].revenueSYP += invoiceSYP(inv, "paidAmount", "paidAmountSYP");
     });
 
-    EXPENSES.forEach(exp => {
+    sourceExpenses.forEach(exp => {
       const monthKey = monthKeyFor(exp.date);
       if (!monthKey) return;
       if (!monthlyData[monthKey]) monthlyData[monthKey] = { revenue: 0, revenueSYP: 0, expenses: 0, expensesSYP: 0 };
@@ -8448,6 +8448,9 @@ Role Guidelines:
 
   // ==================== REPORTS & ANALYTICS API ====================
   app.get("/api/reports/analytics", (req, res) => {
+    const financialTables = readFinancialTablesFromSqlite();
+    const sourceInvoices = financialTables?.invoices || INVOICES;
+    const sourceExpenses = financialTables?.expenses || EXPENSES;
     // 1. Sales & Orders
     const totalOrdersCount = ORDERS.length;
     const orderValueSYP = (order: any) => Math.round(Number(order.totalPrice) || 0);
@@ -8489,31 +8492,31 @@ Role Guidelines:
       const rate = historicalRate > 0 ? historicalRate : 135;
       return Math.round((Number(inv[usdField]) || 0) * rate);
     };
-    const totalRevenue = INVOICES.reduce((sum, inv) => sum + (inv.paidAmount || 0), 0);
-    const totalReceivables = INVOICES.reduce((sum, inv) => sum + (inv.remaining || 0), 0);
-    const totalRevenueSYP = INVOICES.reduce((sum, inv) => sum + invoiceSYP(inv, "paidAmount", "paidAmountSYP"), 0);
-    const totalReceivablesSYP = INVOICES.reduce((sum, inv) => sum + invoiceSYP(inv, "remaining", "remainingSYP"), 0);
+    const totalRevenue = sourceInvoices.reduce((sum, inv) => sum + (inv.paidAmount || 0), 0);
+    const totalReceivables = sourceInvoices.reduce((sum, inv) => sum + (inv.remaining || 0), 0);
+    const totalRevenueSYP = sourceInvoices.reduce((sum, inv) => sum + invoiceSYP(inv, "paidAmount", "paidAmountSYP"), 0);
+    const totalReceivablesSYP = sourceInvoices.reduce((sum, inv) => sum + invoiceSYP(inv, "remaining", "remainingSYP"), 0);
     const expenseSYP = (exp: any) => {
       const fixedSYP = Number(exp.amountSYP);
       if (Number.isFinite(fixedSYP)) return Math.round(fixedSYP);
       const historicalRate = Number(exp.exchangeRateAtCreation);
       return Math.round((Number(exp.amountUSD ?? exp.amount) || 0) * (historicalRate > 0 ? historicalRate : 135));
     };
-    const totalExpenses = EXPENSES.reduce((sum, exp) => sum + (exp.amountUSD ?? exp.amount ?? 0), 0);
-    const totalExpensesSYP = EXPENSES.reduce((sum, exp) => sum + expenseSYP(exp), 0);
+    const totalExpenses = sourceExpenses.reduce((sum, exp) => sum + (exp.amountUSD ?? exp.amount ?? 0), 0);
+    const totalExpensesSYP = sourceExpenses.reduce((sum, exp) => sum + expenseSYP(exp), 0);
     const netProfit = totalRevenue - totalExpenses;
     const netProfitSYP = totalRevenueSYP - totalExpensesSYP;
     const profitMargin = totalRevenueSYP > 0 ? (netProfitSYP / totalRevenueSYP) * 100 : 0;
 
     const expenseCategories: Record<string, number> = {};
-    EXPENSES.forEach(e => {
+    sourceExpenses.forEach(e => {
       expenseCategories[e.category] = (expenseCategories[e.category] || 0) + (e.amountUSD ?? e.amount);
     });
     const expenseBreakdown = Object.entries(expenseCategories).map(([name, value]) => ({
       name,
       value,
       valueUSD: value,
-      valueSYP: EXPENSES.filter((expense: any) => expense.category === name).reduce((sum, expense) => sum + expenseSYP(expense), 0)
+      valueSYP: sourceExpenses.filter((expense: any) => expense.category === name).reduce((sum, expense) => sum + expenseSYP(expense), 0)
     }));
 
     // 3. Machines & Operations
@@ -8560,7 +8563,7 @@ Role Guidelines:
     const totalInventoryValue = stockStatus.reduce((sum, item) => sum + item.stockValue, 0);
 
     // Recent Financial Transactions Combined
-    const recentInvoices = INVOICES.map(inv => ({
+    const recentInvoices = sourceInvoices.map(inv => ({
       id: inv.id,
       type: "invoice",
       reference: inv.invoiceNumber,
@@ -8572,7 +8575,7 @@ Role Guidelines:
       status: inv.status === "paid" ? "تم التحصيل" : (inv.status === "partially_paid" ? "محصل جزئياً" : "غير محصل")
     }));
 
-    const recentExpenses = EXPENSES.map(exp => ({
+    const recentExpenses = sourceExpenses.map(exp => ({
       id: exp.id,
       type: "expense",
       reference: `EXP-${exp.id}`,
