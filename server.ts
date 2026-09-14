@@ -933,20 +933,32 @@ const DELETED_ITEMS: any[] = [
 const ORDER_STATUSES: any[] = [
   { id: "new", name: "جديد", color: "#818cf8", order: 1, isDefault: true },
   { id: "design", name: "قيد التصميم", color: "#c084fc", order: 2, isDefault: true },
-  { id: "in_progress", name: "قيد الإنتاج", color: "#60a5fa", order: 3, isDefault: true },
-  { id: "ready", name: "جاهز للتسليم", color: "#34d399", order: 4, isDefault: true },
-  { id: "delivered", name: "تم التسليم", color: "#a1a1aa", order: 5, isDefault: true },
-  { id: "cancelled", name: "ملغي", color: "#f87171", order: 6, isDefault: true }
+  { id: "design_approved", name: "تم اعتماد التصميم", color: "#a78bfa", order: 3, isDefault: true },
+  { id: "cutting", name: "قيد القص", color: "#60a5fa", order: 4, isDefault: true },
+  { id: "cutting_complete", name: "انتهى القص", color: "#38bdf8", order: 5, isDefault: true },
+  { id: "assembly", name: "قيد التجميع", color: "#f59e0b", order: 6, isDefault: true },
+  { id: "assembly_complete", name: "انتهى التجميع", color: "#fbbf24", order: 7, isDefault: true },
+  { id: "packaging", name: "قيد التغليف", color: "#fb923c", order: 8, isDefault: true },
+  { id: "ready", name: "بانتظار التسليم", color: "#34d399", order: 9, isDefault: true },
+  { id: "delivered", name: "تم التسليم", color: "#a1a1aa", order: 10, isDefault: true },
+  { id: "cancelled", name: "ملغي", color: "#f87171", order: 11, isDefault: true },
+  { id: "in_progress", name: "قيد التنفيذ (قديم)", color: "#64748b", order: 99, isDefault: false }
 ];
 
 function normalizeOrderStatuses() {
   const defaults = [
     { id: "new", name: "جديد", color: "#818cf8", order: 1, isDefault: true },
     { id: "design", name: "قيد التصميم", color: "#c084fc", order: 2, isDefault: true },
-    { id: "in_progress", name: "قيد الإنتاج", color: "#60a5fa", order: 3, isDefault: true },
-    { id: "ready", name: "جاهز للتسليم", color: "#34d399", order: 4, isDefault: true },
-    { id: "delivered", name: "تم التسليم", color: "#a1a1aa", order: 5, isDefault: true },
-    { id: "cancelled", name: "ملغي", color: "#f87171", order: 6, isDefault: true }
+    { id: "design_approved", name: "تم اعتماد التصميم", color: "#a78bfa", order: 3, isDefault: true },
+    { id: "cutting", name: "قيد القص", color: "#60a5fa", order: 4, isDefault: true },
+    { id: "cutting_complete", name: "انتهى القص", color: "#38bdf8", order: 5, isDefault: true },
+    { id: "assembly", name: "قيد التجميع", color: "#f59e0b", order: 6, isDefault: true },
+    { id: "assembly_complete", name: "انتهى التجميع", color: "#fbbf24", order: 7, isDefault: true },
+    { id: "packaging", name: "قيد التغليف", color: "#fb923c", order: 8, isDefault: true },
+    { id: "ready", name: "بانتظار التسليم", color: "#34d399", order: 9, isDefault: true },
+    { id: "delivered", name: "تم التسليم", color: "#a1a1aa", order: 10, isDefault: true },
+    { id: "cancelled", name: "ملغي", color: "#f87171", order: 11, isDefault: true },
+    { id: "in_progress", name: "قيد التنفيذ (قديم)", color: "#64748b", order: 99, isDefault: false }
   ];
   for (const defaultStatus of defaults) {
     if (!ORDER_STATUSES.some((status: any) => status.id === defaultStatus.id)) ORDER_STATUSES.push(defaultStatus);
@@ -982,6 +994,16 @@ function notifyOverdueOrders() {
     (notification as any).code = "overdue";
   }
 }
+
+const WORKFLOW_NEXT_REMINDERS: Record<string, string> = {
+  new: "اعتمد التصميم قبل تحويل الطلب للتنفيذ.",
+  design: "بعد اكتمال التصميم، سجّل اعتماد التصميم.",
+  design_approved: "التصميم معتمد؛ ابدأ مهمة القص من لوحة الإنتاج.",
+  cutting_complete: "انتهى القص؛ ابدأ مرحلة التجميع.",
+  assembly_complete: "انتهى التجميع؛ ابدأ مرحلة التغليف.",
+  packaging: "بعد انتهاء التغليف، حوّل الطلب إلى بانتظار التسليم.",
+  ready: "تواصل مع العميل وسجّل التسليم بعد استيفاء الدفعة المتبقية."
+};
 
 const INVOICES: any[] = [
   { 
@@ -3232,8 +3254,14 @@ async function startServer() {
     const statusArabicMap: Record<string, string> = {
       new: "جديد",
       design: "قيد التصميم",
-      in_progress: "قيد التنفيذ والقص",
-      ready: "جاهز للتسليم",
+      design_approved: "تم اعتماد التصميم",
+      cutting: "قيد القص",
+      cutting_complete: "انتهى القص",
+      assembly: "قيد التجميع",
+      assembly_complete: "انتهى التجميع",
+      packaging: "قيد التغليف",
+      in_progress: "قيد التنفيذ (قديم)",
+      ready: "بانتظار التسليم",
       delivered: "تم التسليم للعميل",
       cancelled: "ملغى"
     };
@@ -3256,6 +3284,16 @@ async function startServer() {
       status === "ready" ? "high" : "normal",
       "/orders"
     );
+    const nextReminder = WORKFLOW_NEXT_REMINDERS[status];
+    if (nextReminder) {
+      createNotification(
+        `الخطوة التالية للطلب #${order.orderNumber}`,
+        nextReminder,
+        "order",
+        ["design_approved", "cutting_complete", "assembly_complete", "ready"].includes(status) ? "high" : "normal",
+        "/orders"
+      );
+    }
 
     // Log Activity
     ACTIVITY_LOGS.unshift({
@@ -7414,23 +7452,27 @@ Role Guidelines:
     job.operatorId = finalOperatorId || "u-1";
     job.status = "running";
 
-    // Auto-update associated order status to 'in_progress'
+    // Auto-update associated order status to 'cutting' when the laser actually starts.
     let orderUpdated = false;
     let updatedOrderNumber = job.orderNumber;
     if (job.orderId || job.orderNumber) {
       const ord = ORDERS.find(o => (job.orderId && o.id === job.orderId) || (job.orderNumber && o.orderNumber === job.orderNumber));
       if (ord) {
-        ord.status = 'in_progress';
+        const previousOrderStatus = ord.status;
+        ord.status = 'cutting';
         orderUpdated = true;
         updatedOrderNumber = ord.orderNumber;
         if (!ord.statusHistory) ord.statusHistory = [];
         ord.statusHistory.push({
           id: "sh_" + Date.now(),
-          status: 'in_progress',
-          note: `تحديث تلقائي: تم بدء تشغيل مهمة القص بالليزر (${job.jobNo}) على الماكينة (${mac ? mac.name : ''})`,
+          oldStatus: previousOrderStatus,
+          newStatus: 'cutting',
+          status: 'cutting',
+          note: `تحديث تلقائي: تم بدء القص بالليزر (${job.jobNo}) على الماكينة (${mac ? mac.name : ''})`,
           createdAt: new Date().toISOString(),
           createdById: finalOperatorId || "u-1"
         });
+        createNotification(`بدأ قص الطلب #${ord.orderNumber}`, `بدأت مهمة القص ${job.jobNo} تلقائياً على الماكينة ${mac?.name || "المحددة"}.`, "production", "normal", "/production");
       }
     }
 
@@ -7536,6 +7578,26 @@ Role Guidelines:
     job.status = "completed";
     job.progress = 100;
     job.completedAt = new Date().toISOString();
+
+    const completedOrder = job.orderId || job.orderNumber
+      ? ORDERS.find(o => (job.orderId && o.id === job.orderId) || (job.orderNumber && o.orderNumber === job.orderNumber))
+      : null;
+    if (completedOrder) {
+      const previousOrderStatus = completedOrder.status;
+      completedOrder.status = "cutting_complete";
+      if (!completedOrder.statusHistory) completedOrder.statusHistory = [];
+      completedOrder.statusHistory.unshift({
+        oldStatus: previousOrderStatus,
+        newStatus: "cutting_complete",
+        status: "cutting_complete",
+        note: `تحديث تلقائي: انتهت مهمة القص ${job.jobNo}. يرجى بدء التجميع عند الجاهزية.`,
+        notes: `انتهى القص ${job.jobNo}، بانتظار بدء التجميع`,
+        changedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        changedById: job.operatorId || "u-1"
+      });
+      createNotification(`انتهى قص الطلب #${completedOrder.orderNumber}`, `انتهت مهمة القص ${job.jobNo}. تذكير: ابدأ مرحلة التجميع.`, "production", "high", "/production");
+    }
 
     // Release machine
     if (job.machineId) {

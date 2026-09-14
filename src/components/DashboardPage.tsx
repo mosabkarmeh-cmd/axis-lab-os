@@ -644,15 +644,55 @@ export default function DashboardPage(props: Record<string, any>) {
                                               <div className="w-[1px] h-3.5 bg-zinc-850"></div>
                                               {ord.status === 'new' && (
                                                 <button
-                                                  onClick={() => handleUpdateOrderStatus(ord.id, 'in_progress', 'تم بدء العمل وقص المواد بالليزر')}
-                                                  className="px-2 py-1 bg-blue-950 text-blue-400 hover:bg-blue-900 border border-blue-900/50 rounded text-[10px] font-medium"
+                                                  onClick={() => handleUpdateOrderStatus(ord.id, 'design', 'تم استلام الطلب وبدء إعداد التصميم')}
+                                                  className="px-2 py-1 bg-purple-950 text-purple-400 hover:bg-purple-900 border border-purple-900/50 rounded text-[10px] font-medium"
                                                 >
-                                                  ابدأ القص
+                                                  ابدأ التصميم
+                                                </button>
+                                              )}
+                                              {ord.status === 'design' && (
+                                                <button
+                                                  onClick={() => handleUpdateOrderStatus(ord.id, 'design_approved', 'تم اعتماد التصميم من العميل أو المسؤول')}
+                                                  className="px-2 py-1 bg-violet-950 text-violet-400 hover:bg-violet-900 border border-violet-900/50 rounded text-[10px] font-medium"
+                                                >
+                                                  اعتماد التصميم
                                                 </button>
                                               )}
                                               {ord.status === 'in_progress' && (
                                                 <button
-                                                  onClick={() => handleUpdateOrderStatus(ord.id, 'ready', 'تم الانتهاء تماماً وتصديق القطع')}
+                                                  onClick={() => handleUpdateOrderStatus(ord.id, 'cutting_complete', 'تم إنهاء القص حسب مواصفات الطلب')}
+                                                  className="px-2 py-1 bg-sky-950 text-sky-400 hover:bg-sky-900 border border-sky-900/50 rounded text-[10px] font-medium"
+                                                >
+                                                  إنهاء القص
+                                                </button>
+                                              )}
+                                              {ord.status === 'cutting_complete' && (
+                                                <button
+                                                  onClick={() => handleUpdateOrderStatus(ord.id, 'assembly', 'تم بدء تجميع القطع')}
+                                                  className="px-2 py-1 bg-amber-950 text-amber-400 hover:bg-amber-900 border border-amber-900/50 rounded text-[10px] font-medium"
+                                                >
+                                                  ابدأ التجميع
+                                                </button>
+                                              )}
+                                              {ord.status === 'assembly' && (
+                                                <button
+                                                  onClick={() => handleUpdateOrderStatus(ord.id, 'assembly_complete', 'تم إنهاء تجميع القطع وفحصها')}
+                                                  className="px-2 py-1 bg-amber-950 text-amber-400 hover:bg-amber-900 border border-amber-900/50 rounded text-[10px] font-medium"
+                                                >
+                                                  إنهاء التجميع
+                                                </button>
+                                              )}
+                                              {ord.status === 'assembly_complete' && (
+                                                <button
+                                                  onClick={() => handleUpdateOrderStatus(ord.id, 'packaging', 'تم بدء تغليف الطلب')}
+                                                  className="px-2 py-1 bg-orange-950 text-orange-400 hover:bg-orange-900 border border-orange-900/50 rounded text-[10px] font-medium"
+                                                >
+                                                  ابدأ التغليف
+                                                </button>
+                                              )}
+                                              {ord.status === 'packaging' && (
+                                                <button
+                                                  onClick={() => handleUpdateOrderStatus(ord.id, 'ready', 'اكتمل التغليف والطلب بانتظار التسليم')}
                                                   className="px-2 py-1 bg-emerald-950 text-emerald-400 hover:bg-emerald-900 border border-emerald-900/50 rounded text-[10px] font-medium"
                                                 >
                                                   جاهز للتسليم
