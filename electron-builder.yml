@@ -25,6 +25,9 @@ extraResources:
     to: install-scope.txt
 win:
   icon: assets/icon.ico
+  publisherName: AXIS LAB
+  signingHashAlgorithms:
+    - sha256
   target:
     - nsis
 publish:

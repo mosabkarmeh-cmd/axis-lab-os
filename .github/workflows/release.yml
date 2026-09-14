@@ -30,6 +30,21 @@ jobs:
         run: npm run lint
       - name: Run security smoke test
         run: npm run test:smoke
+      - name: Configure Windows code signing
+        if: ${{ secrets.CSC_CERT_BASE64 != '' && secrets.CSC_KEY_PASSWORD != '' }}
+        shell: pwsh
+        env:
+          CSC_CERT_BASE64: ${{ secrets.CSC_CERT_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+        run: |
+          $certPath = Join-Path $env:GITHUB_WORKSPACE 'axis-lab-code-signing.pfx'
+          [IO.File]::WriteAllBytes($certPath, [Convert]::FromBase64String($env:CSC_CERT_BASE64))
+          "CSC_LINK=$certPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "CSC_KEY_PASSWORD=$env:CSC_KEY_PASSWORD" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host 'Windows code signing certificate configured.'
+      - name: Report unsigned release mode
+        if: ${{ secrets.CSC_CERT_BASE64 == '' || secrets.CSC_KEY_PASSWORD == '' }}
+        run: Write-Host 'No CSC_CERT_BASE64/CSC_KEY_PASSWORD secrets configured; installers will be unsigned.'
       - name: Build Windows installer (Current User)
         run: npm run desktop:package:win:current -- --publish never
 
@@ -61,4 +76,3 @@ jobs:
             gh release create $tag --generate-notes --title "AXIS LAB OS $tag"
           }
           gh release upload $tag $installer.FullName $blockmap.FullName $latest.FullName $allUsers.FullName --clobber
-
