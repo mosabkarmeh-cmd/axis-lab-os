@@ -7999,7 +7999,7 @@ Role Guidelines:
   });
   // Get Single Invoice Details
   app.get("/api/accounting/invoices/:id", (req, res) => {
-    const inv = INVOICES.find(i => i.id === req.params.id);
+    const inv = (readFinancialTablesFromSqlite()?.invoices || INVOICES).find(i => i.id === req.params.id);
     if (!inv) {
       res.status(404).json({ success: false, message: "الفاتورة غير موجودة" });
       return;
@@ -8113,7 +8113,7 @@ Role Guidelines:
   });
 
   // Create Credit Note (Reverse/Refund Invoice)
-  app.post("/api/accounting/invoices/:id/credit-note", (req, res) => {
+  app.post("/api/accounting/invoices/:id/credit-note", async (req, res) => {
     const inv = INVOICES.find(i => i.id === req.params.id);
     if (!inv) {
       res.status(404).json({ success: false, message: "الفاتورة الأصلية غير موجودة" });
@@ -8185,6 +8185,7 @@ Role Guidelines:
       notes: `تم إلغاء الفاتورة وإصدار إشعار دائن رقم ${creditInvoice.invoiceNumber}`
     });
 
+    await persistMutationWithFastDurability();
     res.json({ success: true, creditInvoice, originalInvoice: inv });
   });
 
@@ -8345,6 +8346,9 @@ Role Guidelines:
 
   // Get Finance Stats
   app.get("/api/accounting/stats", (req, res) => {
+    const financialTables = readFinancialTablesFromSqlite();
+    const sourceInvoices = financialTables?.invoices || INVOICES;
+    const sourceExpenses = financialTables?.expenses || EXPENSES;
     const reportRate = Number(SETTINGS.exchangeRate) > 0 ? Number(SETTINGS.exchangeRate) : 135;
     const invoiceSYP = (inv: any, usdField: string, sypField: string) => {
       const fixedSYP = Number(inv[sypField]);
