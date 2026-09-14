@@ -932,11 +932,26 @@ const DELETED_ITEMS: any[] = [
 
 const ORDER_STATUSES: any[] = [
   { id: "new", name: "جديد", color: "#818cf8", order: 1, isDefault: true },
-  { id: "in_progress", name: "قيد التنفيذ", color: "#60a5fa", order: 2, isDefault: true },
-  { id: "ready", name: "جاهز للتسليم", color: "#34d399", order: 3, isDefault: true },
-  { id: "delivered", name: "تم التسليم", color: "#a1a1aa", order: 4, isDefault: true },
-  { id: "cancelled", name: "ملغي", color: "#f87171", order: 5, isDefault: true }
+  { id: "design", name: "قيد التصميم", color: "#c084fc", order: 2, isDefault: true },
+  { id: "in_progress", name: "قيد الإنتاج", color: "#60a5fa", order: 3, isDefault: true },
+  { id: "ready", name: "جاهز للتسليم", color: "#34d399", order: 4, isDefault: true },
+  { id: "delivered", name: "تم التسليم", color: "#a1a1aa", order: 5, isDefault: true },
+  { id: "cancelled", name: "ملغي", color: "#f87171", order: 6, isDefault: true }
 ];
+
+function normalizeOrderStatuses() {
+  const defaults = [
+    { id: "new", name: "جديد", color: "#818cf8", order: 1, isDefault: true },
+    { id: "design", name: "قيد التصميم", color: "#c084fc", order: 2, isDefault: true },
+    { id: "in_progress", name: "قيد الإنتاج", color: "#60a5fa", order: 3, isDefault: true },
+    { id: "ready", name: "جاهز للتسليم", color: "#34d399", order: 4, isDefault: true },
+    { id: "delivered", name: "تم التسليم", color: "#a1a1aa", order: 5, isDefault: true },
+    { id: "cancelled", name: "ملغي", color: "#f87171", order: 6, isDefault: true }
+  ];
+  for (const defaultStatus of defaults) {
+    if (!ORDER_STATUSES.some((status: any) => status.id === defaultStatus.id)) ORDER_STATUSES.push(defaultStatus);
+  }
+}
 
 function createNotification(title: string, message: string, type: string, priority: string = "normal", link: string = "") {
   const newNotif = {
@@ -951,6 +966,21 @@ function createNotification(title: string, message: string, type: string, priori
   };
   NOTIFICATIONS.unshift(newNotif);
   return newNotif;
+}
+
+function notifyOverdueOrders() {
+  const now = Date.now();
+  for (const order of ORDERS) {
+    if (!order.deliveryDateExpected || ["delivered", "cancelled"].includes(order.status)) continue;
+    const dueAt = new Date(order.deliveryDateExpected).getTime();
+    if (!Number.isFinite(dueAt) || dueAt >= now) continue;
+    const alreadyNotified = NOTIFICATIONS.some((n: any) => n.type === "order" && n.orderId === order.id && n.code === "overdue");
+    if (alreadyNotified) continue;
+    const customer = CUSTOMERS.find((c: any) => c.id === order.customerId);
+    const notification = createNotification(`طلب متأخر #${order.orderNumber}`, `تجاوز الطلب موعد التسليم المتوقع${customer?.name ? ` للعميل ${customer.name}` : ""}. الحالة الحالية: ${order.status}`, "order", "high", "/orders");
+    (notification as any).orderId = order.id;
+    (notification as any).code = "overdue";
+  }
 }
 
 const INVOICES: any[] = [
@@ -1840,6 +1870,7 @@ async function startServer() {
   // last snapshot saved in Postgres, if any. On a brand-new database this finds
   // nothing and the app just keeps the hardcoded seed data (also true on first boot).
   const restoredCount = await loadPersistedState();
+  normalizeOrderStatuses();
   normalizeInventoryState();
   normalizeLegacyMaterialPrices();
   console.log(`[STATE] Mode=${DB_MODE}; restored ${restoredCount} collections from ${USE_SQLITE ? LOCAL_DATA_FILE : "database"}.`);
@@ -2564,6 +2595,7 @@ async function startServer() {
 
   // API - Get Orders
   app.get("/api/orders", (req, res) => {
+    notifyOverdueOrders();
     const user = getRequestUser(req);
     const isEmployee = user && user.role === "employee";
     
@@ -2636,7 +2668,13 @@ async function startServer() {
       createdAt: new Date().toISOString(),
       deliveryDateExpected: deliveryDateExpected || new Date(Date.now() + 3600000 * 48).toISOString(), // default 48h
       items: parsedItems,
-      statusHistory: []
+      statusHistory: [{
+        oldStatus: null,
+        newStatus: "new",
+        notes: "تم استقبال الطلب",
+        changedAt: new Date().toISOString(),
+        changedById: createdById || "u-1"
+      }]
     };
 
     ORDERS.unshift(newOrder);
@@ -3161,6 +3199,11 @@ async function startServer() {
       return;
     }
 
+    if (!ORDER_STATUSES.some((entry: any) => entry.id === status)) {
+      res.status(400).json({ error: "حالة الطلب غير صالحة" });
+      return;
+    }
+
     // Orders are stored in SYP. Block delivery only when at least one whole lira remains.
     const deliveryRemainingSYP = Math.max(0, Math.round(Number(order.remainingSYP ?? order.remaining ?? 0)));
     if (status === "delivered" && deliveryRemainingSYP > 0) {
@@ -3188,6 +3231,7 @@ async function startServer() {
 
     const statusArabicMap: Record<string, string> = {
       new: "جديد",
+      design: "قيد التصميم",
       in_progress: "قيد التنفيذ والقص",
       ready: "جاهز للتسليم",
       delivered: "تم التسليم للعميل",
@@ -3201,8 +3245,17 @@ async function startServer() {
       oldStatus,
       newStatus: status,
       notes: notes || `تحديث حالة الطلب إلى ${newStatusLabel}`,
-      changedAt: new Date().toISOString()
+      changedAt: new Date().toISOString(),
+      changedById: changedById || "u-1"
     });
+
+    createNotification(
+      `تحديث حالة الطلب #${order.orderNumber}`,
+      `انتقلت الحالة من ${oldStatusLabel} إلى ${newStatusLabel}${notes ? `: ${notes}` : ""}`,
+      "order",
+      status === "ready" ? "high" : "normal",
+      "/orders"
+    );
 
     // Log Activity
     ACTIVITY_LOGS.unshift({
