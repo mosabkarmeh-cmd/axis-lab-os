@@ -63,6 +63,20 @@ const EMPTY_ANALYTICS = {
     stockStatus: [] as any[],
     totalInventoryValue: 0,
   },
+  operations: {
+    directCostSYP: 0,
+    materialCostSYP: 0,
+    laborCostSYP: 0,
+    productionHours: 0,
+    trueProfitSYP: 0,
+    trueProfitUSD: 0,
+    overdueOrders: 0,
+    completedOrders: 0,
+    completionRate: 0,
+    workflowFunnel: [] as any[],
+    topProducts: [] as any[],
+    monthlyOrderTrends: [] as any[],
+  },
   machines: [] as any[],
 };
 
@@ -73,6 +87,7 @@ function normalizeAnalytics(value: any) {
     financial: { ...EMPTY_ANALYTICS.financial, ...(value?.financial || {}) },
     sales: { ...EMPTY_ANALYTICS.sales, ...(value?.sales || {}) },
     inventory: { ...EMPTY_ANALYTICS.inventory, ...(value?.inventory || {}) },
+    operations: { ...EMPTY_ANALYTICS.operations, ...(value?.operations || {}) },
     machines: Array.isArray(value?.machines) ? value.machines : [],
   };
 }
@@ -324,6 +339,51 @@ export default function ReportsView() {
           </div>
         </div>
 
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 print:grid-cols-3">
+        <div className="bg-zinc-950 border border-emerald-900/40 rounded-2xl p-5 text-right">
+          <div className="text-[10px] text-zinc-500 font-bold mb-2">الربح الحقيقي بعد التكلفة المباشرة</div>
+          <div className={`text-xl font-mono font-bold ${analytics.operations.trueProfitSYP >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+            {formatFixedFinancialMoney(analytics.operations.trueProfitSYP, analytics.operations.trueProfitUSD)}
+          </div>
+          <div className="text-[10px] text-zinc-500 mt-2">تكلفة المواد والعمل: {formatSypMoney(analytics.operations.directCostSYP)}</div>
+        </div>
+        <div className="bg-zinc-950 border border-indigo-900/40 rounded-2xl p-5 text-right">
+          <div className="text-[10px] text-zinc-500 font-bold mb-2">إنجاز الطلبات</div>
+          <div className="text-xl font-mono font-bold text-indigo-300">{Number(analytics.operations.completionRate).toFixed(1)}%</div>
+          <div className="text-[10px] text-zinc-500 mt-2">{analytics.operations.completedOrders} مكتمل من {analytics.sales.totalOrdersCount} طلب</div>
+        </div>
+        <div className="bg-zinc-950 border border-amber-900/40 rounded-2xl p-5 text-right">
+          <div className="text-[10px] text-zinc-500 font-bold mb-2">طلبات تحتاج متابعة</div>
+          <div className={`text-xl font-mono font-bold ${analytics.operations.overdueOrders > 0 ? "text-amber-400" : "text-emerald-400"}`}>{analytics.operations.overdueOrders}</div>
+          <div className="text-[10px] text-zinc-500 mt-2">متأخرة عن موعد التسليم المتوقع</div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 print:grid-cols-2">
+        <div className="bg-zinc-950 border border-zinc-850 rounded-2xl p-5 text-right">
+          <h4 className="text-xs font-bold text-zinc-200 mb-4">توزيع الطلبات حسب مرحلة العمل</h4>
+          <div className="space-y-2">
+            {analytics.operations.workflowFunnel.map((item: any) => (
+              <div key={item.status} className="flex items-center justify-between text-xs border-b border-zinc-900 pb-2">
+                <span className="font-mono text-zinc-300">{item.count}</span>
+                <span className="text-zinc-400">{item.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="bg-zinc-950 border border-zinc-850 rounded-2xl p-5 text-right">
+          <h4 className="text-xs font-bold text-zinc-200 mb-4">أكثر المنتجات طلباً</h4>
+          <div className="space-y-2">
+            {analytics.operations.topProducts.map((item: any) => (
+              <div key={item.name} className="flex items-center justify-between text-xs border-b border-zinc-900 pb-2">
+                <span className="font-mono text-indigo-300">{item.quantity}</span>
+                <span className="text-zinc-400 truncate max-w-[80%]">{item.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Tabs Controller */}

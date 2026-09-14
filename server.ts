@@ -8521,6 +8521,42 @@ Role Guidelines:
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 10);
 
+    const completedJobs = PRODUCTION_JOBS.filter((job: any) => job.status === "completed");
+    const materialCostSYP = completedJobs.reduce((sum: number, job: any) => {
+      const material = MATERIALS.find((item: any) => item.id === job.materialId);
+      return sum + Math.round(Number(material?.pricePerUnit) || 0);
+    }, 0);
+    const productionHours = PRODUCTION_JOBS.reduce((sum: number, job: any) => sum + ((Number(job.elapsedTimeSec || job.estTimeSec) || 0) / 3600), 0);
+    const laborCostSYP = Math.round(productionHours * (Number(SETTINGS.pricing?.assemblyCostPerHour) || 0) * currentRate);
+    const directCostSYP = materialCostSYP + laborCostSYP;
+    const trueProfitSYP = totalRevenueSYP - totalExpensesSYP - directCostSYP;
+    const overdueOrders = ORDERS.filter((order: any) => order.deliveryDateExpected && !["delivered", "cancelled"].includes(order.status) && new Date(order.deliveryDateExpected).getTime() < Date.now()).length;
+    const completedOrders = ORDERS.filter((order: any) => order.status === "delivered").length;
+    const completionRate = totalOrdersCount > 0 ? (completedOrders / totalOrdersCount) * 100 : 0;
+    const workflowLabels: Record<string, string> = {
+      new: "جديد", design: "التصميم", design_approved: "اعتماد التصميم", cutting: "القص",
+      cutting_complete: "انتهاء القص", assembly: "التجميع", assembly_complete: "انتهاء التجميع",
+      packaging: "التغليف", ready: "بانتظار التسليم", delivered: "تم التسليم", cancelled: "ملغي", in_progress: "تنفيذ قديم"
+    };
+    const workflowFunnel = Object.entries(ordersByStatus).map(([status, count]) => ({ status, name: workflowLabels[status] || status, count }));
+    const productDemand: Record<string, number> = {};
+    ORDERS.forEach((order: any) => (order.items || []).forEach((item: any) => {
+      const name = item.productName || item.name || "منتج غير مسمى";
+      productDemand[name] = (productDemand[name] || 0) + (Number(item.quantity) || 0);
+    }));
+    const topProducts = Object.entries(productDemand).map(([name, quantity]) => ({ name, quantity })).sort((a, b) => b.quantity - a.quantity).slice(0, 8);
+    const monthlyOrders: Record<string, { orders: number; delivered: number; valueSYP: number }> = {};
+    ORDERS.forEach((order: any) => {
+      const date = new Date(order.createdAt || order.orderDate || "");
+      if (Number.isNaN(date.getTime())) return;
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      if (!monthlyOrders[monthKey]) monthlyOrders[monthKey] = { orders: 0, delivered: 0, valueSYP: 0 };
+      monthlyOrders[monthKey].orders += 1;
+      if (order.status === "delivered") monthlyOrders[monthKey].delivered += 1;
+      monthlyOrders[monthKey].valueSYP += orderValueSYP(order);
+    });
+    const monthlyOrderTrends = Object.entries(monthlyOrders).sort(([a], [b]) => a.localeCompare(b)).slice(-6).map(([month, data]) => ({ month, ...data }));
+
     res.json({
       success: true,
       analytics: {
@@ -8553,6 +8589,20 @@ Role Guidelines:
           workshopProfitSYP: netProfitSYP * (1 - getPartnerSharePercentAt() / 100),
           expenseBreakdown,
           recentTransactions
+        },
+        operations: {
+          directCostSYP,
+          materialCostSYP,
+          laborCostSYP,
+          productionHours: Number(productionHours.toFixed(2)),
+          trueProfitSYP,
+          trueProfitUSD: sypToUsd(trueProfitSYP, currentRate),
+          overdueOrders,
+          completedOrders,
+          completionRate,
+          workflowFunnel,
+          topProducts,
+          monthlyOrderTrends
         },
         machines: machineUtilization,
         inventory: {
