@@ -60,6 +60,11 @@ function nextActivityLogId(prefix = "log") {
   activityLogSequence = (activityLogSequence + 1) % 1000000;
   return `${prefix}_${Date.now()}_${process.pid}_${activityLogSequence}_${crypto.randomUUID().slice(0, 8)}`;
 }
+let entityIdSequence = 0;
+function nextEntityId(prefix: string) {
+  entityIdSequence = (entityIdSequence + 1) % 1000000;
+  return `${prefix}-${Date.now()}${entityIdSequence}`;
+}
 type BenchmarkBucket = { count: number; totalMs: number; maxMs: number; samples: number[] };
 const orderCreateBenchmarks = new Map<string, BenchmarkBucket>();
 const persistenceBenchmarks = new Map<string, BenchmarkBucket>();
@@ -2328,7 +2333,7 @@ async function startServer() {
     }
 
     const newCust = {
-      id: "c-" + (CUSTOMERS.length + 1),
+      id: nextEntityId("c"),
       name,
       phone,
       whatsapp: whatsapp || phone,
@@ -2467,7 +2472,7 @@ async function startServer() {
     }
 
     const newProd = {
-      id: "p-" + (PRODUCTS.length + 1),
+      id: nextEntityId("p"),
       name,
       code: code || `PRD-${Date.now().toString().slice(-6)}`,
       category: category || "عام",
