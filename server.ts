@@ -17,7 +17,6 @@ import { createHash } from "crypto";
 import https from "https";
 import multer from "multer";
 import ExcelJS from "exceljs";
-import * as XLSX from "xlsx";
 import PDFDocument from "pdfkit";
 import cookieParser from "cookie-parser";
 import cors from "cors";
@@ -4773,10 +4772,23 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
     if (!requireImportAdmin(req, res)) return;
     if (!req.file) { res.status(400).json({ success: false, message: "ملف Excel مطلوب" }); return; }
     try {
-      const workbook = XLSX.read(req.file.buffer, { type: "buffer", cellDates: true, cellNF: false, cellStyles: false });
-      const sheets = workbook.SheetNames.map((name) => {
-        const worksheet = workbook.Sheets[name];
-        const matrix = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1, defval: "", raw: true });
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(req.file.buffer);
+      const sheets = workbook.worksheets.map((worksheet) => {
+        const name = worksheet.name;
+        const matrix: any[][] = [];
+        worksheet.eachRow({ includeEmpty: true }, (row) => {
+          const rawValues = row.values as any[];
+          const values = rawValues.slice(1).map((value: any) => {
+            if (value && typeof value === "object") {
+              if ("text" in value) return value.text;
+              if ("result" in value) return value.result;
+              if (value instanceof Date) return value;
+            }
+            return value ?? "";
+          });
+          matrix.push(values);
+        });
         const headers = (matrix[0] || []).map((value: any) => String(value ?? "").trim());
         const kind = inferImportSheet(name, headers);
         const rows = matrix.slice(1).filter((row) => row.some((value: any) => String(value ?? "").trim() !== "")).map((row) => {

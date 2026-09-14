@@ -54,8 +54,7 @@
     "react-dom": "^19.0.1",
     "react-markdown": "^10.1.0",
     "recharts": "^3.9.2",
-    "sql.js": "^1.14.1",
-    "xlsx": "^0.18.5"
+    "sql.js": "^1.14.1"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
