@@ -7818,7 +7818,7 @@ Role Guidelines:
   });
 
   // Create Custom Standalone Invoice
-  app.post("/api/accounting/invoices", (req, res) => {
+  app.post("/api/accounting/invoices", async (req, res) => {
     const { customerId, totalPrice, dueDate, notes, items, taxPercent, discount } = req.body;
     if (!customerId) {
       res.status(400).json({ success: false, message: "العميل مطلوب" });
@@ -7893,6 +7893,7 @@ Role Guidelines:
       createdAt: new Date().toISOString()
     });
 
+    await persistMutationWithFastDurability();
     res.json({ success: true, invoice: newInv });
   });
 
@@ -8016,7 +8017,7 @@ Role Guidelines:
   });
 
   // Update Invoice Details (Saves modification history)
-  app.put("/api/accounting/invoices/:id", (req, res) => {
+  app.put("/api/accounting/invoices/:id", async (req, res) => {
     const inv = INVOICES.find(i => i.id === req.params.id);
     if (!inv) {
       res.status(404).json({ success: false, message: "الفاتورة غير موجودة" });
@@ -8080,11 +8081,12 @@ Role Guidelines:
       createdAt: new Date().toISOString()
     });
 
+    await persistMutationWithFastDurability();
     res.json({ success: true, invoice: inv });
   });
 
   // Update Invoice Status
-  app.post("/api/accounting/invoices/:id/status", (req, res) => {
+  app.post("/api/accounting/invoices/:id/status", async (req, res) => {
     const inv = INVOICES.find(i => i.id === req.params.id);
     if (!inv) {
       res.status(404).json({ success: false, message: "الفاتورة غير موجودة" });
@@ -8106,6 +8108,7 @@ Role Guidelines:
       createdAt: new Date().toISOString()
     });
 
+    await persistMutationWithFastDurability();
     res.json({ success: true, invoice: inv });
   });
 
@@ -8214,7 +8217,7 @@ Role Guidelines:
   });
 
   // Create Expense
-  app.post("/api/accounting/expenses", (req, res) => {
+  app.post("/api/accounting/expenses", async (req, res) => {
         const { category, amount, amountSYP, date, description, status, exchangeRateAtCreation } = req.body;
     const amountUSD = Number(amount);
     const requestedSYP = amountSYP === undefined ? undefined : Number(amountSYP);
@@ -8254,11 +8257,12 @@ Role Guidelines:
       createdAt: new Date().toISOString()
     });
 
+    await persistMutationWithFastDurability();
     res.json({ success: true, expense: newExp });
   });
 
   // Update Expense
-  app.put("/api/accounting/expenses/:id", (req, res) => {
+  app.put("/api/accounting/expenses/:id", async (req, res) => {
     const { category, amount, amountSYP, date, description, status, exchangeRateAtCreation } = req.body;
     const exp = EXPENSES.find(e => e.id === req.params.id);
     if (!exp) {
@@ -8311,11 +8315,12 @@ Role Guidelines:
       createdAt: new Date().toISOString()
     });
 
+    await persistMutationWithFastDurability();
     res.json({ success: true, expense: exp });
   });
 
   // Delete Expense
-  app.delete("/api/accounting/expenses/:id", (req, res) => {
+  app.delete("/api/accounting/expenses/:id", async (req, res) => {
     const idx = EXPENSES.findIndex(e => e.id === req.params.id);
     if (idx === -1) {
       res.status(404).json({ success: false, message: "المصروف غير موجود" });
@@ -8334,6 +8339,7 @@ Role Guidelines:
       createdAt: new Date().toISOString()
     });
 
+    await persistMutationWithFastDurability();
     res.json({ success: true, expense: deleted });
   });
 
