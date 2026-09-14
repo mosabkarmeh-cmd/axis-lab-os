@@ -2,7 +2,7 @@ export interface User {
   id: string;
   email: string;
   fullName: string;
-  role: 'admin' | 'employee' | 'accountant';
+  role: 'admin' | 'employee' | 'accountant' | 'viewer';
   isActive: boolean;
   mustChangePassword?: boolean;
 }

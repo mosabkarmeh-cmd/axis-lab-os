@@ -114,7 +114,7 @@ export default function SettingsView({
   const [userFormEmail, setUserFormEmail] = useState("");
   const [userFormPassword, setUserFormPassword] = useState("");
   const [userFormFullName, setUserFormFullName] = useState("");
-  const [userFormRole, setUserFormRole] = useState<"admin" | "employee" | "accountant">("employee");
+  const [userFormRole, setUserFormRole] = useState<"admin" | "employee" | "accountant" | "viewer">("employee");
   const [userFormIsActive, setUserFormIsActive] = useState(true);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [userActionStatus, setUserActionStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -2426,6 +2426,7 @@ export default function SettingsView({
                           <option value="admin">مدير النظام العام (Admin)</option>
                           <option value="employee">فني تشغيل آلات ليزر (Employee)</option>
                           <option value="accountant">محاسب مالي ورقابة (Accountant)</option>
+                          <option value="viewer">مشاهدة فقط (Viewer)</option>
                         </select>
                       </div>
 
@@ -2524,10 +2525,12 @@ export default function SettingsView({
                                   ? "bg-amber-950/60 text-amber-400 border border-amber-900/30" 
                                   : u.role === "accountant"
                                   ? "bg-emerald-950/60 text-emerald-400 border border-emerald-900/30"
+                                  : u.role === "viewer"
+                                  ? "bg-violet-950/60 text-violet-400 border border-violet-900/30"
                                   : "bg-sky-950/60 text-sky-400 border border-sky-900/30"
                               }`}>
                                 <Shield className="w-3 h-3" />
-                                {u.role === "admin" ? "مدير عام" : u.role === "accountant" ? "محاسب مالي" : "فني تشغيل ليزر"}
+                                {u.role === "admin" ? "مدير عام" : u.role === "accountant" ? "محاسب مالي" : u.role === "viewer" ? "مشاهدة فقط" : "فني تشغيل ليزر"}
                               </span>
                             </td>
                             <td className="p-3 text-center">

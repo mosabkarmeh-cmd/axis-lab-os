@@ -2044,6 +2044,18 @@ async function startServer() {
     next();
   });
 
+  // Viewer accounts are strictly read-only. Password changes and notification
+  // read receipts remain available, while business mutations are rejected.
+  app.use("/api", (req, res, next) => {
+    const user = getRequestUser(req);
+    const allowedViewerWrite = req.path === "/auth/change-password" || req.path.endsWith("/read");
+    if (user?.role === "viewer" && ["POST", "PUT", "PATCH", "DELETE"].includes(req.method) && !allowedViewerWrite) {
+      res.status(403).json({ success: false, message: "حساب المشاهدة للقراءة فقط ولا يسمح بتعديل البيانات" });
+      return;
+    }
+    next();
+  });
+
   // Safe reset: business data only. System settings, admin users, numbering and statuses remain.
   app.post("/api/admin/reset-business-data", async (req, res) => {
     const user = getRequestUser(req);
@@ -2156,7 +2168,7 @@ async function startServer() {
       res.status(400).json({ error: "يجب أن تتكون كلمة المرور من 8 أحرف على الأقل" });
       return;
     }
-    if (!["employee", "accountant"].includes(role)) {
+    if (!["employee", "accountant", "viewer"].includes(role)) {
       res.status(400).json({ error: "الدور المطلوب غير صالح" });
       return;
     }
@@ -2243,6 +2255,10 @@ async function startServer() {
       res.status(400).json({ error: "جميع الحقول (اسم المستخدم، كلمة المرور، الاسم الكامل، الصلاحية) مطلوبة" });
       return;
     }
+    if (!["admin", "employee", "accountant", "viewer"].includes(role)) {
+      res.status(400).json({ error: "الصلاحية المحددة غير صالحة" });
+      return;
+    }
     const exists = USERS.find(u => u.email === email.toLowerCase());
     if (exists) {
       res.status(400).json({ error: "اسم المستخدم / البريد الإلكتروني مسجل بالفعل بالنظام لموظف آخر" });
@@ -2286,6 +2302,11 @@ async function startServer() {
       return;
     }
     const { email, password, fullName, role, isActive } = req.body;
+
+    if (role && !["admin", "employee", "accountant", "viewer"].includes(role)) {
+      res.status(400).json({ error: "الصلاحية المحددة غير صالحة" });
+      return;
+    }
 
     if (email) {
       const exists = USERS.find(u => u.email === email.toLowerCase() && u.id !== req.params.id);
