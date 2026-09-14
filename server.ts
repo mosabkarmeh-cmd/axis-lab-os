@@ -881,7 +881,7 @@ function getNextNumber(entity: string): string {
   const setting = NUMBERING_SETTINGS.find(s => s.entity === entity);
   if (!setting) {
     const defaultSetting = {
-      id: "num-" + (NUMBERING_SETTINGS.length + 1),
+      id: nextEntityId("num"),
       entity,
       prefix: entity.toUpperCase().slice(0, 3),
       suffix: "",
@@ -2619,7 +2619,7 @@ async function startServer() {
     const objectBuildStartedAt = performance.now();
 
     const newOrder = {
-      id: "ord-" + (ORDERS.length + 1),
+      id: nextEntityId("ord"),
       orderNumber: orderNum,
       customerId,
       status: "new",
@@ -2642,7 +2642,7 @@ async function startServer() {
     ORDERS.unshift(newOrder);
 
     // Auto-create matching Invoice
-    const invoiceId = "inv-" + (INVOICES.length + 1);
+    const invoiceId = nextEntityId("inv");
     const invoiceItems = parsedItems.map((it: any, idx: number) => ({
       id: `invitem-${Date.now()}-${idx}`,
       invoiceId: invoiceId,
@@ -3775,7 +3775,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
 
     // Create corresponding Inventory record
     const newInv = {
-      id: "inv-" + (INVENTORY.length + 1),
+      id: nextEntityId("inv"),
       materialId: newMat.id,
       quantity: 0,
       reservedQuantity: 0,
@@ -4028,7 +4028,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
       }
 
       const newTx = {
-        id: "tx-" + (INVENTORY_TRANSACTIONS.length + 1),
+        id: nextEntityId("tx"),
         materialId,
         type: type || "adjustment",
         quantity: qtyChange,
@@ -4102,7 +4102,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
       }
 
       const newTx = {
-        id: "tx-" + (INVENTORY_TRANSACTIONS.length + 1),
+        id: nextEntityId("tx"),
         materialId,
         type: "reservation",
         quantity: qty,
@@ -4165,7 +4165,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
       }
 
       const newTx = {
-        id: "tx-" + (INVENTORY_TRANSACTIONS.length + 1),
+        id: nextEntityId("tx"),
         materialId,
         type: "unreserve",
         quantity: -qty,
@@ -4248,7 +4248,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
     }
 
     const newRem = {
-      id: "rem-" + (REMNANTS.length + 1),
+      id: nextEntityId("rem"),
       materialId,
       width: w,
       height: h,
@@ -4537,7 +4537,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
           }
 
           const newTx = {
-            id: "tx-" + (INVENTORY_TRANSACTIONS.length + 1),
+            id: nextEntityId("tx"),
             materialId: order.materialId,
             type: "purchase",
             quantity: order.quantity,
@@ -7532,7 +7532,7 @@ Role Guidelines:
 
         // Log transaction
         INVENTORY_TRANSACTIONS.push({
-          id: "tx-" + (INVENTORY_TRANSACTIONS.length + 1),
+          id: nextEntityId("tx"),
           materialId: job.materialId,
           type: "consumption",
           quantity: -1,
@@ -7656,7 +7656,7 @@ Role Guidelines:
       return;
     }
 
-    const invoiceId = "inv-" + (INVOICES.length + 1);
+    const invoiceId = nextEntityId("inv");
     const invItems = (items && items.length > 0) ? items.map((it: any, idx: number) => ({
       id: `invitem-${Date.now()}-${idx}`,
       invoiceId: invoiceId,
@@ -7948,7 +7948,7 @@ Role Guidelines:
       return;
     }
 
-    const creditNoteId = "inv-" + (INVOICES.length + 1);
+    const creditNoteId = nextEntityId("inv");
     const creditItems = inv.items ? inv.items.map((it: any, idx: number) => ({
       id: `invitem-${Date.now()}-${idx}`,
       invoiceId: creditNoteId,
