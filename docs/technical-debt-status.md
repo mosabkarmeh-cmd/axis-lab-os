@@ -12,7 +12,7 @@
 | الكيانات الأساسية | `local_entities` + IDs محمية من التصادم بعد الحذف (customers/products/users/materials/expenses/orders/invoices/inventory/remnants) | 97% | جداول relational صريحة وقيود مرجعية لكل domain |
 | الفواتير | `local_invoices`، وتقارير `/accounting/stats` و`/reports/analytics` تقرأ منها فعلياً الآن | 93% | قراءة وكتابة API مباشرة من الجداول دون in-memory authority (كتابة الفواتير نفسها لسا عبر مسارين منفصلين order/invoice) |
 | بنود الفواتير والتاريخ | جداول مستقلة مع foreign key | 90% | اختبارات تعديل/إلغاء/credit note مع rollback ذري |
-| المدفوعات | `local_payments`، ومنع تكرار فعلي (idempotency key) على مساري الطلب والفاتورة | 90% | ledger موحد (مسار واحد بدل مسارين منفصلين order/invoice) |
+| المدفوعات | `local_payments`، منطق موحد فعلياً (applyPayment) على مساري الطلب والفاتورة، ومنع تكرار (idempotency key) | 96% | معاملة SQLite ذرية صريحة بدل التزامن اللحظي بالذاكرة |
 | المصروفات | `local_expenses`، والتقارير المالية تقرأ منها مباشرة الآن | 93% | قيود مبالغ وتواريخ واختبارات إغلاق الفترة |
 | App.tsx | 5,085 سطر (من 15,055) — استخراج مكونات وhooks (AccountingView, useAccountingActions, DashboardPage...) | 85% | إكمال فصل باقي الصفحات لhooks/domain services |
 | API والاختبارات | lint وsmoke وmigration وWindows QA ناجحة، صفر ثغرات npm audit | 96% | تغطية mutations والحالات السلبية والـ UI smoke |
