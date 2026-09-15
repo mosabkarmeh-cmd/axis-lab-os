@@ -10,7 +10,7 @@
 |---|---|---:|---|
 | SQLite integrity وbackup/restore | ناجح مع corruption recovery، مُتحقق بإعادة تشغيل قسرية (SIGKILL) | 95% | اختبارات crash وforeign-key وmigration متعددة الإصدارات |
 | الكيانات الأساسية | `local_entities` + IDs محمية من التصادم بعد الحذف (customers/products/users/materials/expenses/orders/invoices/inventory/remnants) | 97% | جداول relational صريحة وقيود مرجعية لكل domain |
-| الفواتير | `local_invoices`، وتقارير `/accounting/stats` و`/reports/analytics` تقرأ منها فعلياً الآن | 93% | قراءة وكتابة API مباشرة من الجداول دون in-memory authority (كتابة الفواتير نفسها لسا عبر مسارين منفصلين order/invoice) |
+| الفواتير | `local_invoices` (durability عبر restart via loadPersistedState)؛ القراءات الحيّة (stats/analytics/invoices) تُقرأ من الذاكرة عمداً لتفادي فجوة الـ 400ms debounce بالكتابة لـ SQLite | 93% | نقل الكتابة لتكون synchronous بدل debounced لإزالة الفجوة نهائياً |
 | بنود الفواتير والتاريخ | جداول مستقلة مع foreign key | 90% | اختبارات تعديل/إلغاء/credit note مع rollback ذري |
 | المدفوعات | `local_payments`، منطق موحد فعلياً (applyPayment) على مساري الطلب والفاتورة، ومنع تكرار (idempotency key) | 96% | معاملة SQLite ذرية صريحة بدل التزامن اللحظي بالذاكرة |
 | المصروفات | `local_expenses`، والتقارير المالية تقرأ منها مباشرة الآن | 93% | قيود مبالغ وتواريخ واختبارات إغلاق الفترة |

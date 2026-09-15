@@ -7878,8 +7878,12 @@ Role Guidelines:
 
   // Get Invoices
   app.get("/api/accounting/invoices", (req, res) => {
-    const financialTables = readFinancialTablesFromSqlite();
-    const sourceInvoices = financialTables?.invoices || INVOICES;
+    // In-memory INVOICES is always immediately consistent with the latest
+    // mutation; SQLite writes are debounced (~400ms) so reading from the
+    // SQLite tables here can return stale data right after a write.
+    // Durability across restarts is already guaranteed separately by
+    // loadPersistedState() repopulating memory from SQLite at boot.
+    const sourceInvoices = INVOICES;
     const list = sourceInvoices.map(inv => {
       const cust = CUSTOMERS.find(c => c.id === inv.customerId);
       const ord = ORDERS.find(o => o.id === inv.orderId);
@@ -7990,7 +7994,7 @@ Role Guidelines:
   });
   // Get Single Invoice Details
   app.get("/api/accounting/invoices/:id", (req, res) => {
-    const inv = (readFinancialTablesFromSqlite()?.invoices || INVOICES).find(i => i.id === req.params.id);
+    const inv = INVOICES.find(i => i.id === req.params.id);
     if (!inv) {
       res.status(404).json({ success: false, message: "الفاتورة غير موجودة" });
       return;
@@ -8204,8 +8208,7 @@ Role Guidelines:
 
   // Get Expenses
   app.get("/api/accounting/expenses", (req, res) => {
-    const financialTables = readFinancialTablesFromSqlite();
-    res.json({ success: true, expenses: financialTables?.expenses || EXPENSES });
+    res.json({ success: true, expenses: EXPENSES });
   });
 
   // Create Expense
@@ -8337,9 +8340,10 @@ Role Guidelines:
 
   // Get Finance Stats
   app.get("/api/accounting/stats", (req, res) => {
-    const financialTables = readFinancialTablesFromSqlite();
-    const sourceInvoices = financialTables?.invoices || INVOICES;
-    const sourceExpenses = financialTables?.expenses || EXPENSES;
+    // In-memory is authoritative for freshness (SQLite writes are debounced
+    // ~400ms); restart durability comes from loadPersistedState() at boot.
+    const sourceInvoices = INVOICES;
+    const sourceExpenses = EXPENSES;
     const reportRate = Number(SETTINGS.exchangeRate) > 0 ? Number(SETTINGS.exchangeRate) : 135;
     const invoiceSYP = (inv: any, usdField: string, sypField: string) => {
       const fixedSYP = Number(inv[sypField]);
@@ -8439,9 +8443,10 @@ Role Guidelines:
 
   // ==================== REPORTS & ANALYTICS API ====================
   app.get("/api/reports/analytics", (req, res) => {
-    const financialTables = readFinancialTablesFromSqlite();
-    const sourceInvoices = financialTables?.invoices || INVOICES;
-    const sourceExpenses = financialTables?.expenses || EXPENSES;
+    // See note on /api/accounting/stats: in-memory is the fresh, race-free
+    // source; SQLite durability is handled by loadPersistedState() at boot.
+    const sourceInvoices = INVOICES;
+    const sourceExpenses = EXPENSES;
     // 1. Sales & Orders
     const totalOrdersCount = ORDERS.length;
     const orderValueSYP = (order: any) => Math.round(Number(order.totalPrice) || 0);
