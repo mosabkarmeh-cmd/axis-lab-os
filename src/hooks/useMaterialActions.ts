@@ -5,7 +5,7 @@ type Options = {
   editingMaterial: any | null; aiClassificationResult: any | null;
   setMatName: (v: string) => void; setMatSubCategory: (v: string) => void; setMatThickness: (v: string) => void; setMatColor: (v: string) => void; setMatWidth: (v: string) => void; setMatHeight: (v: string) => void; setMatPrice: (v: string) => void; setMatMinStock: (v: string) => void; setMatSupplierId: (v: string) => void; setMatNotes: (v: string) => void; setMatLocation: (v: string) => void; setMatQualityStatus: (v: any) => void;
   setEditingMaterial: (v: any | null) => void; setAiClassificationResult: (v: any) => void; setIsAiClassifying: (v: boolean) => void; setShowAddMaterial: (v: boolean) => void; setMaterials: React.Dispatch<React.SetStateAction<any[]>>;
-  refreshInventoryData: () => void | Promise<void>; addTerminalLog: (scope: string, message: string) => void;
+  refreshInventoryData: () => void | Promise<void>; addTerminalLog: (scope: string, message: string) => void; materials: any[]; exchangeRate: number; setMaterialSortBy: (v: any) => void;
 };
 
 export function useMaterialActions(o: Options) {
@@ -42,5 +42,15 @@ export function useMaterialActions(o: Options) {
   };
   const handleUpdateMaterialQualityStatus = async (id: string, qualityStatus: string) => { try { o.setMaterials(prev => prev.map(m => m.id === id ? { ...m, qualityStatus } : m)); const res = await fetch(`/api/materials/${id}/quality-status`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ qualityStatus }) }); if (!res.ok) await o.refreshInventoryData(); else o.addTerminalLog("DB", `Updated material quality: ${qualityStatus}`); } catch { o.addTerminalLog("ERROR", "Failed to update material quality"); await o.refreshInventoryData(); } };
   const handleDeleteMaterial = async (id: string, name: string) => { try { const res = await fetch(`/api/materials/${id}`, { method: "DELETE" }); if (!res.ok) throw new Error(); o.addTerminalLog("DB", `Archived material item: ${name}`); await o.refreshInventoryData(); } catch { o.addTerminalLog("ERROR", "Failed to archive material"); } };
-  return { handleAiClassifyMaterial, handleCreateMaterial, handleUpdateMaterial, handleUpdateMaterialQualityStatus, handleDeleteMaterial };
+  const handleReorderMaterials = (sourceId: string, targetId: string) => {
+    o.setMaterials(prev => { const sourceIdx = prev.findIndex(m => m.id === sourceId); const targetIdx = prev.findIndex(m => m.id === targetId); if (sourceIdx < 0 || targetIdx < 0) return prev; const updated = [...prev]; const [moved] = updated.splice(sourceIdx, 1); updated.splice(targetIdx, 0, moved); try { localStorage.setItem("axislab_materials_order_ids", JSON.stringify(updated.map(m => m.id))); } catch {} return updated; });
+    o.setMaterialSortBy("default"); o.addTerminalLog("SUCCESS", "تم حفظ ترتيب المواد الخام بنجاح");
+  };
+  const handleExportMaterialsCSV = (list: any[] = o.materials) => {
+    if (!list.length) { o.addTerminalLog("WARN", "لا يوجد خامات للتصدير"); return; }
+    const headers = ["كود المادة","اسم المادة والخامة","التصنيف","السماكة (ملم)","اللون / المواصفة","حالة الجودة الفنية","سعر الشراء للوحدة ($)","سعر الوحدة بالليرة (ل.س)","الرصيد المتاح الحالي","الوحدة","الكمية المحجوزة للإنتاج","حد الطلب الأدنى","موقع التخزين","حالة المخزون","إجمالي قيمة المخزون ($)"];
+    const rows = list.map(m => { const qty=m.inventory?.quantity??0, reserved=m.inventory?.reservedQuantity??0, min=m.minimumStock||0, price=Number(m.pricePerUnit)||0; const quality=m.qualityStatus==='defective'?'معيبة':m.qualityStatus==='in_preparation'?'قيد التجهيز':'مفحوصة'; const status=qty<=0?'نافذ بالكامل':qty<=min?'منخفض / يتطلب توريد':'سليم ومتوفر'; return [m.id,m.name||'',m.category||'',m.thickness||'-',m.color||'-',quality,price,Math.round(price*o.exchangeRate),qty,m.unit||'وحدة',reserved,min,m.inventory?.location||'المستودع الرئيسي',status,(qty*price).toFixed(2)]; });
+    const csv="\uFEFF"+[headers.join(","),...rows.map(row=>row.map(v=>{const x=String(v).replace(/"/g,'""'); return /[",\n]/.test(x)?`"${x}"`:x;}).join(","))].join("\n"); const url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8;"})); const link=document.createElement("a"); link.href=url; link.download=`AXIS_LAB_Materials_Inventory_Audit_${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url); o.addTerminalLog("EXPORT", `تم تصدير سجل المواد والمخزون (${list.length} خامة)`);
+  };
+  return { handleAiClassifyMaterial, handleCreateMaterial, handleUpdateMaterial, handleUpdateMaterialQualityStatus, handleDeleteMaterial, handleReorderMaterials, handleExportMaterialsCSV };
 }

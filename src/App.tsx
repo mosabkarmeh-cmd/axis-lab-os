@@ -1021,7 +1021,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     }
   };
 
-  const handleReorderMaterials = (sourceId: string, targetId: string) => {
+  const legacyHandleReorderMaterials = (sourceId: string, targetId: string) => {
     setMaterials((prevMaterials) => {
       const sourceIdx = prevMaterials.findIndex((item) => item.id === sourceId);
       const targetIdx = prevMaterials.findIndex((item) => item.id === targetId);
@@ -1186,12 +1186,14 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     handleUpdateMaterial: materialHandleUpdate,
     handleUpdateMaterialQualityStatus: materialHandleQuality,
     handleDeleteMaterial: materialHandleDelete,
+    handleReorderMaterials: materialHandleReorder,
+    handleExportMaterialsCSV: materialHandleExport,
   } = useMaterialActions({
     matName, matCategory, matSubCategory, matThickness, matColor, matWidth, matHeight, matUnit, matPrice, matMinStock, matSupplierId, matNotes, matLocation, matQualityStatus,
     editingMaterial, aiClassificationResult,
     setMatName, setMatSubCategory, setMatThickness, setMatColor, setMatWidth, setMatHeight, setMatPrice, setMatMinStock, setMatSupplierId, setMatNotes, setMatLocation, setMatQualityStatus,
     setEditingMaterial, setAiClassificationResult, setIsAiClassifying, setShowAddMaterial, setMaterials,
-    refreshInventoryData, addTerminalLog,
+    refreshInventoryData, addTerminalLog, materials, exchangeRate, setMaterialSortBy,
   });
 
 
@@ -1966,7 +1968,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
   };
 
   // Export Materials & Inventory CSV for external stock auditing
-  const handleExportMaterialsCSV = (materialsList: any[] = materials) => {
+  const legacyHandleExportMaterialsCSV = (materialsList: any[] = materials) => {
     if (!materialsList || materialsList.length === 0) {
       addTerminalLog("WARN", "لا يوجد خامات للتصدير");
       return;
@@ -4776,8 +4778,8 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
                     prodDescription, setProdDescription, prodStock, setProdStock, products, productSearch, setProductSearch, productFilter, setProductFilter,
                     orders, productionJobs, exchangeRate,
                     refreshInventoryData, addTerminalLog, handleAiClassifyMaterial: materialHandleAiClassify, handleCompileGCode, handleConsumeRemnant, handleCreateSupplyOrder,
-                    handleDeleteMaterial: materialHandleDelete, handleDuplicateSupplyOrder, handleExportMaterialsCSV, handleFindSuitableRemnantSubmit, handleOpenSmartSupplyModal,
-                    handleQuickSupplyRequest, handleReorderMaterials, handleUpdateMaterialQualityStatus: materialHandleQuality, handleUpdateSupplyOrderStatus, handleWasteRemnant,
+                    handleDeleteMaterial: materialHandleDelete, handleDuplicateSupplyOrder, handleExportMaterialsCSV: materialHandleExport, handleFindSuitableRemnantSubmit, handleOpenSmartSupplyModal,
+                    handleQuickSupplyRequest, handleReorderMaterials: materialHandleReorder, handleUpdateMaterialQualityStatus: materialHandleQuality, handleUpdateSupplyOrderStatus, handleWasteRemnant,
                     isCompilingGCode, gcodeTabMode, setGcodeTabMode, gcodePrompt, setGcodePrompt, gcodeMaterial, setGcodeMaterial, gcodePower, setGcodePower,
                     gcodeSpeed, setGcodeSpeed, gcodeResult, setGcodeResult
                   }}
