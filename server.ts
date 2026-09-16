@@ -1792,6 +1792,7 @@ async function persistStateNow() {
   } catch (err) {
     persistQueueStats.failed += 1;
     console.error("[STATE] Failed to persist app state to database:", err);
+    throw err;
     } finally {
     persistInFlight = false;
     if (persistAgainAfter) {
@@ -3103,6 +3104,29 @@ async function startServer() {
     res.json(order);
   });
 
+  // Financial mutations use one in-memory snapshot plus the SQLite transaction
+  // in persistStateNow. If the durable commit fails, restore every affected
+  // collection so the API cannot report a payment that was not persisted.
+  async function withAtomicFinancialMutation<T>(mutation: () => T | Promise<T>): Promise<T> {
+    const snapshot = {
+      orders: JSON.stringify(ORDERS),
+      invoices: JSON.stringify(INVOICES),
+      invoiceHistory: JSON.stringify(INVOICE_HISTORY),
+      activityLogs: JSON.stringify(ACTIVITY_LOGS),
+    };
+    try {
+      const result = await mutation();
+      await persistStateNow();
+      return result;
+    } catch (error) {
+      ORDERS.splice(0, ORDERS.length, ...JSON.parse(snapshot.orders));
+      INVOICES.splice(0, INVOICES.length, ...JSON.parse(snapshot.invoices));
+      INVOICE_HISTORY.splice(0, INVOICE_HISTORY.length, ...JSON.parse(snapshot.invoiceHistory));
+      ACTIVITY_LOGS.splice(0, ACTIVITY_LOGS.length, ...JSON.parse(snapshot.activityLogs));
+      throw error;
+    }
+  }
+
   // API - Record Payment
   // Unified payment ledger core. Both /api/orders/:id/payments and
   // /api/accounting/invoices/:id/payments call this single function so the
@@ -3267,12 +3291,18 @@ async function startServer() {
       return;
     }
     const matchingInv2 = INVOICES.find(inv => inv.orderId === order.id) || null;
-    const result = applyPayment({ order, inv: matchingInv2, amount, currency, notes, paymentMethod, changedById, paymentId });
+    let result;
+    try {
+      result = await withAtomicFinancialMutation(() => applyPayment({ order, inv: matchingInv2, amount, currency, notes, paymentMethod, changedById, paymentId }));
+    } catch (error) {
+      console.error("[FINANCE] Atomic order payment failed:", error);
+      res.status(500).json({ error: "تعذر حفظ الدفعة بشكل ذري؛ لم يتم تغيير البيانات." });
+      return;
+    }
     if (!result.ok) {
       res.status(result.status).json(result.body);
       return;
     }
-    await persistStateNow();
     res.json(result.order);
   });
   // API - Delete Payment Installment
@@ -7984,12 +8014,18 @@ Role Guidelines:
       res.status(404).json({ success: false, message: "الفاتورة غير موجودة" });
       return;
     }
-    const result = applyPayment({ order: null, inv, amount, currency, notes, paymentMethod, changedById, paymentId });
+    let result;
+    try {
+      result = await withAtomicFinancialMutation(() => applyPayment({ order: null, inv, amount, currency, notes, paymentMethod, changedById, paymentId }));
+    } catch (error) {
+      console.error("[FINANCE] Atomic invoice payment failed:", error);
+      res.status(500).json({ success: false, message: "تعذر حفظ الدفعة بشكل ذري؛ لم يتم تغيير البيانات." });
+      return;
+    }
     if (!result.ok) {
       res.status(result.status).json({ success: false, ...result.body });
       return;
     }
-    await persistStateNow();
     res.json({ success: true, invoice: result.invoice });
   });
   // Get Single Invoice Details

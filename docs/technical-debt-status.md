@@ -12,7 +12,7 @@
 | الكيانات الأساسية | `local_entities` + IDs محمية من التصادم بعد الحذف (customers/products/users/materials/expenses/orders/invoices/inventory/remnants) | 97% | جداول relational صريحة وقيود مرجعية لكل domain |
 | الفواتير | `local_invoices` (durability عبر restart via loadPersistedState)؛ القراءات الحيّة (stats/analytics/invoices) تُقرأ من الذاكرة عمداً لتفادي فجوة الـ 400ms debounce بالكتابة لـ SQLite | 93% | نقل الكتابة لتكون synchronous بدل debounced لإزالة الفجوة نهائياً |
 | بنود الفواتير والتاريخ | جداول مستقلة مع foreign key | 90% | اختبارات تعديل/إلغاء/credit note مع rollback ذري |
-| المدفوعات | `local_payments`، منطق موحد فعلياً (applyPayment) على مساري الطلب والفاتورة، ومنع تكرار (idempotency key) | 96% | معاملة SQLite ذرية صريحة بدل التزامن اللحظي بالذاكرة |
+| المدفوعات | `local_payments`، مسار موحد عبر `applyPayment`، idempotency، ومعاملة حفظ ذرية مع rollback للذاكرة عند فشل SQLite | 99% | اختبارات fault injection وcredit note متقدمة |
 | المصروفات | `local_expenses`، والتقارير المالية تقرأ منها مباشرة الآن | 93% | قيود مبالغ وتواريخ واختبارات إغلاق الفترة |
 | App.tsx | استخراج Hooks للعملاء والمنتجات والمواد والتوريد الذكي والإنتاج والطلبات؛ بقي G-Code orchestration | 95% | فصل G-Code orchestration واختبار UI |
 | API والاختبارات | lint وsmoke وmigration وWindows QA ناجحة، صفر ثغرات npm audit | 96% | تغطية mutations والحالات السلبية والـ UI smoke |
@@ -30,7 +30,7 @@
 
 ## الطريق إلى 100%
 
-**المرحلة الأولى (الأهم الآن):** توحيد مسارَي تسجيل الدفعة (`/api/orders/:id/payments` و`/api/accounting/invoices/:id/payments`) بمنطق واحد مشترك بدل تكرار نفس المنطق في مكانين، مع معاملة ذرية واحدة تغطي invoice + items + history + payment + activity log.
+**المرحلة الأولى:** اكتملت المعاملة الذرية المشتركة لمساري تسجيل الدفعة؛ الحفظ يلتزم عبر SQLite transaction، وفشل الالتزام يعيد الحالة الذاكرية ويرجع HTTP 500.
 
 **المرحلة الثانية:** إنهاء تفكيك `App.tsx` (90% مكتمل) — المتبقي أساساً orchestration الطلبات وعمليات مخزون محدودة.
 
