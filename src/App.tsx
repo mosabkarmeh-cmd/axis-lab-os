@@ -9,6 +9,7 @@ import { useAccountingActions } from "./hooks/useAccountingActions";
 import { useCustomerActions } from "./hooks/useCustomerActions";
 import { useMaterialActions } from "./hooks/useMaterialActions";
 import { useSmartSupplyActions } from "./hooks/useSmartSupplyActions";
+import { useOrderActions } from "./hooks/useOrderActions";
 import { useProductActions } from "./hooks/useProductActions";
 import { useProductionActions } from "./hooks/useProductionActions";
 import { extractMaterialName, materialPriceUSD } from "./lib/materials";
@@ -1227,6 +1228,13 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     materials, suppliers, smartSupplyItems, currentUser, setSmartSupplyItems, setShowSmartSupplyModal,
     setIsSubmittingSmartSupply, fetchSupplyOrders, addTerminalLog,
   });
+
+  const {
+    handleUpdateOrderStatus: orderHandleStatus,
+    handleRunAutoArchive: orderHandleAutoArchive,
+    handleArchiveOrder: orderHandleArchive,
+    handleRestoreOrder: orderHandleRestore,
+  } = useOrderActions({ orders, currentUser, fetchOrders, fetchLogs, setDeliveryBlockedOrder, addTerminalLog, archiveDaysThreshold });
 
   const handleLogout = (isAuto: boolean = false) => {
     setToken(null);
@@ -2958,7 +2966,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     addTerminalLog,
   });
   // Update Order Status Action
-  const handleUpdateOrderStatus = async (orderId: string, status: string, notesText: string) => {
+  const legacyHandleUpdateOrderStatus = async (orderId: string, status: string, notesText: string) => {
     const targetOrder = orders.find(o => o.id === orderId);
     
     // Strict Delivery Enforcement Check: Block delivery if remaining > 0
@@ -3054,7 +3062,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
   };
 
   // Order Archiving Handlers
-  const handleRunAutoArchive = async (days = archiveDaysThreshold) => {
+  const legacyHandleRunAutoArchive = async (days = archiveDaysThreshold) => {
     try {
       const res = await fetch("/api/orders/auto-archive", {
         method: "POST",
@@ -3073,7 +3081,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     }
   };
 
-  const handleArchiveOrder = async (orderId: string) => {
+  const legacyHandleArchiveOrder = async (orderId: string) => {
     try {
       const res = await fetch(`/api/orders/${orderId}/archive`, {
         method: "POST",
@@ -3089,7 +3097,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     }
   };
 
-  const handleRestoreOrder = async (orderId: string) => {
+  const legacyHandleRestoreOrder = async (orderId: string) => {
     try {
       const res = await fetch(`/api/orders/${orderId}/restore`, {
         method: "POST",
@@ -4451,11 +4459,11 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
             <AnimatePresence mode="wait">
               {activeView === "dashboard" && (
                 <DashboardPage
-                  {...{ activeOrderFiltersCount, activeView, calculateOrderProgress, currentUser, remnants, productionJobs, theme, setActiveProductSubTab, setIsCurrencyConverterOpen, custAddress, custCategory, custCompany, custName, custNotes, custPhone, customerCategoryFilter, customers, exchangeRate, fastLocalDashboardTrends, fastLocalInventoryPredictions, fastLocalProductionScheduling, filteredOrders, getSevenDaysChartData, handleAddCustomer, handleExportCustomersCSV, handleOpenEditCustomer, handleUpdateOrderStatus, laserMachines, laserUtilizationPercent, lowStockCount, orderFilterCustomer, orderFilterEndDate, orderFilterPriority, orderFilterSearch, orderFilterStartDate, orderFilterStatus, orders, pageTransition, pageVariants, pendingOrders, resetOrderFilters, runningLasersCount, setActiveView, setCustAddress, setCustCategory, setCustCompany, setCustName, setCustNotes, setCustPhone, setCustomerCategoryFilter, setDeleteConfirmTarget, setEditOrderItems, setEditingOrder, setOrderDetailsTab, setOrderFilterCustomer, setOrderFilterEndDate, setOrderFilterPriority, setOrderFilterSearch, setOrderFilterStartDate, setOrderFilterStatus, setOrderGcodeResult, setProgressModalOrder, setSelectedCustomerFiles, setSelectedCustomerIdForOrder, setSelectedOrder, setShowAddCustomer, setShowAddOrder, showAddCustomer, updateRate }}
+                  {...{ activeOrderFiltersCount, activeView, calculateOrderProgress, currentUser, remnants, productionJobs, theme, setActiveProductSubTab, setIsCurrencyConverterOpen, custAddress, custCategory, custCompany, custName, custNotes, custPhone, customerCategoryFilter, customers, exchangeRate, fastLocalDashboardTrends, fastLocalInventoryPredictions, fastLocalProductionScheduling, filteredOrders, getSevenDaysChartData, handleAddCustomer, handleExportCustomersCSV, handleOpenEditCustomer, handleUpdateOrderStatus: orderHandleStatus, laserMachines, laserUtilizationPercent, lowStockCount, orderFilterCustomer, orderFilterEndDate, orderFilterPriority, orderFilterSearch, orderFilterStartDate, orderFilterStatus, orders, pageTransition, pageVariants, pendingOrders, resetOrderFilters, runningLasersCount, setActiveView, setCustAddress, setCustCategory, setCustCompany, setCustName, setCustNotes, setCustPhone, setCustomerCategoryFilter, setDeleteConfirmTarget, setEditOrderItems, setEditingOrder, setOrderDetailsTab, setOrderFilterCustomer, setOrderFilterEndDate, setOrderFilterPriority, setOrderFilterSearch, setOrderFilterStartDate, setOrderFilterStatus, setOrderGcodeResult, setProgressModalOrder, setSelectedCustomerFiles, setSelectedCustomerIdForOrder, setSelectedOrder, setShowAddCustomer, setShowAddOrder, showAddCustomer, updateRate }}
                 />
               )}              {activeView === "database" && (
                 <DatabasePage
-                  {...{ USERS, activeView, addTerminalLog, archiveDaysThreshold, calculateOrderProgress, currentUser, customers, databaseTab, exchangeRate, executeTerminalCommand, fetchCustomers, fetchLogs, fetchOrders, getOrderStatusBadge, productionJobs, handleArchiveOrder, handleExportCustomersCSV, handleOpenEditCustomer, handleRestoreOrder, handleRunAutoArchive, logs, orderTabFilter, orders, pageTransition, pageVariants, products, setArchiveDaysThreshold, setDatabaseTab, setOrderTabFilter, setSelectedCustomerIdForOrder, setShowAddOrder }}
+                  {...{ USERS, activeView, addTerminalLog, archiveDaysThreshold, calculateOrderProgress, currentUser, customers, databaseTab, exchangeRate, executeTerminalCommand, fetchCustomers, fetchLogs, fetchOrders, getOrderStatusBadge, productionJobs, handleArchiveOrder: orderHandleArchive, handleExportCustomersCSV, handleOpenEditCustomer, handleRestoreOrder: orderHandleRestore, handleRunAutoArchive: orderHandleAutoArchive, logs, orderTabFilter, orders, pageTransition, pageVariants, products, setArchiveDaysThreshold, setDatabaseTab, setOrderTabFilter, setSelectedCustomerIdForOrder, setShowAddOrder }}
                 />
               )}              {activeView === "products" && (
                 <InventoryPage
@@ -4541,7 +4549,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
                   handleReorderProductionJobs={handleReorderProductionJobs}
                   handleStartProductionJob={handleStartProductionJob}
                   handleUpdateMachineCalibration={handleUpdateMachineCalibration}
-                  handleUpdateOrderStatus={handleUpdateOrderStatus}
+                  handleUpdateOrderStatus={orderHandleStatus}
                   handleUpdateProductionJob={handleUpdateProductionJob}
                 />
               )}              {/* FINANCIAL & ACCOUNTING CONTROL PANEL */}
