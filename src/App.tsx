@@ -2965,48 +2965,6 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     fetchLogs,
     addTerminalLog,
   });
-  // Update Order Status Action
-  const legacyHandleUpdateOrderStatus = async (orderId: string, status: string, notesText: string) => {
-    const targetOrder = orders.find(o => o.id === orderId);
-    
-    // Strict Delivery Enforcement Check: Block delivery if remaining > 0
-    if (status === 'delivered' && targetOrder && targetOrder.remaining > 0.01) {
-      setDeliveryBlockedOrder(targetOrder);
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/orders/${orderId}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          status,
-          notes: notesText,
-          changedById: currentUser?.id || "u-1"
-        })
-      });
-
-      if (res.ok) {
-        addTerminalLog("DB", `Order ${orderId} status transitioned to: ${status}`);
-        fetchOrders();
-        fetchLogs();
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        if (errData && errData.remainingUSD !== undefined) {
-          if (targetOrder) {
-            setDeliveryBlockedOrder(targetOrder);
-          } else {
-            alert(`⚠️ ${errData.error}`);
-          }
-        } else {
-          alert(`خطأ أثناء تحديث حالة الطلب: ${errData.error || 'خطأ غير معروف'}`);
-        }
-      }
-    } catch (e) {
-      addTerminalLog("ERROR", "Failed to transition order status");
-    }
-  };
-
   // Compile G-Code specifically for viewed Order
   const handleCompileOrderGCode = async () => {
     if (!selectedOrder) return;
@@ -3058,58 +3016,6 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
       }, 1000);
     } finally {
       setIsCompilingOrderGcode(false);
-    }
-  };
-
-  // Order Archiving Handlers
-  const legacyHandleRunAutoArchive = async (days = archiveDaysThreshold) => {
-    try {
-      const res = await fetch("/api/orders/auto-archive", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ days }),
-      });
-      const data = await res.json();
-      if (data && data.success) {
-        addTerminalLog("ARCHIVE", `[AUTO-ARCHIVE ENGINE] ${data.message}`);
-        fetchOrders();
-        fetchLogs();
-      }
-    } catch (err) {
-      console.error("Auto archive error:", err);
-      addTerminalLog("ERROR", "Failed to run auto archiving");
-    }
-  };
-
-  const legacyHandleArchiveOrder = async (orderId: string) => {
-    try {
-      const res = await fetch(`/api/orders/${orderId}/archive`, {
-        method: "POST",
-      });
-      if (res.ok) {
-        addTerminalLog("ARCHIVE", `[ORDER ARCHIVED] Order ${orderId} moved to archive.`);
-        fetchOrders();
-        fetchLogs();
-      }
-    } catch (err) {
-      console.error("Archive order error:", err);
-      addTerminalLog("ERROR", "Failed to archive order");
-    }
-  };
-
-  const legacyHandleRestoreOrder = async (orderId: string) => {
-    try {
-      const res = await fetch(`/api/orders/${orderId}/restore`, {
-        method: "POST",
-      });
-      if (res.ok) {
-        addTerminalLog("ARCHIVE", `[ORDER RESTORED] Order ${orderId} restored to active queue.`);
-        fetchOrders();
-        fetchLogs();
-      }
-    } catch (err) {
-      console.error("Restore order error:", err);
-      addTerminalLog("ERROR", "Failed to restore order");
     }
   };
 

@@ -14,7 +14,7 @@
 | بنود الفواتير والتاريخ | جداول مستقلة مع foreign key | 90% | اختبارات تعديل/إلغاء/credit note مع rollback ذري |
 | المدفوعات | `local_payments`، منطق موحد فعلياً (applyPayment) على مساري الطلب والفاتورة، ومنع تكرار (idempotency key) | 96% | معاملة SQLite ذرية صريحة بدل التزامن اللحظي بالذاكرة |
 | المصروفات | `local_expenses`، والتقارير المالية تقرأ منها مباشرة الآن | 93% | قيود مبالغ وتواريخ واختبارات إغلاق الفترة |
-| App.tsx | 4,698 سطر — استخراج Hooks للعملاء والمنتجات والمواد والتوريد الذكي والإنتاج | 90% | فصل orchestration المتبقي واختبار UI |
+| App.tsx | استخراج Hooks للعملاء والمنتجات والمواد والتوريد الذكي والإنتاج والطلبات؛ بقي G-Code orchestration | 95% | فصل G-Code orchestration واختبار UI |
 | API والاختبارات | lint وsmoke وmigration وWindows QA ناجحة، صفر ثغرات npm audit | 96% | تغطية mutations والحالات السلبية والـ UI smoke |
 
 ## آخر ما تم إصلاحه (هذه الجلسة)
@@ -25,6 +25,7 @@
 - Docker يعمل الآن بمستخدم غير-root.
 - منع تسجيل دفعة مكررة (double-click/network retry) عبر idempotency key على مساري دفع الطلب والفاتورة.
 - إصلاح تصادم IDs بعد الحذف لكل كيان عنده حذف فعلي (customers, products, users, materials, expenses) + بقية الكيانات وقائياً (orders, invoices, inventory, transactions, remnants, numbering settings) — واكتشاف وإصلاح تصادم كان كامناً بين عناصر المخزون والفواتير لأنهم كانوا يشتركون بنفس البادئة `inv-`.
+- **تم فصل Order Actions (`useOrderActions`) وإزالة نسخ status/archive القديمة من `App.tsx`، مع نجاح lint/build وsmoke الكامل.**
 - **`/api/accounting/stats` و`/api/reports/analytics` صارا يقرآن الإيرادات والمصروفات والتقارير الشهرية من الجداول المالية بـ SQLite فعلياً، بدل قراءتها من مصفوفات الذاكرة رغم وجود متغيرات SQLite جاهزة وغير مستخدمة سابقاً.**
 
 ## الطريق إلى 100%
