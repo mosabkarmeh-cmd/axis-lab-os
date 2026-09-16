@@ -8,6 +8,7 @@ import { useInventoryWorkspace } from "./hooks/useInventoryWorkspace";
 import { useAccountingActions } from "./hooks/useAccountingActions";
 import { useCustomerActions } from "./hooks/useCustomerActions";
 import { useMaterialActions } from "./hooks/useMaterialActions";
+import { useProductActions } from "./hooks/useProductActions";
 import { extractMaterialName, materialPriceUSD } from "./lib/materials";
 import { getOrderStatusBadge, getPaymentStatusBadge } from "./components/StatusBadges";
 import { DEFAULT_EXCHANGE_RATE, EXCHANGE_RATE_STORAGE_KEY, sanitizeExchangeRate, sypToUsd, usdToSyp } from "./lib/currency";
@@ -1195,6 +1196,11 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     setEditingMaterial, setAiClassificationResult, setIsAiClassifying, setShowAddMaterial, setMaterials,
     refreshInventoryData, addTerminalLog, materials, exchangeRate, setMaterialSortBy,
   });
+  const { handleCreateProduct, handleUpdateProduct, handleDeleteProduct } = useProductActions({
+    prodName, prodCode, prodCategory, prodPrice, prodDescription, prodStock, editingProduct,
+    setProdName, setProdCode, setProdCategory, setProdPrice, setProdDescription, setProdStock,
+    setShowAddProduct, setEditingProduct, fetchProducts, addTerminalLog,
+  });
 
 
   const handleLogout = (isAuto: boolean = false) => {
@@ -2373,74 +2379,6 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
 
     return () => clearInterval(interval);
   }, [activeRunningJob]);
-
-  // Create Product Action
-  const handleCreateProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!prodName || !prodPrice) return;
-
-    try {
-      const res = await fetch("/api/products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: prodName,
-          code: prodCode,
-          category: prodCategory,
-          price: Number(prodPrice) || 0,
-          description: prodDescription,
-          stock: Number(prodStock) || 0
-        })
-      });
-      if (res.ok) {
-        addTerminalLog("DB", `Added product: ${prodName}`);
-        setProdName("");
-        setProdCode("");
-        setProdCategory("الأكريليك");
-        setProdPrice("");
-        setProdDescription("");
-        setProdStock("");
-        setShowAddProduct(false);
-        fetchProducts();
-      }
-    } catch (e) {
-      addTerminalLog("ERROR", "Failed to add product");
-    }
-  };
-
-  // Update Product Action
-  const handleUpdateProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingProduct || !editingProduct.name || !editingProduct.price) return;
-
-    try {
-      const res = await fetch(`/api/products/${editingProduct.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editingProduct)
-      });
-      if (res.ok) {
-        addTerminalLog("DB", `Updated product: ${editingProduct.name}`);
-        setEditingProduct(null);
-        fetchProducts();
-      }
-    } catch (e) {
-      addTerminalLog("ERROR", "Failed to update product");
-    }
-  };
-
-  // Delete Product
-  const handleDeleteProduct = async (id: string, name: string) => {
-    try {
-      const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
-      if (res.ok) {
-        addTerminalLog("DB", `Purged product: ${name}`);
-        fetchProducts();
-      }
-    } catch (e) {
-      addTerminalLog("ERROR", "Failed to delete product");
-    }
-  };
 
   // ==================== MATERIALS & INVENTORY ACTIONS ====================
 
