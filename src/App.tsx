@@ -10,6 +10,7 @@ import { useCustomerActions } from "./hooks/useCustomerActions";
 import { useMaterialActions } from "./hooks/useMaterialActions";
 import { useSmartSupplyActions } from "./hooks/useSmartSupplyActions";
 import { useOrderActions } from "./hooks/useOrderActions";
+import { useGCodeActions } from "./hooks/useGCodeActions";
 import { useProductActions } from "./hooks/useProductActions";
 import { useProductionActions } from "./hooks/useProductionActions";
 import { extractMaterialName, materialPriceUSD } from "./lib/materials";
@@ -2965,103 +2966,10 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     fetchLogs,
     addTerminalLog,
   });
-  // Compile G-Code specifically for viewed Order
-  const handleCompileOrderGCode = async () => {
-    if (!selectedOrder) return;
-    setIsCompilingOrderGcode(true);
-    setOrderGcodeResult(null);
-    
-    // Orders from LAN clients may arrive before their item payload is hydrated.
-    // Never let an undefined/non-array items value prevent the G-code button
-    // from running; use a safe order-level prompt instead.
-    const orderItems = Array.isArray(selectedOrder.items) ? selectedOrder.items : [];
-    const itemsDescription = orderItems.length > 0
-      ? orderItems.map(it => `${it.quantity}x ${it.productName}`).join(" and ")
-      : `الطلب رقم ${selectedOrder.orderNumber}`;
-    const prompt = `قص وتشكيل القطع التالية بالليزر: ${itemsDescription}. مع مراعاة الملاحظات التشغيلية: ${selectedOrder.notes || "لا توجد ملاحظات"}`;
-    
-    addTerminalLog("LASER", `Compiling order ${selectedOrder.orderNumber} blueprint: "${prompt}"`);
-
-    try {
-      const res = await fetch("/api/compiler/gcode", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          promptText: prompt,
-          material: "Acrylic 3mm",
-          speed: 40,
-          power: "85"
-        })
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "G-Code Compilation failed");
-
-      setOrderGcodeResult(data);
-      addTerminalLog("SUCCESS", `Compiled G-Code paths for order ${selectedOrder.orderNumber} successfully (${data.totalPaths} vectors).`);
-    } catch (err: any) {
-      addTerminalLog("ERROR", `Compilation for order failed: ${err.message}`);
-      // Fallback
-      setTimeout(() => {
-        setOrderGcodeResult({
-          gcodeSnippet: `G00 X0 Y0 F3000\nM03 S850\nG01 X20 Y20 F2400\nG01 X180 Y20\nG01 X180 Y120\nG01 X20 Y120\nG01 X20 Y20\nM05\nG00 X0 Y0`,
-          estimatedTime: "02m 15s",
-          totalPaths: 5,
-          beamDutyCycle: "85%",
-          materialLossPercent: 1.8,
-          calibrationAdvice: "اضبط مساعد الهواء والعدسة البؤرية على 2.0 بوصة لضمان حواف نظيفة للقطع المطلوبة.",
-          gcodeExplanation: "مسار قص أكريليك مخصص لعناصر الطلب مع تحديد طاقة ليزر CO2 بنسبة 85% وسرعة 40مم/ث."
-        });
-        setIsCompilingOrderGcode(false);
-      }, 1000);
-    } finally {
-      setIsCompilingOrderGcode(false);
-    }
-  };
-
-  // Run G-Code AI compiler (Gemini)
-  const handleCompileGCode = async () => {
-    if (!gcodePrompt) return;
-    setIsCompilingGCode(true);
-    setGcodeResult(null);
-    addTerminalLog("LASER", `Compiling blueprint: "${gcodePrompt}" under speed: ${gcodeSpeed}mm/s`);
-
-    try {
-      const res = await fetch("/api/compiler/gcode", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          promptText: gcodePrompt,
-          material: gcodeMaterial,
-          speed: gcodeSpeed,
-          power: `${gcodePower}%`
-        })
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "G-Code Compilation failed");
-
-      setGcodeResult(data);
-      addTerminalLog("SUCCESS", `Compiled G-Code paths successfully (${data.totalPaths} vectors). Time: ${data.estimatedTime}`);
-    } catch (err: any) {
-      addTerminalLog("ERROR", `Compilation failed: ${err.message}`);
-      // Fallback local simulation
-      setTimeout(() => {
-        setGcodeResult({
-          gcodeSnippet: `G00 X0 Y0 F3000\nM03 S${gcodePower * 10}\nG01 X50 Y50 F${gcodeSpeed * 60}\nG01 X50 Y150\nG01 X150 Y150\nG01 X150 Y50\nG01 X50 Y50\nM05\nG00 X0 Y0`,
-          estimatedTime: "01m 40s",
-          totalPaths: 6,
-          beamDutyCycle: `${gcodePower}%`,
-          materialLossPercent: 2.1,
-          calibrationAdvice: "قم بتعيين البعد البؤري لعدسة الليزر عند 50.8 ملم. اضبط مساعد الهواء القوي لمنع الاحتراق وتراكم الدخان.",
-          gcodeExplanation: "مسار قص مستطيل متماثل مع بدء تشغيل رأس الليزر CO2 والتنقل السريع من النقطة المرجعية الصفرية."
-        });
-        setIsCompilingGCode(false);
-      }, 1000);
-    } finally {
-      setIsCompilingGCode(false);
-    }
-  };
+  const { handleCompileOrderGCode, handleCompileGCode } = useGCodeActions({
+    selectedOrder, gcodePrompt, gcodeMaterial, gcodeSpeed, gcodePower,
+    setIsCompilingGCode, setGcodeResult, setIsCompilingOrderGcode, setOrderGcodeResult, addTerminalLog
+  });
 
   const handleSelectCalcMaterial = (matId: string) => {
     setCalcMatId(matId);
