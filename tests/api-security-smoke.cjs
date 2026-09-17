@@ -258,8 +258,8 @@ const assert = (condition, message) => {
     const backupFilesBeforeRestore = fs.readdirSync(path.join(tempDir, "backups")).filter((name) => name.endsWith(".sqlite"));
     const backupContainsOrder = backupFilesBeforeRestore.some((name) => {
       const backupDb = new SQL.Database(fs.readFileSync(path.join(tempDir, "backups", name)));
-      const rows = backupDb.exec("SELECT value FROM app_state WHERE key = 'ORDERS'");
-      const contains = rows.length > 0 && String(rows[0].values[0][0]).includes(orderId);
+      const rows = backupDb.exec("SELECT payload FROM local_entities WHERE collection = 'ORDERS' AND entity_id = ?", [orderId]);
+      const contains = rows.length > 0 && rows[0].values.length > 0;
       backupDb.close();
       return contains;
     });
@@ -286,11 +286,11 @@ const assert = (condition, message) => {
     await new Promise((resolve) => setTimeout(resolve, 800));
     const database = new SQL.Database(fs.readFileSync(env.AXIS_DATA_FILE));
     const stateRows = database.exec("SELECT key, value FROM app_state ORDER BY key");
-    assert(stateRows.length === 1 && stateRows[0].values.length >= 10, "SQLite app_state table is incomplete");
+    assert(stateRows.length === 1 && stateRows[0].values.length >= 8, "SQLite app_state table is incomplete");
     const legacyNormalizedKeys = stateRows[0].values.filter(([key]) => ["CUSTOMERS", "PRODUCTS", "MATERIALS", "INVENTORY", "SUPPLIERS", "MACHINES", "EXPENSES"].includes(String(key)));
     assert(legacyNormalizedKeys.length === 0, `Normalized collections still duplicated in app_state: ${JSON.stringify(legacyNormalizedKeys.map(([key]) => key))}`);
     const schemaRows = database.exec("SELECT value FROM local_metadata WHERE key = 'schema_version'");
-    assert(schemaRows.length === 1 && String(schemaRows[0].values[0][0]) === "5", "SQLite local schema version is not current");
+    assert(schemaRows.length === 1 && String(schemaRows[0].values[0][0]) === "6", "SQLite local schema version is not current");
     const entitySchema = database.exec("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'local_entities'");
     assert(entitySchema.length === 1 && entitySchema[0].values.length === 1, "Normalized local entity table is missing");
     const entityRows = database.exec("SELECT collection, COUNT(*) AS count FROM local_entities GROUP BY collection ORDER BY collection");
@@ -317,8 +317,8 @@ const assert = (condition, message) => {
     const recoveredOrders = await request("/api/orders");
     const recoveryCandidates = fs.readdirSync(path.join(tempDir, "backups")).filter((name) => name.endsWith(".sqlite")).map((name) => {
       const candidateDb = new SQL.Database(fs.readFileSync(path.join(tempDir, "backups", name)));
-      const rows = candidateDb.exec("SELECT value FROM app_state WHERE key = 'ORDERS'");
-      const hasOrder = rows.length > 0 && String(rows[0].values[0][0]).includes(orderId);
+      const rows = candidateDb.exec("SELECT payload FROM local_entities WHERE collection = 'ORDERS' AND entity_id = ?", [orderId]);
+      const hasOrder = rows.length > 0 && rows[0].values.length > 0;
       candidateDb.close();
       return { name, hasOrder };
     });

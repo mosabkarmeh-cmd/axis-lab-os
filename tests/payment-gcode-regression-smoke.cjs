@@ -24,7 +24,7 @@ const waitForHealth = async () => {
       const response = await fetch(`http://127.0.0.1:${port}/api/health`);
       if (response.ok) {
         const body = await response.json();
-        if (body.database !== "sqlite" || body.sqliteIntegrity !== "ok" || body.schemaVersion !== 5) throw new Error(`health diagnostics failed: ${JSON.stringify(body)}`);
+        if (body.database !== "sqlite" || body.sqliteIntegrity !== "ok" || body.schemaVersion !== 6) throw new Error(`health diagnostics failed: ${JSON.stringify(body)}`);
         return;
       }
     } catch (error) {

@@ -163,8 +163,8 @@ async function runRateWave(values) {
     const SQL = await initSqlJs({ locateFile: (file) => path.join(root, "node_modules/sql.js/dist", file) });
     let db = new SQL.Database(fs.readFileSync(dataFile));
     const integrity = String(db.exec("PRAGMA integrity_check")[0].values[0][0]);
-    const ordersJson = db.exec("SELECT value FROM app_state WHERE key = 'ORDERS'")[0]?.values?.[0]?.[0] || "[]";
-    const orderCountBefore = JSON.parse(ordersJson).length;
+    const orderRows = db.exec("SELECT payload FROM local_entities WHERE collection = 'ORDERS'")[0]?.values || [];
+    const orderCountBefore = orderRows.length;
     const activityRows = db.exec("SELECT payload FROM local_entities WHERE collection = 'ACTIVITY_LOGS'")[0]?.values || [];
     const activityIds = activityRows.map(([payload]) => JSON.parse(payload).id);
     const uniqueActivityIds = new Set(activityIds);
