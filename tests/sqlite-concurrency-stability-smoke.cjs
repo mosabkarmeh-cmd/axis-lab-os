@@ -48,10 +48,10 @@ function assert(ok, message) { if (!ok) throw new Error(message); }
     let db = new SQL.Database(fs.readFileSync(dataFile));
     const schemaVersion = String(db.exec("SELECT value FROM local_metadata WHERE key = 'schema_version'")[0].values[0][0]);
     const integrity = String(db.exec("PRAGMA integrity_check")[0].values[0][0]);
-    const orderCountBefore = Number(db.exec("SELECT COUNT(*) FROM app_state WHERE key = 'ORDERS'")[0].values[0][0] ? JSON.parse(db.exec("SELECT value FROM app_state WHERE key = 'ORDERS'")[0].values[0][0]).length : 0);
+    const orderCountBefore = Number(db.exec("SELECT COUNT(*) FROM local_entities WHERE collection = 'ORDERS'")[0].values[0][0]);
     const entityCounts = db.exec("SELECT collection, COUNT(*) FROM local_entities GROUP BY collection ORDER BY collection")[0].values;
     db.close();
-    assert(schemaVersion === "5", `unexpected schema version ${schemaVersion}`);
+    assert(schemaVersion === "6", `unexpected schema version ${schemaVersion}`);
     assert(integrity === "ok", `SQLite integrity check failed: ${integrity}`);
     await stop(); start(); await waitHealth();
     const afterRestart = await request("/api/orders");

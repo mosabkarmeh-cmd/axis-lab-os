@@ -51,7 +51,7 @@ function assert(condition, message) { if (!condition) throw new Error(message); 
     const indexes = database.exec("SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE 'idx_local_entities_%'")[0].values.map(([name]) => String(name));
     database.close();
     assert(integrity === "ok", `integrity check failed: ${integrity}`);
-    assert(schema === "5", `unexpected schema version: ${schema}`);
+    assert(schema === "6", `unexpected schema version: ${schema}`);
     assert(indexes.includes("idx_local_entities_collection_updated") && indexes.includes("idx_local_entities_entity"), `SQLite indexes missing: ${indexes.join(",")}`);
     console.log(`sqlite-crash-recovery-smoke: PASS (forced-stop persistence, restart recovery, integrity, schema v${schema}, indexes)`);
   } catch (error) {

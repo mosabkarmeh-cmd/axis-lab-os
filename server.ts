@@ -54,7 +54,7 @@ const USE_POSTGRES = DB_MODE === "postgres" || (DB_MODE === "auto" && Boolean(pr
 const USE_SQLITE = DB_MODE === "sqlite";
 const LOCAL_DATA_FILE = process.env.AXIS_DATA_FILE || path.join(os.homedir(), "AppData", "Roaming", "AXIS LAB OS", "axis-data.sqlite");
 const LOCAL_LEGACY_DATA_FILE = process.env.AXIS_LEGACY_DATA_FILE || path.join(os.homedir(), "AppData", "Roaming", "Electron", "axis-data.json");
-const LOCAL_SCHEMA_VERSION = 5;
+const LOCAL_SCHEMA_VERSION = 6;
 let activityLogSequence = 0;
 function nextActivityLogId(prefix = "log") {
   activityLogSequence = (activityLogSequence + 1) % 1000000;
@@ -87,7 +87,7 @@ function benchmarkSnapshot(target: Map<string, BenchmarkBucket>) {
     return { name, count: bucket.count, avgMs: Number((bucket.totalMs / Math.max(1, bucket.count)).toFixed(2)), p95Ms: Number(p95.toFixed(2)), maxMs: Number(bucket.maxMs.toFixed(2)) };
   });
 }
-const NORMALIZED_LOCAL_COLLECTIONS = ["CUSTOMERS", "PRODUCTS", "MATERIALS", "INVENTORY", "SUPPLIERS", "MACHINES", "ACTIVITY_LOGS", "NOTIFICATIONS", "PRODUCTION_JOBS"] as const;
+const NORMALIZED_LOCAL_COLLECTIONS = ["CUSTOMERS", "PRODUCTS", "MATERIALS", "INVENTORY", "INVENTORY_TRANSACTIONS", "REMNANTS", "SUPPLIERS", "SUPPLY_ORDERS", "SUPPLIER_QUOTES", "MACHINES", "ORDERS", "ACTIVITY_LOGS", "NOTIFICATIONS", "PRODUCTION_JOBS"] as const;
 const NORMALIZED_FINANCIAL_COLLECTIONS = ["INVOICES", "EXPENSES"] as const;
 let localSqlite: any = null;
 
