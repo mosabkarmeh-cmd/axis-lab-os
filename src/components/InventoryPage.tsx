@@ -623,10 +623,12 @@ export default function InventoryPage(props: Record<string, any>) {
                                    });
                                    
                                    return sorted.map((m, index) => {
-                                     const inv = m.inventory || { quantity: 0, reserved: 0, location: "غير محدد" };
-                                     const isCritical = inv.quantity === 0;
-                                     const isWarning = !isCritical && inv.quantity <= (m.minimumStock || 0);
-                                     const availableStock = inv.quantity - inv.reserved;
+                                     const inv = m.inventory || { quantity: 0, reservedQuantity: 0, location: "غير محدد" };
+                                     const quantity = Number(inv.quantity) || 0;
+                                     const reservedQuantity = Number(inv.reservedQuantity ?? inv.reserved) || 0;
+                                     const isCritical = quantity === 0;
+                                     const isWarning = !isCritical && quantity <= (m.minimumStock || 0);
+                                     const availableStock = quantity - reservedQuantity;
                                      const quality = m.qualityStatus || 'inspected';
 
                                      const isDragging = draggedMaterialId === m.id;
@@ -841,11 +843,11 @@ export default function InventoryPage(props: Record<string, any>) {
                                         {m.supplier && <div className="text-[10px] text-indigo-400 mt-0.5">{m.supplier.name}</div>}
                                       </td>
                                       <td className="p-3 text-center">
-                                        <div className="font-mono font-bold text-zinc-100">{inv.quantity} {m.unit || "وحدة"}</div>
+                                        <div className="font-mono font-bold text-zinc-100">{quantity} {m.unit || "وحدة"}</div>
                                         <div className="text-[10px] text-zinc-500 mt-1">الحد الأدنى: {m.minimumStock || 0}</div>
                                       </td>
                                       <td className="p-3 text-center font-mono">
-                                        <div className="text-amber-500 text-[11px]">محجوز: {inv.reserved}</div>
+                                        <div className="text-amber-500 text-[11px]">محجوز: {reservedQuantity}</div>
                                         <div className="text-emerald-400 font-bold mt-0.5">متاح: {availableStock}</div>
                                       </td>
                                       <td className="p-3">

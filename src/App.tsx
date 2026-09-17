@@ -4279,7 +4279,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
                 <DatabasePage
                   {...{ USERS, activeView, addTerminalLog, archiveDaysThreshold, calculateOrderProgress, currentUser, customers, databaseTab, exchangeRate, executeTerminalCommand, fetchCustomers, fetchLogs, fetchOrders, getOrderStatusBadge, productionJobs, handleArchiveOrder: orderHandleArchive, handleExportCustomersCSV, handleOpenEditCustomer, handleRestoreOrder: orderHandleRestore, handleRunAutoArchive: orderHandleAutoArchive, logs, orderTabFilter, orders, pageTransition, pageVariants, products, setArchiveDaysThreshold, setDatabaseTab, setOrderTabFilter, setSelectedCustomerIdForOrder, setShowAddOrder }}
                 />
-              )}              {activeView === "products" && (
+              )}              {(activeView === "products" || activeView === "gcode") && (
                 <InventoryPage
                   {...{
                     pageVariants, pageTransition, activeView, currentUser, activeProductSubTab, setActiveProductSubTab, materials, setMaterials,
