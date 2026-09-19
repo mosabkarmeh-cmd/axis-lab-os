@@ -1058,13 +1058,13 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
   } = useNotificationActions();
 
   const {
-    handleAiClassifyMaterial: materialHandleAiClassify,
-    handleCreateMaterial: materialHandleCreate,
-    handleUpdateMaterial: materialHandleUpdate,
-    handleUpdateMaterialQualityStatus: materialHandleQuality,
-    handleDeleteMaterial: materialHandleDelete,
-    handleReorderMaterials: materialHandleReorder,
-    handleExportMaterialsCSV: materialHandleExport,
+    handleAiClassifyMaterial,
+    handleCreateMaterial,
+    handleUpdateMaterial,
+    handleUpdateMaterialQualityStatus,
+    handleDeleteMaterial,
+    handleReorderMaterials,
+    handleExportMaterialsCSV,
   } = useMaterialActions({
     matName, matCategory, matSubCategory, matThickness, matColor, matWidth, matHeight, matUnit, matPrice, matMinStock, matSupplierId, matNotes, matLocation, matQualityStatus,
     editingMaterial, aiClassificationResult,
@@ -2041,255 +2041,6 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
 
     return () => clearInterval(interval);
   }, [activeRunningJob]);
-
-  // ==================== MATERIALS & INVENTORY ACTIONS ====================
-
-  const handleAiClassifyMaterial = async (
-    nameToClassify: string,
-    thicknessToClassify: string,
-    colorToClassify: string,
-    notesToClassify: string,
-    isForEdit: boolean,
-    quiet: boolean = false
-  ) => {
-    if (!nameToClassify || nameToClassify.trim().length < 2) {
-      if (!quiet) {
-        window.showAlert?.("يرجى إدخال اسم المادة أولاً (حرفين على الأقل) لتشغيل التصنيف الذكي بالذكاء الاصطناعي", "تنبيه الذكاء الاصطناعي");
-      }
-      return;
-    }
-
-    setIsAiClassifying(true);
-    setAiClassificationResult(null);
-
-    try {
-      const res = await fetch("/api/materials/ai-classify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: nameToClassify,
-          thickness: thicknessToClassify,
-          color: colorToClassify,
-          notes: notesToClassify
-        })
-      });
-
-      const data = await res.json();
-      if (data.success && data.classification) {
-        const { category, subCategory, confidence, explanation } = data.classification;
-        
-        // Update the form fields automatically
-        if (isForEdit) {
-          setEditingMaterial((prev: any) => prev ? {
-            ...prev,
-            category: category,
-            subCategory: subCategory
-          } : null);
-        } else {
-          setMatCategory(category);
-          setMatSubCategory(subCategory);
-        }
-
-        setAiClassificationResult({
-          category,
-          subCategory,
-          confidence,
-          explanation
-        });
-        
-        addTerminalLog("AI", `Auto-classified material '${nameToClassify}' as '${category}' (${subCategory}) with confidence ${Math.round(confidence * 100)}%`);
-      } else {
-        addTerminalLog("ERROR", `AI classification failed: ${data.message || "Unknown error"}`);
-        if (!quiet) {
-          window.showAlert?.(`فشل التصنيف بالذكاء الاصطناعي: ${data.message || "خطأ غير معروف"}`, "خطأ التصنيف الذكي");
-        }
-      }
-    } catch (err: any) {
-      console.error(err);
-      addTerminalLog("ERROR", `AI classification request error: ${err.message}`);
-      if (!quiet) {
-        window.showAlert?.(`فشل الاتصال بالخادم لتصنيف المادة: ${err.message}`, "خطأ اتصال");
-      }
-    } finally {
-      setIsAiClassifying(false);
-    }
-  };
-
-  const handleCreateMaterial = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!matName) return;
-
-    let finalCategory = matCategory;
-    let finalSubCategory = matSubCategory;
-
-    // Run AI classification automatically if not done yet
-    if (!aiClassificationResult && matName.trim().length >= 2) {
-      try {
-        const classRes = await fetch("/api/materials/ai-classify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: matName,
-            thickness: matThickness,
-            color: matColor,
-            notes: matNotes
-          })
-        });
-        const classData = await classRes.json();
-        if (classData.success && classData.classification) {
-          if (!matCategory || matCategory === "عام") finalCategory = classData.classification.category;
-          if (!matSubCategory.trim()) finalSubCategory = classData.classification.subCategory;
-          addTerminalLog("AI", `Pre-save AI auto-classified material '${matName}' as '${finalCategory}' (${finalSubCategory})`);
-        }
-      } catch (err) {
-        // Fall back to current selection
-      }
-    }
-
-    try {
-      const res = await fetch("/api/materials", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: matName,
-          category: finalCategory || matCategory || "عام",
-          subCategory: matSubCategory.trim() || finalSubCategory || "عام",
-          thickness: matThickness ? parseFloat(matThickness) : null,
-          color: matColor,
-          width: matWidth ? parseFloat(matWidth) : null,
-          height: matHeight ? parseFloat(matHeight) : null,
-          unit: matUnit,
-          pricePerUnit: matPrice ? Math.round(parseFloat(matPrice)) : 0,
-          minimumStock: matMinStock ? parseFloat(matMinStock) : 0,
-          supplierId: matSupplierId || null,
-          notes: matNotes,
-          location: matLocation,
-          qualityStatus: matQualityStatus
-        })
-      });
-
-      if (res.ok) {
-        addTerminalLog("DB", `Created raw material: ${matName}`);
-        setShowAddMaterial(false);
-        setAiClassificationResult(null);
-        setMatName("");
-        setMatSubCategory("");
-        setMatThickness("");
-        setMatColor("");
-        setMatWidth("");
-        setMatHeight("");
-        setMatPrice("");
-        setMatMinStock("");
-        setMatSupplierId("");
-        setMatNotes("");
-        setMatLocation("");
-        setMatQualityStatus("inspected");
-        refreshInventoryData();
-      }
-    } catch (e) {
-      addTerminalLog("ERROR", "Failed to create material");
-    }
-  };
-
-  const handleUpdateMaterial = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingMaterial || !editingMaterial.name) return;
-
-    let finalCategory = editingMaterial.category;
-    let finalSubCategory = editingMaterial.subCategory;
-
-    // Run AI classification automatically if not done yet
-    if (!aiClassificationResult && editingMaterial.name.trim().length >= 2) {
-      try {
-        const classRes = await fetch("/api/materials/ai-classify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: editingMaterial.name,
-            thickness: editingMaterial.thickness,
-            color: editingMaterial.color,
-            notes: editingMaterial.notes
-          })
-        });
-        const classData = await classRes.json();
-        if (classData.success && classData.classification) {
-          if (!editingMaterial.category || editingMaterial.category === "عام") finalCategory = classData.classification.category;
-          if (!editingMaterial.subCategory?.trim()) finalSubCategory = classData.classification.subCategory;
-          addTerminalLog("AI", `Pre-update AI auto-classified material '${editingMaterial.name}' as '${finalCategory}' (${finalSubCategory})`);
-        }
-      } catch (err) {
-        // Fall back to current selection
-      }
-    }
-
-    try {
-      const res = await fetch(`/api/materials/${editingMaterial.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: editingMaterial.name,
-          category: finalCategory || editingMaterial.category || "عام",
-          subCategory: editingMaterial.subCategory?.trim() || finalSubCategory || "عام",
-          thickness: editingMaterial.thickness,
-          color: editingMaterial.color,
-          width: editingMaterial.width,
-          height: editingMaterial.height,
-          unit: editingMaterial.unit,
-          pricePerUnit: Math.round(Number(editingMaterial.pricePerUnit) || 0),
-          minimumStock: editingMaterial.minimumStock,
-          supplierId: editingMaterial.supplierId,
-          notes: editingMaterial.notes,
-          location: editingMaterial.inventory?.location,
-          qualityStatus: editingMaterial.qualityStatus || "inspected"
-        })
-      });
-
-      if (res.ok) {
-        addTerminalLog("DB", `Updated raw material: ${editingMaterial.name}`);
-        setEditingMaterial(null);
-        setAiClassificationResult(null);
-        refreshInventoryData();
-      }
-    } catch (e) {
-      addTerminalLog("ERROR", "Failed to update material");
-    }
-  };
-
-  const handleUpdateMaterialQualityStatus = async (id: string, newQualityStatus: string) => {
-    try {
-      setMaterials(prev => prev.map(m => m.id === id ? { ...m, qualityStatus: newQualityStatus } : m));
-      const res = await fetch(`/api/materials/${id}/quality-status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ qualityStatus: newQualityStatus })
-      });
-      if (res.ok) {
-        const labels: Record<string, string> = {
-          inspected: "مفحوصة ومطابقة",
-          defective: "معيبة (مرفوضة)",
-          in_preparation: "قيد التجهيز"
-        };
-        addTerminalLog("DB", `تحديث حالة الجودة للمادة إلى "${labels[newQualityStatus] || newQualityStatus}"`);
-      } else {
-        refreshInventoryData();
-      }
-    } catch (err) {
-      addTerminalLog("ERROR", "فشل تحديث حالة جودة المادة");
-      refreshInventoryData();
-    }
-  };
-
-  const handleDeleteMaterial = async (id: string, name: string) => {
-    try {
-      const res = await fetch(`/api/materials/${id}`, { method: "DELETE" });
-      if (res.ok) {
-        addTerminalLog("DB", `Archived material item: ${name}`);
-        refreshInventoryData();
-      }
-    } catch (e) {
-      addTerminalLog("ERROR", "Failed to archive material");
-    }
-  };
 
   const handleQuickSupplyRequest = (mat: any) => {
     if (!mat) return;
@@ -3809,9 +3560,9 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
                     prodName, setProdName, prodCode, setProdCode, prodCategory, setProdCategory, prodPrice, setProdPrice,
                     prodDescription, setProdDescription, prodStock, setProdStock, products, productSearch, setProductSearch, productFilter, setProductFilter,
                     orders, productionJobs, exchangeRate,
-                    refreshInventoryData, addTerminalLog, handleAiClassifyMaterial: materialHandleAiClassify, handleCompileGCode, handleConsumeRemnant, handleCreateSupplyOrder,
-                    handleDeleteMaterial: materialHandleDelete, handleDuplicateSupplyOrder, handleExportMaterialsCSV: materialHandleExport, handleFindSuitableRemnantSubmit, handleOpenSmartSupplyModal: smartHandleOpen,
-                    handleQuickSupplyRequest, handleReorderMaterials: materialHandleReorder, handleUpdateMaterialQualityStatus: materialHandleQuality, handleUpdateSupplyOrderStatus, handleWasteRemnant,
+                    refreshInventoryData, addTerminalLog, handleAiClassifyMaterial, handleCompileGCode, handleConsumeRemnant, handleCreateSupplyOrder,
+                    handleDeleteMaterial, handleDuplicateSupplyOrder, handleExportMaterialsCSV, handleFindSuitableRemnantSubmit, handleOpenSmartSupplyModal: smartHandleOpen,
+                    handleQuickSupplyRequest, handleReorderMaterials, handleUpdateMaterialQualityStatus, handleUpdateSupplyOrderStatus, handleWasteRemnant,
                     isCompilingGCode, gcodeTabMode, setGcodeTabMode, gcodePrompt, setGcodePrompt, gcodeMaterial, setGcodeMaterial, gcodePower, setGcodePower,
                     gcodeSpeed, setGcodeSpeed, gcodeResult, setGcodeResult
                   }}
@@ -4017,7 +3768,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
           </aside>
         )}
       <GlobalDialogs
-        {...{ USERS, activeView, addTerminalLog, appendEditOrderDraftItem, calculateOrderProgress, companySettings, currentUser, customers, deleteConfirmTarget, deliveryBlockedOrder, editCustAddress, editCustCategory, editCustCompany, editCustEmail, editCustName, editCustNotes, editCustPhone, editCustWhatsapp, editFocusedItemIdx, editOrderDiscountAmountVal, editOrderItems, editOrderRemaining, editOrderSubtotal, editOrderTaxAmount, editOrderTaxPercentVal, editOrderTotalPrice, editingCustomer, editingOrder, editingProduct, adjustQty, adjustReason, adjustType, aiClassificationResult, editingMaterial, getPaymentStatusBadge, isAiClassifying, isCurrencyConverterOpen, isSubmittingSmartSupply, jobRemHeight, jobRemLocation, jobRemWidth, matCategory, matColor, matHeight, matLocation, matMinStock, matNotes, matPrice, matSubCategory, matSupplierId, matThickness, matUnit, matWidth, materials, newJobEstTime, newJobItemName, newJobLaserPower, newJobLaserSpeed, newJobMaterialId, newJobOrderId, priceComparisonMaterial, productionJobs, setAdjustQty, setAdjustReason, setAdjustType, setAiClassificationResult, setEditingMaterial, setIsCurrencyConverterOpen, setJobRemHeight, setJobRemLocation, setJobRemWidth, setMatCategory, setMatColor, setMatHeight, setMatLocation, setMatMinStock, setMatName, setMatNotes, setMatPrice, setMatSubCategory, setMatSupplierId, setMatThickness, setMatUnit, setMatWidth, setNewJobEstTime, setNewJobItemName, setNewJobLaserPower, setNewJobLaserSpeed, setNewJobMaterialId, setNewJobOrderId, setPriceComparisonMaterial, setShowAddJob, setShowAddMaterial, setShowAdjustStock, setShowRemnantRegister, setShowSmartSupplyModal, setSmartSupplyItems, showAddJob, showAddMaterial, showAdjustStock, showRemnantRegister, showSmartSupplyModal, smartSupplyItems, suppliers, exchangeRate, fetchCustomers, fetchLogs, fetchOrders, handleAdjustStockSubmit, handleAiClassifyMaterial, handleCompileOrderGCode, handleCopyText, handleCreateDirectSupplyOrder, handleCreateMaterial: materialHandleCreate, handleCreateProduct, handleCreateProductionJob, handleCreateRemnant, handleDeleteCustomer, handleDeletePayment, handleDeleteProduct, handleDirectCompleteJob, handleEditOrderSubmit, handleExecuteSmartSupplyOrders: smartHandleExecute, handleRecordPaymentSubmit, handleRegisterRemnantOnJobComplete, handleSaveEditCustomer, handleSendEmailShare, handleSettleRemainingAndDeliver, handleUpdateItemProgress, handleUpdateMaterial: materialHandleUpdate, handleUpdateProduct, isCompilingOrderGcode, isHelpGuideOpen, isProcessingQuickFullPay, isQuickActionsOpen, isSearchPaletteOpen, isSearching, isSharingEmail, matName, newPaymentAmount, newPaymentNotes, newPaymentSYPAmount, orderDetailsTab, orderGcodeResult, orders, pageTransition, pageVariants, paymentInputCurrency, printTicketOrder, prodCategory, prodCode, prodDescription, prodName, prodPrice, prodStock, products, progressModalOrder, refreshInventoryData, remHeight, remLocation, remMatId, remQty, remWidth, removeEditOrderDraftItem, renderCutProgressInteractiveTable, searchQuery, searchResults, selectedCustomerFiles, selectedCustomerIdForOrder, selectedMaterialFiles, selectedOrder, selectedPaymentMethod, selectedPaymentReceipt, selectedProductFiles, setActiveView, setDeleteConfirmTarget, setDeliveryBlockedOrder, setEditCustAddress, setEditCustCategory, setEditCustCompany, setEditCustEmail, setEditCustName, setEditCustNotes, setEditCustPhone, setEditCustWhatsapp, setEditFocusedItemIdx, setEditOrderItems, setEditingCustomer, setEditingOrder, setEditingProduct, setIsHelpGuideOpen, setIsQuickActionsOpen, setIsSearchPaletteOpen, setNewPaymentAmount, setNewPaymentNotes, setNewPaymentSYPAmount, setOrderDetailsTab, setPaymentInputCurrency, setPrintTicketOrder, setProdCategory, setProdCode, setProdDescription, setProdName, setProdPrice, setProdStock, setProgressModalOrder, setRemHeight, setRemLocation, setRemMatId, setRemQty, setRemWidth, setSearchQuery, setSearchResults, setSelectedCustomerFiles, setSelectedCustomerIdForOrder, setSelectedMaterialFiles, setSelectedOrder, setSelectedPaymentMethod, setSelectedPaymentReceipt, setSelectedProductFiles, setShareBody, setShareEmail, setShareEmailSuccess, setShareMethod, setShareSubject, setShowAddOrder, setShowAddProduct, setShowAddRemnant, setShowHelpModal, setShowShareModal, shareBody, shareEmail, shareEmailSuccess, shareMethod, shareMsgCopied, sharePdfCopied, shareSubject, showAddOrder, showAddProduct, showAddRemnant, showHelpModal, showShareModal, updateEditOrderDraftItem, updateRate }}
+        {...{ USERS, activeView, addTerminalLog, appendEditOrderDraftItem, calculateOrderProgress, companySettings, currentUser, customers, deleteConfirmTarget, deliveryBlockedOrder, editCustAddress, editCustCategory, editCustCompany, editCustEmail, editCustName, editCustNotes, editCustPhone, editCustWhatsapp, editFocusedItemIdx, editOrderDiscountAmountVal, editOrderItems, editOrderRemaining, editOrderSubtotal, editOrderTaxAmount, editOrderTaxPercentVal, editOrderTotalPrice, editingCustomer, editingOrder, editingProduct, adjustQty, adjustReason, adjustType, aiClassificationResult, editingMaterial, getPaymentStatusBadge, isAiClassifying, isCurrencyConverterOpen, isSubmittingSmartSupply, jobRemHeight, jobRemLocation, jobRemWidth, matCategory, matColor, matHeight, matLocation, matMinStock, matNotes, matPrice, matSubCategory, matSupplierId, matThickness, matUnit, matWidth, materials, newJobEstTime, newJobItemName, newJobLaserPower, newJobLaserSpeed, newJobMaterialId, newJobOrderId, priceComparisonMaterial, productionJobs, setAdjustQty, setAdjustReason, setAdjustType, setAiClassificationResult, setEditingMaterial, setIsCurrencyConverterOpen, setJobRemHeight, setJobRemLocation, setJobRemWidth, setMatCategory, setMatColor, setMatHeight, setMatLocation, setMatMinStock, setMatName, setMatNotes, setMatPrice, setMatSubCategory, setMatSupplierId, setMatThickness, setMatUnit, setMatWidth, setNewJobEstTime, setNewJobItemName, setNewJobLaserPower, setNewJobLaserSpeed, setNewJobMaterialId, setNewJobOrderId, setPriceComparisonMaterial, setShowAddJob, setShowAddMaterial, setShowAdjustStock, setShowRemnantRegister, setShowSmartSupplyModal, setSmartSupplyItems, showAddJob, showAddMaterial, showAdjustStock, showRemnantRegister, showSmartSupplyModal, smartSupplyItems, suppliers, exchangeRate, fetchCustomers, fetchLogs, fetchOrders, handleAdjustStockSubmit, handleAiClassifyMaterial, handleCompileOrderGCode, handleCopyText, handleCreateDirectSupplyOrder, handleCreateMaterial, handleCreateProduct, handleCreateProductionJob, handleCreateRemnant, handleDeleteCustomer, handleDeletePayment, handleDeleteProduct, handleDirectCompleteJob, handleEditOrderSubmit, handleExecuteSmartSupplyOrders: smartHandleExecute, handleRecordPaymentSubmit, handleRegisterRemnantOnJobComplete, handleSaveEditCustomer, handleSendEmailShare, handleSettleRemainingAndDeliver, handleUpdateItemProgress, handleUpdateMaterial, handleUpdateProduct, isCompilingOrderGcode, isHelpGuideOpen, isProcessingQuickFullPay, isQuickActionsOpen, isSearchPaletteOpen, isSearching, isSharingEmail, matName, newPaymentAmount, newPaymentNotes, newPaymentSYPAmount, orderDetailsTab, orderGcodeResult, orders, pageTransition, pageVariants, paymentInputCurrency, printTicketOrder, prodCategory, prodCode, prodDescription, prodName, prodPrice, prodStock, products, progressModalOrder, refreshInventoryData, remHeight, remLocation, remMatId, remQty, remWidth, removeEditOrderDraftItem, renderCutProgressInteractiveTable, searchQuery, searchResults, selectedCustomerFiles, selectedCustomerIdForOrder, selectedMaterialFiles, selectedOrder, selectedPaymentMethod, selectedPaymentReceipt, selectedProductFiles, setActiveView, setDeleteConfirmTarget, setDeliveryBlockedOrder, setEditCustAddress, setEditCustCategory, setEditCustCompany, setEditCustEmail, setEditCustName, setEditCustNotes, setEditCustPhone, setEditCustWhatsapp, setEditFocusedItemIdx, setEditOrderItems, setEditingCustomer, setEditingOrder, setEditingProduct, setIsHelpGuideOpen, setIsQuickActionsOpen, setIsSearchPaletteOpen, setNewPaymentAmount, setNewPaymentNotes, setNewPaymentSYPAmount, setOrderDetailsTab, setPaymentInputCurrency, setPrintTicketOrder, setProdCategory, setProdCode, setProdDescription, setProdName, setProdPrice, setProdStock, setProgressModalOrder, setRemHeight, setRemLocation, setRemMatId, setRemQty, setRemWidth, setSearchQuery, setSearchResults, setSelectedCustomerFiles, setSelectedCustomerIdForOrder, setSelectedMaterialFiles, setSelectedOrder, setSelectedPaymentMethod, setSelectedPaymentReceipt, setSelectedProductFiles, setShareBody, setShareEmail, setShareEmailSuccess, setShareMethod, setShareSubject, setShowAddOrder, setShowAddProduct, setShowAddRemnant, setShowHelpModal, setShowShareModal, shareBody, shareEmail, shareEmailSuccess, shareMethod, shareMsgCopied, sharePdfCopied, shareSubject, showAddOrder, showAddProduct, showAddRemnant, showHelpModal, showShareModal, updateEditOrderDraftItem, updateRate }}
       />
       </main>
 
