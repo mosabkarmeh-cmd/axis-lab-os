@@ -15,6 +15,7 @@ import { useProductActions } from "./hooks/useProductActions";
 import { useProductionActions } from "./hooks/useProductionActions";
 import { useNotificationActions } from "./hooks/useNotificationActions";
 import { useAuthActions } from "./hooks/useAuthActions";
+import { useGlobalSearch } from "./hooks/useGlobalSearch";
 import { extractMaterialName, materialPriceUSD } from "./lib/materials";
 import { getOrderStatusBadge, getPaymentStatusBadge } from "./components/StatusBadges";
 import { DEFAULT_EXCHANGE_RATE, EXCHANGE_RATE_STORAGE_KEY, sanitizeExchangeRate, sypToUsd, usdToSyp } from "./lib/currency";
@@ -187,15 +188,7 @@ export default function App() {
 
   // Global Search Command Palette States
   const [isSearchPaletteOpen, setIsSearchPaletteOpen] = useState<boolean>(false);
-  const [searchQuery, setSearchQuery] = useState<string>("");
-  const [searchResults, setSearchResults] = useState<{
-    orders: any[];
-    customers: any[];
-    products: any[];
-    materials: any[];
-    invoices: any[];
-  } | null>(null);
-  const [isSearching, setIsSearching] = useState<boolean>(false);
+  const { searchQuery, setSearchQuery, searchResults, setSearchResults, isSearching } = useGlobalSearch();
   const [isHelpGuideOpen, setIsHelpGuideOpen] = useState<boolean>(false);
   const [showHelpModal, setShowHelpModal] = useState<boolean>(false);
   const [helpActiveTab, setHelpActiveTab] = useState<'intro' | 'smart_forms' | 'shortcuts' | 'video'>('intro');
@@ -235,28 +228,6 @@ export default function App() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
-
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setSearchResults(null);
-      return;
-    }
-    const delayDebounce = setTimeout(async () => {
-      setIsSearching(true);
-      try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`);
-        const data = await res.json();
-        if (data.success) {
-          setSearchResults(data.results);
-        }
-      } catch (e) {
-        console.error("Search error", e);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 300);
-    return () => clearTimeout(delayDebounce);
-  }, [searchQuery]);
 
   const [isProfileOpen, setIsProfileOpen] = useState<boolean>(false);
 
