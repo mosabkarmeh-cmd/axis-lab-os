@@ -14,6 +14,7 @@ import { useGCodeActions } from "./hooks/useGCodeActions";
 import { useProductActions } from "./hooks/useProductActions";
 import { useProductionActions } from "./hooks/useProductionActions";
 import { useNotificationActions } from "./hooks/useNotificationActions";
+import { useAuthActions } from "./hooks/useAuthActions";
 import { extractMaterialName, materialPriceUSD } from "./lib/materials";
 import { getOrderStatusBadge, getPaymentStatusBadge } from "./components/StatusBadges";
 import { DEFAULT_EXCHANGE_RATE, EXCHANGE_RATE_STORAGE_KEY, sanitizeExchangeRate, sypToUsd, usdToSyp } from "./lib/currency";
@@ -1067,96 +1068,17 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     fetchMaterialCategories();
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError(null);
-    setIsAuthLoading(true);
-    try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: authEmail, password: authPassword })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Login Failed");
-
-      localStorage.setItem("axislab_token", data.token);
-      document.cookie = `axislab_token=${data.token}; path=/; max-age=${60 * 60 * 24}; SameSite=Lax`;
-      setToken(data.token);
-      setCurrentUser(data.user);
-      if (data.user.role === "accountant") {
-        setActiveView("accounting");
-      } else if (data.user.role === "employee") {
-        setActiveView("production");
-      } else {
-        setActiveView("dashboard");
-      }
-      addTerminalLog("JWT", `User '${data.user.fullName}' authenticated. Token issued.`);
-      fetchLogs();
-    } catch (err: any) {
-      setAuthError(err.message);
-      addTerminalLog("ERROR", `Auth failed: ${err.message}`);
-    } finally {
-      setIsAuthLoading(false);
-    }
-  };
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError(null);
-    if (!authFullName) {
-      setAuthError("الرجاء إدخال الاسم الكامل");
-      return;
-    }
-    setIsAuthLoading(true);
-    try {
-      const res = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: authEmail,
-          password: authPassword,
-          fullName: authFullName,
-          role: authRole
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Registration Failed");
-
-      localStorage.setItem("axislab_token", data.token);
-      document.cookie = `axislab_token=${data.token}; path=/; max-age=${60 * 60 * 24}; SameSite=Lax`;
-      setToken(data.token);
-      setCurrentUser(data.user);
-      setIsRegisterMode(false);
-      if (data.user.role === "accountant") {
-        setActiveView("accounting");
-      } else if (data.user.role === "employee") {
-        setActiveView("production");
-      } else {
-        setActiveView("dashboard");
-      }
-      addTerminalLog("JWT", `New account registered: ${data.user.email} as ${data.user.role}`);
-      fetchLogs();
-    } catch (err: any) {
-      setAuthError(err.message);
-      addTerminalLog("ERROR", `Registration failed: ${err.message}`);
-    } finally {
-      setIsAuthLoading(false);
-    }
-  };
-
-  // Quick Preset login credentials filler
-  const setAuthPreset = (presetKey: string, email: string, pass: string) => {
-    setActivePreset(presetKey);
-    setAuthEmail(email);
-    setAuthPassword(pass);
-    setAuthError(null);
-  };
-
   const addTerminalLog = (type: string, msg: string) => {
     const time = new Date().toLocaleTimeString([], { hour12: false });
     setTerminalLogs(prev => [...prev, { time, type: type.toUpperCase(), msg }]);
   };
+
+  const { handleLogin, handleRegister, setAuthPreset } = useAuthActions({
+    authEmail, authPassword, authFullName, authRole,
+    setToken, setCurrentUser, setAuthError, setIsAuthLoading, setIsRegisterMode,
+    setActivePreset, setAuthEmail, setAuthPassword, setActiveView,
+    addTerminalLog, fetchLogs,
+  });
 
   const {
     notifications,
