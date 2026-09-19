@@ -16,6 +16,8 @@ import { useProductionActions } from "./hooks/useProductionActions";
 import { useNotificationActions } from "./hooks/useNotificationActions";
 import { useAuthActions } from "./hooks/useAuthActions";
 import { useGlobalSearch } from "./hooks/useGlobalSearch";
+import { useAiMemoryActions } from "./hooks/useAiMemoryActions";
+import { useTerminalActions } from "./hooks/useTerminalActions";
 import { extractMaterialName, materialPriceUSD } from "./lib/materials";
 import { getOrderStatusBadge, getPaymentStatusBadge } from "./components/StatusBadges";
 import { DEFAULT_EXCHANGE_RATE, EXCHANGE_RATE_STORAGE_KEY, sanitizeExchangeRate, sypToUsd, usdToSyp } from "./lib/currency";
@@ -387,11 +389,6 @@ export default function App() {
     showRemnantRegister, setShowRemnantRegister, jobRemWidth, setJobRemWidth, jobRemHeight, setJobRemHeight,
     jobRemLocation, setJobRemLocation,
   } = useProductionWorkspace();
-  const [terminalLogs, setTerminalLogs] = useState<Array<{ time: string; type: string; msg: string }>>([
-    { time: "11:22:01", type: "SYSTEM", msg: "AXIS LAB bootstrap engine initialized." },
-    { time: "11:22:05", type: "DB", msg: "Prisma Database Client initialized in memory." },
-    { time: "11:22:10", type: "JWT", msg: "Secret key configured for secure token signing." }
-  ]);
 
   // Workspace explorer files state
   const [virtualFiles, setVirtualFiles] = useState<CodeFile[]>(VIRTUAL_FILES);
@@ -477,12 +474,6 @@ export default function App() {
   ]);
   const [chatInput, setChatInput] = useState<string>("");
   const [isSendingChatMessage, setIsSendingChatMessage] = useState<boolean>(false);
-  const [aiMemoryLayers, setAiMemoryLayers] = useState<any>(null);
-  const [isLoadingAiMemory, setIsLoadingAiMemory] = useState<boolean>(false);
-  const [selectedMemoryLayer, setSelectedMemoryLayer] = useState<string>("short_term");
-  const [aiSearchQuery, setAiSearchQuery] = useState<string>("");
-  const [aiSearchResults, setAiSearchResults] = useState<any[]>([]);
-  const [isSearchingAi, setIsSearchingAi] = useState<boolean>(false);
 
   // --- FAST LOCAL REAL-TIME AI INTERACTION STATES ---
   const [fastLocalInventoryPredictions, setFastLocalInventoryPredictions] = useState<any[]>([]);
@@ -739,8 +730,6 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
   const [isCompilingGCode, setIsCompilingGCode] = useState<boolean>(false);
   const [gcodeResult, setGcodeResult] = useState<GCodeResult | null>(null);
 
-  // Active terminal command line
-  const [commandInput, setCommandInput] = useState<string>("");
   const terminalBottomRef = useRef<HTMLDivElement>(null);
 
   // Computed Dashboard Metrics
@@ -858,10 +847,6 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
       }
     }
   }, [currentUser, activeView]);
-
-  useEffect(() => {
-    terminalBottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [terminalLogs]);
 
   // Decode JWT on state update
   useEffect(() => {
@@ -1050,6 +1035,18 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     setActivePreset, setAuthEmail, setAuthPassword, setActiveView,
     addTerminalLog, fetchLogs,
   });
+
+  const {
+    aiMemoryLayers, isLoadingAiMemory, aiSearchQuery, setAiSearchQuery, aiSearchResults,
+    isSearchingAi, fetchAiMemory, handleAiSearch,
+  } = useAiMemoryActions({ activeAiTab, orders, materials });
+  const [selectedMemoryLayer, setSelectedMemoryLayer] = useState<string>("short_term");
+  const {
+    terminalLogs, setTerminalLogs, commandInput, setCommandInput, handleTerminalSubmit, executeTerminalCommand,
+  } = useTerminalActions({ currentUser, token, users: USERS, addTerminalLog });
+  useEffect(() => {
+    terminalBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [terminalLogs]);
 
   const {
     notifications,
@@ -3030,103 +3027,6 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
       }]);
     } finally {
       setIsSendingChatMessage(false);
-    }
-  };
-
-  // Fetch AXIS AI DeepBrain Learned Memory
-  const fetchAiMemory = async () => {
-    setIsLoadingAiMemory(true);
-    try {
-      const res = await fetch("/api/ai/memory");
-      const data = await res.json();
-      if (data.success) {
-        setAiMemoryLayers(data.layers);
-      }
-    } catch (err) {
-      console.error("Error fetching AI memory:", err);
-    } finally {
-      setIsLoadingAiMemory(false);
-    }
-  };
-
-  // Perform Intelligent Semantic Search
-  const handleAiSearch = async () => {
-    const q = aiSearchQuery.trim();
-    if (!q) {
-      setAiSearchResults([]);
-      return;
-    }
-    setIsSearchingAi(true);
-    try {
-      const res = await fetch("/api/ai/semantic-search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: q })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setAiSearchResults(data.results);
-      }
-    } catch (err) {
-      console.error("AI Semantic Search error:", err);
-    } finally {
-      setIsSearchingAi(false);
-    }
-  };
-
-  // Effect to load memory when moving to the memory tab
-  useEffect(() => {
-    if (activeAiTab === "memory") {
-      fetchAiMemory();
-    }
-  }, [activeAiTab, orders, materials]);
-
-  // Terminal manual command input line
-  const handleTerminalSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const cmd = commandInput.trim().toLowerCase();
-    if (!cmd) return;
-
-    addTerminalLog("USER", `$ ${commandInput}`);
-    setCommandInput("");
-
-    setTimeout(() => {
-      if (cmd === "help" || cmd === "?") {
-        addTerminalLog("INFO", "Commands: /help, /prisma-generate, /prisma-migrate, /clear, /status, /users");
-      } else if (cmd === "clear") {
-        setTerminalLogs([]);
-      } else if (cmd === "prisma-generate" || cmd === "npx prisma generate") {
-        addTerminalLog("PRISMA", "Parsing database/schema.prisma models...");
-        setTimeout(() => {
-          addTerminalLog("SUCCESS", "Generated client bundle: @prisma/client successfully!");
-        }, 800);
-      } else if (cmd === "prisma-migrate" || cmd === "npx prisma migrate dev") {
-        addTerminalLog("PRISMA", "Creating migration file inside /migrations...");
-        setTimeout(() => {
-          addTerminalLog("SUCCESS", "Applied migration: init_tables_laser_workshop onto Postgres client");
-        }, 1200);
-      } else if (cmd === "status") {
-        addTerminalLog("STATUS", `User: ${currentUser?.fullName || "Guest"}, Active token: ${token ? "YES" : "NO"}`);
-      } else if (cmd === "users") {
-        addTerminalLog("INFO", `Users: ${USERS.map(u => `${u.fullName} (${u.role})`).join(" | ")}`);
-      } else {
-        addTerminalLog("ERROR", `Command not found: "${cmd}". Type help for a list.`);
-      }
-    }, 200);
-  };
-
-  const executeTerminalCommand = (cmd: string) => {
-    addTerminalLog("USER", `$ ${cmd}`);
-    if (cmd === "npx prisma generate") {
-      addTerminalLog("PRISMA", "Parsing database/schema.prisma models...");
-      setTimeout(() => {
-        addTerminalLog("SUCCESS", "Generated client bundle: @prisma/client successfully!");
-      }, 800);
-    } else if (cmd === "npx prisma migrate dev") {
-      addTerminalLog("PRISMA", "Creating migration file inside /migrations...");
-      setTimeout(() => {
-        addTerminalLog("SUCCESS", "Applied migration: init_tables_laser_workshop onto Postgres client");
-      }, 1200);
     }
   };
 
