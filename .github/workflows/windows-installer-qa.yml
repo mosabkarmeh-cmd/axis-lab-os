@@ -94,3 +94,12 @@ jobs:
             Get-Process -Name 'AXIS LAB OS' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
             if (-not $process.HasExited) { $process.Kill() }
           }
+
+      - name: Upload tested Windows installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: axis-lab-os-windows-installers
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/axis-lab-current-user-setup.exe
+            dist-all-users/**/*AllUsers*.exe
