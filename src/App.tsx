@@ -13,6 +13,7 @@ import { useOrderActions } from "./hooks/useOrderActions";
 import { useGCodeActions } from "./hooks/useGCodeActions";
 import { useProductActions } from "./hooks/useProductActions";
 import { useProductionActions } from "./hooks/useProductionActions";
+import { useNotificationActions } from "./hooks/useNotificationActions";
 import { extractMaterialName, materialPriceUSD } from "./lib/materials";
 import { getOrderStatusBadge, getPaymentStatusBadge } from "./components/StatusBadges";
 import { DEFAULT_EXCHANGE_RATE, EXCHANGE_RATE_STORAGE_KEY, sanitizeExchangeRate, sypToUsd, usdToSyp } from "./lib/currency";
@@ -180,7 +181,6 @@ export default function App() {
 
   // Interactive Notification states
   const [isNotificationsOpen, setIsNotificationsOpen] = useState<boolean>(false);
-  const [notifications, setNotifications] = useState<any[]>([]);
   const [recycleBinItems, setRecycleBinItems] = useState<any[]>([]);
   const [orderStatuses, setOrderStatuses] = useState<any[]>([]);
 
@@ -946,11 +946,6 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     if (data && Array.isArray(data)) setLogs(data);
   };
 
-  const fetchNotifications = async () => {
-    const data = await safeApiFetch("/api/notifications");
-    if (data && data.success) setNotifications(data.notifications);
-  };
-
   const refreshNetworkSnapshot = async () => {
     if (networkSyncInFlightRef.current || !currentUser) return;
     networkSyncInFlightRef.current = true;
@@ -976,28 +971,6 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
   const fetchOrderStatuses = async () => {
     const data = await safeApiFetch("/api/order-statuses");
     if (data && data.success) setOrderStatuses(data.statuses);
-  };
-
-  const handleMarkAsRead = async (id: string) => {
-    const data = await safeApiFetch(`/api/notifications/${id}/read`, { method: "PATCH" });
-    if (data && data.success) {
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
-    }
-  };
-
-  const handleMarkAllAsRead = async () => {
-    const data = await safeApiFetch("/api/notifications/read-all", { method: "PATCH" });
-    if (data && data.success) {
-      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-    }
-  };
-
-  const handleDeleteNotification = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const data = await safeApiFetch(`/api/notifications/${id}`, { method: "DELETE" });
-    if (data && data.success) {
-      setNotifications(prev => prev.filter(n => n.id !== id));
-    }
   };
 
   const sortMaterialsBySavedOrder = (mats: any[]) => {
@@ -1184,6 +1157,14 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     const time = new Date().toLocaleTimeString([], { hour12: false });
     setTerminalLogs(prev => [...prev, { time, type: type.toUpperCase(), msg }]);
   };
+
+  const {
+    notifications,
+    fetchNotifications,
+    handleMarkAsRead,
+    handleMarkAllAsRead,
+    handleDeleteNotification,
+  } = useNotificationActions();
 
   const {
     handleAiClassifyMaterial: materialHandleAiClassify,
