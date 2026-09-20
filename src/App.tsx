@@ -14,7 +14,7 @@ import { useGCodeActions } from "./hooks/useGCodeActions";
 import { useProductActions } from "./hooks/useProductActions";
 import { useProductionActions } from "./hooks/useProductionActions";
 import { useNotificationActions } from "./hooks/useNotificationActions";
-import { useAuthActions } from "./hooks/useAuthActions";
+import { useAuthActions, useLogoutAction } from "./hooks/useAuthActions";
 import { useGlobalSearch } from "./hooks/useGlobalSearch";
 import { useAiMemoryActions } from "./hooks/useAiMemoryActions";
 import { useTerminalActions } from "./hooks/useTerminalActions";
@@ -1096,8 +1096,9 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
   const {
     handleAdjustStockSubmit, handleCreateRemnant, handleConsumeRemnant, handleWasteRemnant,
     handleCreateSupplyOrder, handleCreateDirectSupplyOrder, handleDuplicateSupplyOrder,
-    handleUpdateSupplyOrderStatus, handleFindSuitableRemnantSubmit,
+    handleUpdateSupplyOrderStatus, handleFindSuitableRemnantSubmit, handleQuickSupplyRequest,
   } = useSupplyActions({
+    suppliers, activeView, setActiveView, setActiveProductSubTab, setSelectedDashboardSupplierId,
     showAdjustStock, adjustQty, adjustType, adjustReason, currentUser,
     remMatId, remWidth, remHeight, remQty, remLocation,
     selectedDashboardSupplierId, newSupplyMaterialId, newSupplyQty, newSupplyPrice, newSupplyExpectedDate, newSupplyNotes,
@@ -1137,54 +1138,15 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     handleRunAutoArchive: orderHandleAutoArchive,
     handleArchiveOrder: orderHandleArchive,
     handleRestoreOrder: orderHandleRestore,
-  } = useOrderActions({ orders, currentUser, fetchOrders, fetchLogs, setDeliveryBlockedOrder, addTerminalLog, archiveDaysThreshold });
+    handleUpdateItemProgress,
+    handleEditOrderSubmit,
+  } = useOrderActions({
+    orders, currentUser, fetchOrders, fetchLogs, setDeliveryBlockedOrder, addTerminalLog, archiveDaysThreshold,
+    setOrders, selectedOrder, setSelectedOrder, progressModalOrder, setProgressModalOrder,
+    editingOrder, setEditingOrder, editOrderItems,
+  });
 
-  const handleLogout = (isAuto: boolean = false) => {
-    setToken(null);
-    setCurrentUser(null);
-    localStorage.removeItem("axislab_token");
-    document.cookie = "axislab_token=; path=/; max-age=0; SameSite=Lax";
-    if (isAuto) {
-      addTerminalLog("JWT", "تم تسجيل الخروج التلقائي لحماية الجلسة بعد 30 دقيقة من الخمول.");
-    } else {
-      addTerminalLog("JWT", "تم تسجيل الخروج وإتلاف الرمز المميز لجلسة العمل بنجاح.");
-    }
-  };
-
-  // Update completion progress for a single part, material group, or set all complete (تعديل نسبة إنجاز أجزاء ومواد الطلب)
-  const handleUpdateItemProgress = async (
-    orderId: string, 
-    params: { itemId?: string; materialName?: string; setAllCompleted?: boolean; resetAll?: boolean; addItem?: any; removeItemId?: string; completedQuantity?: number }
-  ) => {
-    try {
-      const res = await fetch(`/api/orders/${orderId}/items-progress`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...params,
-          changedById: currentUser?.id || "u-1"
-        })
-      });
-
-      if (res.ok) {
-        const updatedOrder = await res.json();
-        setOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
-        if (selectedOrder && selectedOrder.id === orderId) {
-          setSelectedOrder(updatedOrder);
-        }
-        if (progressModalOrder && progressModalOrder.id === orderId) {
-          setProgressModalOrder(updatedOrder);
-        }
-        addTerminalLog("PROD", `تم تحديث إنجاز أجزاء ومواد الطلب #${updatedOrder.orderNumber}`);
-        fetchLogs();
-      } else {
-        const err = await res.json();
-        addTerminalLog("ERROR", err.error || "فشل تحديث إنجاز أجزاء ومواد الطلب");
-      }
-    } catch (e) {
-      addTerminalLog("ERROR", "خطأ في الاتصال بالخادم لتحديث إنجاز الأجزاء والمواد");
-    }
-  };
+  const { handleLogout } = useLogoutAction({ setToken, setCurrentUser, addTerminalLog });
 
   // Helper to calculate technical order completion progress based on each part/item and material breakdown (حسب تفاصيل كل مادة وعدد القطع والتكرارات)
   const calculateOrderProgress = (ord: any, jobsList: any[] = productionJobs) => {
@@ -2057,55 +2019,6 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     return () => clearInterval(interval);
   }, [activeRunningJob]);
 
-  const handleQuickSupplyRequest = (mat: any) => {
-    if (!mat) return;
-
-    // Set selected material
-    setNewSupplyMaterialId(mat.id);
-
-    // Select target supplier associated with this material or default to first available
-    let targetSupplierId = mat.supplierId || (mat.supplier && mat.supplier.id) || "";
-    if (!targetSupplierId && suppliers.length > 0) {
-      targetSupplierId = suppliers[0].id;
-    }
-    if (targetSupplierId) {
-      setSelectedDashboardSupplierId(targetSupplierId);
-    }
-
-    // Set recommended unit price
-    const unitPriceVal = mat.pricePerUnit !== undefined && mat.pricePerUnit !== null
-      ? mat.pricePerUnit.toString()
-      : (mat.price !== undefined ? mat.price.toString() : "15");
-    setNewSupplyPrice(unitPriceVal);
-
-    // Calculate recommended supply quantity
-    const currentAvailable = mat.inventory?.available ?? (mat.inventory?.quantity ?? 0);
-    const minStock = mat.minimumStock || 10;
-    const suggestedQty = Math.max(10, minStock - currentAvailable);
-    setNewSupplyQty(suggestedQty.toString());
-
-    // Expected delivery date (3 days in future)
-    const futureDate = new Date();
-    futureDate.setDate(futureDate.getDate() + 3);
-    setNewSupplyExpectedDate(futureDate.toISOString().split("T")[0]);
-
-    // Descriptive notes
-    setNewSupplyNotes(`طلب توريد سريع ومباشر للخامة: ${mat.name} (${mat.category}${mat.thickness ? ` - سماكة ${mat.thickness}مم` : ""})`);
-
-    // Switch view if needed and change tab to suppliers
-    if (activeView !== "products") {
-      setActiveView("products");
-    }
-    setActiveProductSubTab("suppliers");
-
-    // Terminal log & feedback
-    addTerminalLog("INVENTORY", `تم إعداد نموذج طلب توريد سريع لخامة: ${mat.name}`);
-    window.showAlert?.(
-      `تمت تعبئة نموذج طلب التوريد تلقائياً للخامة "${mat.name}". الكمية المقترحة: ${suggestedQty} قطعة بسعر $${unitPriceVal} للوحدة. يرجى مراجعة الطلب واعتتماده.`,
-      "طلب توريد سريع 🚚"
-    );
-  };
-
   // Smart Auto-Replenishment Supply Proposal Engine
   const legacyHandleOpenSmartSupplyModal = () => {
     const lowStock = materials.filter(m => (m.inventory?.quantity ?? 0) <= (m.minimumStock || 0));
@@ -2234,50 +2147,6 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
       }
       return item;
     }));
-  };
-
-  // Edit/Update Order Action
-  const handleEditOrderSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingOrder) return;
-
-    const itemsToSend = editOrderItems.map(it => ({
-      productName: it.name || "عنصر تشغيل عام",
-      quantity: Number(it.qty) || 1,
-      unitPrice: Number(it.price) || 0,
-      notes: it.notes || ""
-    }));
-
-    try {
-      const res = await fetch(`/api/orders/${editingOrder.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customerId: editingOrder.customerId,
-          notes: editingOrder.notes,
-          priority: editingOrder.priority,
-          items: itemsToSend,
-          paidAmount: Number(editingOrder.paidAmount) || 0,
-          deliveryDateExpected: editingOrder.deliveryDateExpected,
-          taxPercent: Number(editingOrder.taxPercent) || 0,
-          discount: Number(editingOrder.discount) || 0
-        })
-      });
-
-      if (res.ok) {
-        const updated = await res.json();
-        addTerminalLog("DB", `Order ${editingOrder.orderNumber} successfully updated and re-compiled.`);
-        setEditingOrder(null);
-        fetchOrders();
-        fetchLogs();
-        // If the updated order was also being viewed, update its view too
-        if (selectedOrder && selectedOrder.id === updated.id) {
-          setSelectedOrder(updated);
-        }
-      }
-    } catch (e) {
-      addTerminalLog("ERROR", "Failed to update order");
-    }
   };
 
   const { handleAddCustomer, handleDeleteCustomer, handleOpenEditCustomer, handleSaveEditCustomer, handleExportCustomersCSV } = useCustomerActions({

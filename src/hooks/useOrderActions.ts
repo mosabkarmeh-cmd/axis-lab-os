@@ -1,7 +1,14 @@
+import type React from "react";
+
 type OrderActionsOptions = {
   orders: any[]; currentUser: any; fetchOrders: () => void | Promise<void>; fetchLogs: () => void | Promise<void>;
   setDeliveryBlockedOrder: (order: any) => void; addTerminalLog: (scope: string, message: string) => void;
   archiveDaysThreshold: number;
+  setOrders: (updater: (prev: any[]) => any[]) => void;
+  selectedOrder: any; setSelectedOrder: (value: any) => void;
+  progressModalOrder: any; setProgressModalOrder: (value: any) => void;
+  editingOrder: any; setEditingOrder: (value: any) => void;
+  editOrderItems: any[];
 };
 
 export function useOrderActions(o: OrderActionsOptions) {
@@ -20,5 +27,84 @@ export function useOrderActions(o: OrderActionsOptions) {
   };
   const handleArchiveOrder = async (id: string) => { try { const res = await fetch(`/api/orders/${id}/archive`, { method: "POST" }); if (res.ok) { o.addTerminalLog("ARCHIVE", `[ORDER ARCHIVED] Order ${id} moved to archive.`); await o.fetchOrders(); await o.fetchLogs(); } } catch { o.addTerminalLog("ERROR", "Failed to archive order"); } };
   const handleRestoreOrder = async (id: string) => { try { const res = await fetch(`/api/orders/${id}/restore`, { method: "POST" }); if (res.ok) { o.addTerminalLog("ARCHIVE", `[ORDER RESTORED] Order ${id} restored to active queue.`); await o.fetchOrders(); await o.fetchLogs(); } } catch { o.addTerminalLog("ERROR", "Failed to restore order"); } };
-  return { handleUpdateOrderStatus, handleRunAutoArchive, handleArchiveOrder, handleRestoreOrder };
+  const handleUpdateItemProgress = async (
+    orderId: string,
+    params: { itemId?: string; materialName?: string; setAllCompleted?: boolean; resetAll?: boolean; addItem?: any; removeItemId?: string; completedQuantity?: number }
+  ) => {
+    try {
+      const res = await fetch(`/api/orders/${orderId}/items-progress`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...params,
+          changedById: o.currentUser?.id || "u-1"
+        })
+      });
+
+      if (res.ok) {
+        const updatedOrder = await res.json();
+        o.setOrders(prev => prev.map(ord => ord.id === orderId ? updatedOrder : ord));
+        if (o.selectedOrder && o.selectedOrder.id === orderId) {
+          o.setSelectedOrder(updatedOrder);
+        }
+        if (o.progressModalOrder && o.progressModalOrder.id === orderId) {
+          o.setProgressModalOrder(updatedOrder);
+        }
+        o.addTerminalLog("PROD", `تم تحديث إنجاز أجزاء ومواد الطلب #${updatedOrder.orderNumber}`);
+        o.fetchLogs();
+      } else {
+        const err = await res.json();
+        o.addTerminalLog("ERROR", err.error || "فشل تحديث إنجاز أجزاء ومواد الطلب");
+      }
+    } catch (e) {
+      o.addTerminalLog("ERROR", "خطأ في الاتصال بالخادم لتحديث إنجاز الأجزاء والمواد");
+    }
+  };
+
+  const handleEditOrderSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!o.editingOrder) return;
+
+    const itemsToSend = o.editOrderItems.map(it => ({
+      productName: it.name || "عنصر تشغيل عام",
+      quantity: Number(it.qty) || 1,
+      unitPrice: Number(it.price) || 0,
+      notes: it.notes || ""
+    }));
+
+    try {
+      const res = await fetch(`/api/orders/${o.editingOrder.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerId: o.editingOrder.customerId,
+          notes: o.editingOrder.notes,
+          priority: o.editingOrder.priority,
+          items: itemsToSend,
+          paidAmount: Number(o.editingOrder.paidAmount) || 0,
+          deliveryDateExpected: o.editingOrder.deliveryDateExpected,
+          taxPercent: Number(o.editingOrder.taxPercent) || 0,
+          discount: Number(o.editingOrder.discount) || 0
+        })
+      });
+
+      if (res.ok) {
+        const updated = await res.json();
+        o.addTerminalLog("DB", `Order ${o.editingOrder.orderNumber} successfully updated and re-compiled.`);
+        o.setEditingOrder(null);
+        o.fetchOrders();
+        o.fetchLogs();
+        if (o.selectedOrder && o.selectedOrder.id === updated.id) {
+          o.setSelectedOrder(updated);
+        }
+      }
+    } catch (e) {
+      o.addTerminalLog("ERROR", "Failed to update order");
+    }
+  };
+
+  return {
+    handleUpdateOrderStatus, handleRunAutoArchive, handleArchiveOrder, handleRestoreOrder,
+    handleUpdateItemProgress, handleEditOrderSubmit,
+  };
 }

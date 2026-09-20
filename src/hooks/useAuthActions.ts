@@ -25,6 +25,12 @@ type AuthActionsOptions = {
   fetchLogs: () => void;
 };
 
+type LogoutOptions = {
+  setToken: (token: any) => void;
+  setCurrentUser: (user: any) => void;
+  addTerminalLog: (type: string, message: string) => void;
+};
+
 function persistSession(data: AuthResponse) {
   localStorage.setItem("axislab_token", data.token);
   document.cookie = `axislab_token=${data.token}; path=/; max-age=${60 * 60 * 24}; SameSite=Lax`;
@@ -117,4 +123,19 @@ export function useAuthActions({
   }, [setActivePreset, setAuthEmail, setAuthError, setAuthPassword]);
 
   return { handleLogin, handleRegister, setAuthPreset };
+}
+
+export function useLogoutAction({ setToken, setCurrentUser, addTerminalLog }: LogoutOptions) {
+  const handleLogout = (isAuto: boolean = false) => {
+    setToken(null);
+    setCurrentUser(null);
+    localStorage.removeItem("axislab_token");
+    document.cookie = "axislab_token=; path=/; max-age=0; SameSite=Lax";
+    if (isAuto) {
+      addTerminalLog("JWT", "تم تسجيل الخروج التلقائي لحماية الجلسة بعد 30 دقيقة من الخمول.");
+    } else {
+      addTerminalLog("JWT", "تم تسجيل الخروج وإتلاف الرمز المميز لجلسة العمل بنجاح.");
+    }
+  };
+  return { handleLogout };
 }

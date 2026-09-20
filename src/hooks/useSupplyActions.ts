@@ -20,6 +20,11 @@ type SupplyActionsOptions = {
   findSuitableMatId: string;
   findSuitableW: string;
   findSuitableH: string;
+  suppliers: any[];
+  activeView: string;
+  setActiveView: (value: string) => void;
+  setActiveProductSubTab: (value: any) => void;
+  setSelectedDashboardSupplierId: (value: string) => void;
   setShowAdjustStock: (value: any) => void;
   setAdjustQty: (value: string) => void;
   setAdjustReason: (value: string) => void;
@@ -61,6 +66,11 @@ export function useSupplyActions({
   findSuitableMatId,
   findSuitableW,
   findSuitableH,
+  suppliers,
+  activeView,
+  setActiveView,
+  setActiveProductSubTab,
+  setSelectedDashboardSupplierId,
   setShowAdjustStock,
   setAdjustQty,
   setAdjustReason,
@@ -365,8 +375,50 @@ export function useSupplyActions({
     }
   };
 
+  const handleQuickSupplyRequest = (mat: any) => {
+    if (!mat) return;
+
+    setNewSupplyMaterialId(mat.id);
+
+    let targetSupplierId = mat.supplierId || (mat.supplier && mat.supplier.id) || "";
+    if (!targetSupplierId && suppliers.length > 0) {
+      targetSupplierId = suppliers[0].id;
+    }
+    if (targetSupplierId) {
+      setSelectedDashboardSupplierId(targetSupplierId);
+    }
+
+    const unitPriceVal = mat.pricePerUnit !== undefined && mat.pricePerUnit !== null
+      ? mat.pricePerUnit.toString()
+      : (mat.price !== undefined ? mat.price.toString() : "15");
+    setNewSupplyPrice(unitPriceVal);
+
+    const currentAvailable = mat.inventory?.available ?? (mat.inventory?.quantity ?? 0);
+    const minStock = mat.minimumStock || 10;
+    const suggestedQty = Math.max(10, minStock - currentAvailable);
+    setNewSupplyQty(suggestedQty.toString());
+
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + 3);
+    setNewSupplyExpectedDate(futureDate.toISOString().split("T")[0]);
+
+    setNewSupplyNotes(`طلب توريد سريع ومباشر للخامة: ${mat.name} (${mat.category}${mat.thickness ? ` - سماكة ${mat.thickness}مم` : ""})`);
+
+    if (activeView !== "products") {
+      setActiveView("products");
+    }
+    setActiveProductSubTab("suppliers");
+
+    addTerminalLog("INVENTORY", `تم إعداد نموذج طلب توريد سريع لخامة: ${mat.name}`);
+    window.showAlert?.(
+      `تمت تعبئة نموذج طلب التوريد تلقائياً للخامة "${mat.name}". الكمية المقترحة: ${suggestedQty} قطعة بسعر $${unitPriceVal} للوحدة. يرجى مراجعة الطلب واعتتماده.`,
+      "طلب توريد سريع 🚚"
+    );
+  };
+
   return {
     handleAdjustStockSubmit,
+    handleQuickSupplyRequest,
     handleCreateRemnant,
     handleConsumeRemnant,
     handleWasteRemnant,
