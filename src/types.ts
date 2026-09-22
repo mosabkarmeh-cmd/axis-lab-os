@@ -67,6 +67,15 @@ export interface Order {
   discount?: number;
   isArchived?: boolean;
   archivedAt?: string;
+  designerId?: string;
+  cutterId?: string;
+  assemblerId?: string;
+  designRating?: number;
+  cuttingRating?: number;
+  assemblyRating?: number;
+  ratingNotes?: string;
+  ratedById?: string;
+  ratedAt?: string;
 }
 
 export interface ActivityLog {
