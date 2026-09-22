@@ -103,8 +103,57 @@ export function useOrderActions(o: OrderActionsOptions) {
     }
   };
 
+  const handleAssignOrderWorkers = async (
+    orderId: string,
+    assignment: { designerId?: string | null; cutterId?: string | null; assemblerId?: string | null }
+  ) => {
+    try {
+      const res = await fetch(`/api/orders/${orderId}/assign-workers`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...assignment, changedById: o.currentUser?.id || "u-1" })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        o.setOrders(prev => prev.map(ord => ord.id === orderId ? updated : ord));
+        if (o.selectedOrder && o.selectedOrder.id === orderId) o.setSelectedOrder(updated);
+        o.addTerminalLog("DB", `تم تحديث تعيين العمال للطلب #${updated.orderNumber}`);
+        o.fetchLogs();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        o.addTerminalLog("ERROR", err.error || "فشل تعيين العمال");
+      }
+    } catch (e) {
+      o.addTerminalLog("ERROR", "خطأ في الاتصال بالخادم لتعيين العمال");
+    }
+  };
+
+  const handleRateOrder = async (
+    orderId: string,
+    rating: { designRating?: number | null; cuttingRating?: number | null; assemblyRating?: number | null; ratingNotes?: string }
+  ) => {
+    try {
+      const res = await fetch(`/api/orders/${orderId}/rate`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(rating)
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        o.setOrders(prev => prev.map(ord => ord.id === orderId ? updated : ord));
+        if (o.selectedOrder && o.selectedOrder.id === orderId) o.setSelectedOrder(updated);
+        o.addTerminalLog("DB", `تم تسجيل تقييم الطلب #${updated.orderNumber}`);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        o.addTerminalLog("ERROR", err.error || "فشل تسجيل التقييم");
+      }
+    } catch (e) {
+      o.addTerminalLog("ERROR", "خطأ في الاتصال بالخادم لتسجيل التقييم");
+    }
+  };
+
   return {
     handleUpdateOrderStatus, handleRunAutoArchive, handleArchiveOrder, handleRestoreOrder,
-    handleUpdateItemProgress, handleEditOrderSubmit,
+    handleUpdateItemProgress, handleEditOrderSubmit, handleAssignOrderWorkers, handleRateOrder,
   };
 }
