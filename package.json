@@ -1,7 +1,7 @@
 {
   "name": "axis-lab-os",
   "private": true,
-  "version": "0.13.44",
+  "version": "0.14.0",
   "description": "AXIS LAB OS - نظام تشغيل ورش القص والنقش بالليزر",
   "author": "AXIS LAB",
   "type": "module",
@@ -30,7 +30,8 @@
     "test:sqlite-migration": "npm run build && node tests/sqlite-migration-smoke.cjs",
     "test:sqlite-crash": "npm run build && node tests/sqlite-crash-recovery-smoke.cjs",
     "test:sqlite-concurrency": "npm run build && node tests/sqlite-concurrency-stability-smoke.cjs",
-    "test:stress": "npm run build && node tests/stress-test.cjs"
+    "test:stress": "npm run build && node tests/stress-test.cjs",
+    "test:architecture": "node scripts/architecture-audit.cjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
