@@ -1,6 +1,6 @@
 export async function safeApiFetch<T = any>(url: string, options?: RequestInit): Promise<T | null> {
   try {
-    const response = await fetch(url, options);
+    const response = await fetch(url, { ...options, credentials: "include" });
     if (!response.ok) return null;
     const contentType = response.headers.get("content-type");
     if (!contentType || !contentType.includes("application/json")) return null;
@@ -11,7 +11,7 @@ export async function safeApiFetch<T = any>(url: string, options?: RequestInit):
 }
 
 export async function apiFetchJson<T = unknown>(url: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(url, options);
+  const response = await fetch(url, { ...options, credentials: "include" });
   const contentType = response.headers.get("content-type") || "";
   const body = contentType.includes("application/json") ? await response.json() : null;
   if (!response.ok) {

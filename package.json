@@ -1,7 +1,7 @@
 {
   "name": "axis-lab-os",
   "private": true,
-  "version": "0.13.44",
+  "version": "0.15.0",
   "description": "AXIS LAB OS - نظام تشغيل ورش القص والنقش بالليزر",
   "author": "AXIS LAB",
   "type": "module",
@@ -10,13 +10,13 @@
     "dev": "tsx server.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
-    "clean": "rm -rf dist server.js",
+    "clean": "node scripts/clean.cjs",
     "lint": "tsc --noEmit",
     "test:smoke": "npm run build && npx tsx tests/currency-conversion-smoke.ts && node tests/api-security-smoke.cjs && node tests/first-run-password-smoke.cjs && node tests/api-coverage-smoke.cjs && node tests/rbac-viewer-smoke.cjs && node tests/rbac-workflow-integration-smoke.cjs && node tests/financial-negative-cases-smoke.cjs && node tests/sqlite-migration-smoke.cjs && node tests/sqlite-crash-recovery-smoke.cjs && node tests/sqlite-concurrency-stability-smoke.cjs && node tests/production-completion-smoke.cjs && node tests/report-monthly-smoke.cjs && node tests/inventory-guards-smoke.cjs && node tests/workflow-material-supply-smoke.cjs && node tests/payment-gcode-regression-smoke.cjs",
     "test:rbac-workflow": "npm run build && node tests/rbac-viewer-smoke.cjs && node tests/rbac-workflow-integration-smoke.cjs",
     "db:generate": "drizzle-kit generate --config=src/db/drizzle.config.ts",
     "db:migrate": "drizzle-kit migrate --config=src/db/drizzle.config.ts",
-    "start:prod": "NODE_ENV=production node dist/server.cjs",
+    "start:prod": "node scripts/start-prod.cjs",
     "network:server": "node scripts/start-central-server.cjs",
     "network:client": "node scripts/start-network-client.cjs",
     "test:network": "npm run build && node tests/network-two-clients-smoke.cjs",
@@ -30,7 +30,13 @@
     "test:sqlite-migration": "npm run build && node tests/sqlite-migration-smoke.cjs",
     "test:sqlite-crash": "npm run build && node tests/sqlite-crash-recovery-smoke.cjs",
     "test:sqlite-concurrency": "npm run build && node tests/sqlite-concurrency-stability-smoke.cjs",
-    "test:stress": "npm run build && node tests/stress-test.cjs"
+    "test:stress": "npm run build && node tests/stress-test.cjs",
+    "test:architecture": "node scripts/architecture-audit.cjs",
+    "test:security-static": "node tests/static-security-audit.cjs",
+    "test:pre-release": "node scripts/pre-release-audit.cjs",
+    "test:decomposition": "node scripts/decomposition-audit.cjs",
+    "test:source": "node scripts/static-source-check.cjs",
+    "test:desktop-security": "node tests/desktop-security-smoke.cjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -84,5 +90,8 @@
   "overrides": {
     "uuid": "^11.1.1",
     "qs": "^6.16.0"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

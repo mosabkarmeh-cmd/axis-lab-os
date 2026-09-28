@@ -56,7 +56,16 @@ function getBootstrapAdminPassword() {
     const existing = fs.readFileSync(passwordPath, 'utf8').trim();
     if (existing) return existing;
   } catch {}
-  const initialPassword = '12345';
+  const existing = (() => {
+    try {
+      const current = fs.readFileSync(passwordPath, 'utf8').trim();
+      return current || null;
+    } catch {
+      return null;
+    }
+  })();
+  if (existing) return existing;
+  const initialPassword = crypto.randomBytes(16).toString('base64url');
   fs.mkdirSync(path.dirname(passwordPath), { recursive: true });
   fs.writeFileSync(passwordPath, initialPassword, { encoding: 'utf8', mode: 0o600 });
   bootstrapPasswordCreated = true;
@@ -241,6 +250,9 @@ function startServer() {
       AXIS_DATA_FILE: process.env.AXIS_DATA_FILE || path.join(process.env.AXIS_DATA_DIR || CLI_DATA_DIR || app.getPath('userData'), 'axis-data.sqlite'),
       AXIS_LEGACY_DATA_FILE: process.env.AXIS_LEGACY_DATA_FILE || path.join(process.env.AXIS_DATA_DIR || CLI_DATA_DIR || app.getPath('userData'), 'axis-data.json'),
       SQLITE_WASM_PATH: app.isPackaged ? path.join(process.resourcesPath, 'sql-wasm.wasm') : path.join(projectRoot(), 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
+      AXIS_APP_ROOT: root,
+      AXIS_BOOTSTRAP_PASSWORD_FILE: path.join(app.getPath('userData'), 'bootstrap-admin-password.txt'),
+      AXIS_FONT_PATH: app.isPackaged ? path.join(process.resourcesPath, 'Amiri-Regular.ttf') : path.join(projectRoot(), 'Amiri-Regular.ttf'),
       PORT: String(PORT),
       APP_URL: process.env.AXIS_APP_URL || `http://${IS_CENTRAL_SERVER ? 'localhost' : '127.0.0.1'}:${PORT}`,
       SERVER_HOST: process.env.AXIS_SERVER_HOST || (IS_CENTRAL_SERVER ? '0.0.0.0' : '127.0.0.1'),
