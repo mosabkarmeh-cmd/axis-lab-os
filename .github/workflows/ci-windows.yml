@@ -1,0 +1,27 @@
+name: Windows CI
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-and-build:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    env:
+      NODE_OPTIONS: --disable-warning=DEP0040 --disable-warning=DEP0169
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund --loglevel=error
+      - run: npm run test:pre-release
+      - run: npm run lint
+      - run: npm run test:smoke
