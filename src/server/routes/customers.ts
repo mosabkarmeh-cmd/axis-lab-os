@@ -42,7 +42,7 @@ router.get("/", async (req, res) => {
       category: c.category || "شركة"
     }));
     res.json(mapped);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error fetching customers:", err);
     res.status(500).json({ error: "Failed to fetch customers: " + err.message });
   }
@@ -78,7 +78,7 @@ router.post("/", async (req, res) => {
       ...values
     };
     res.json(result);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error adding customer:", err);
     res.status(500).json({ error: "Failed to add customer: " + err.message });
   }
@@ -104,7 +104,7 @@ router.delete("/:id", async (req, res) => {
 
     await db.delete(customers).where(eq(customers.id, rawId));
     res.json({ success: true, id: req.params.id, name: existing[0].name });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error deleting customer:", err);
     res.status(500).json({ error: "Failed to delete customer: " + err.message });
   }
@@ -150,7 +150,7 @@ router.put("/:id", async (req, res) => {
       ...values
     };
     res.json(result);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error updating customer:", err);
     res.status(500).json({ error: "Failed to update customer: " + err.message });
   }
@@ -190,7 +190,7 @@ router.patch("/:id", async (req, res) => {
       ...values
     };
     res.json(result);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error updating customer:", err);
     res.status(500).json({ error: "Failed to update customer: " + err.message });
   }
