@@ -39,7 +39,6 @@ export function useAccountingActions({
   fetchLogs,
   addTerminalLog,
 }: AccountingActionsOptions) {
-  const changedById = currentUserId || "u-1";
   const isSubmittingPaymentRef = useRef(false);
   const paymentIdempotencyKeyRef = useRef<string | null>(null);
 
@@ -65,7 +64,6 @@ export function useAccountingActions({
           currency: paymentInputCurrency,
           notes: newPaymentNotes,
           paymentMethod: selectedPaymentMethod,
-          changedById,
           paymentId: paymentIdempotencyKeyRef.current,
         }),
       });
@@ -98,7 +96,6 @@ export function useAccountingActions({
       const res = await fetch(`/api/orders/${selectedOrder.id}/payments/${paymentId}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ changedById }),
       });
       if (res.ok) {
         const updated = await res.json() as Order;
@@ -128,8 +125,7 @@ export function useAccountingActions({
             currency: "SYP",
             notes: "تسديد تلقائي كامل للمتبقي عند استلام العميل وتسليم الطلب",
             paymentMethod: selectedPaymentMethod,
-            changedById,
-          }),
+            }),
         });
         const payJson = await payRes.json().catch(() => ({}));
         if (!payRes.ok) {
@@ -144,7 +140,7 @@ export function useAccountingActions({
       const statusRes = await fetch(`/api/orders/${ordToDeliver.id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "delivered", notes: "تم قبض المتبقي وتسليم الطلب والقطع للعميل فورياً", changedById }),
+        body: JSON.stringify({ status: "delivered", notes: "تم قبض المتبقي وتسليم الطلب والقطع للعميل فورياً" }),
       });
       if (statusRes.ok) {
         addTerminalLog("DB", `Order ${ordToDeliver.orderNumber} fully settled and delivered successfully.`);

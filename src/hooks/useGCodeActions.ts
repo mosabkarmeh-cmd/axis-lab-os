@@ -34,7 +34,7 @@ export function useGCodeActions(o: Options) {
       const res = await fetch("/api/compiler/gcode", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ promptText: prompt, material: "Acrylic 3mm", speed: 40, power: "85" }) });
       const data = await res.json(); if (!res.ok) throw new Error(data.error || "G-Code Compilation failed");
       o.setOrderGcodeResult(data); o.addTerminalLog("SUCCESS", `Compiled G-Code paths for order ${order.orderNumber} successfully (${data.totalPaths} vectors).`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       o.addTerminalLog("ERROR", `Compilation for order failed: ${err.message}`);
       setTimeout(() => o.setOrderGcodeResult(fallbackOrderResult), 1000);
     } finally { o.setIsCompilingOrderGcode(false); }
@@ -48,7 +48,7 @@ export function useGCodeActions(o: Options) {
       const res = await fetch("/api/compiler/gcode", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ promptText: o.gcodePrompt, material: o.gcodeMaterial, speed: o.gcodeSpeed, power: `${o.gcodePower}%` }) });
       const data = await res.json(); if (!res.ok) throw new Error(data.error || "G-Code Compilation failed");
       o.setGcodeResult(data); o.addTerminalLog("SUCCESS", `Compiled G-Code paths successfully (${data.totalPaths} vectors). Time: ${data.estimatedTime}`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       o.addTerminalLog("ERROR", `Compilation failed: ${err.message}`);
       setTimeout(() => o.setGcodeResult({ ...fallbackOrderResult, gcodeSnippet: `G00 X0 Y0 F3000\nM03 S${o.gcodePower * 10}\nG01 X50 Y50 F${o.gcodeSpeed * 60}\nG01 X50 Y150\nG01 X150 Y150\nG01 X150 Y50\nG01 X50 Y50\nM05\nG00 X0 Y0`, estimatedTime: "01m 40s", totalPaths: 6, beamDutyCycle: `${o.gcodePower}%`, materialLossPercent: 2.1 }), 1000);
     } finally { o.setIsCompilingGCode(false); }

@@ -150,7 +150,7 @@ export function useAiToolsActions({
       const latency = Math.round(performance.now() - startTime);
       setLastResponseLatencyMs(latency);
       addTerminalLog("AI", `⚡ حساب بارامترات القص والأسعار بنجاح في (${latency}ms) ✓`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Fast Calc Error:", err);
       window.showAlert?.("خطأ في الحاسبة السريعة: " + err.message);
     } finally {
@@ -177,7 +177,7 @@ export function useAiToolsActions({
       const latency = Math.round(performance.now() - startTime);
       setLastResponseLatencyMs(latency);
       addTerminalLog("AI", `⚡ تحليل وتفكيك نص الطلب دلالياً بنجاح (${latency}ms) ✓`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Fast Parser Error:", err);
       window.showAlert?.("خطأ في المستخرج السريع: " + err.message);
     } finally {
@@ -257,7 +257,7 @@ export function useAiToolsActions({
         time: new Date().toLocaleTimeString("ar-SY", { hour: '2-digit', minute: '2-digit' })
       }]);
       addTerminalLog("AI", `تم الرد بنجاح (${latency}ms) ✓`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("AI Chat error:", err);
       const latency = Math.round(performance.now() - startTime);
       setLastResponseLatencyMs(latency);
