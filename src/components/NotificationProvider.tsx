@@ -32,6 +32,15 @@ interface NotificationContextProps {
 
 const NotificationContext = createContext<NotificationContextProps | undefined>(undefined);
 
+let notificationSequence = 0;
+function nextNotificationId(prefix: string): string {
+  notificationSequence = (notificationSequence + 1) % 1_000_000;
+  const random = typeof globalThis.crypto?.randomUUID === "function"
+    ? globalThis.crypto.randomUUID()
+    : `${Date.now()}-${notificationSequence}`;
+  return `${prefix}-${random}`;
+}
+
 export const useNotifications = () => {
   const context = useContext(NotificationContext);
   if (!context) {
@@ -46,7 +55,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
   const [alerts, setAlerts] = useState<AlertDialog[]>([]);
 
   const showToast = (message: string, type: ToastType = "info") => {
-    const id = Math.random().toString(36).substring(2, 9);
+    const id = nextNotificationId("toast");
     setToasts((prev) => [...prev, { id, message, type }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -55,14 +64,14 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
 
   const showConfirm = (message: string, title: string = "تأكيد الإجراء"): Promise<boolean> => {
     return new Promise((resolve) => {
-      const id = Math.random().toString(36).substring(2, 9);
+      const id = nextNotificationId("confirm");
       setConfirms((prev) => [...prev, { id, message, title, resolve }]);
     });
   };
 
   const showAlert = (message: string, title: string = "تنبيه"): Promise<void> => {
     return new Promise((resolve) => {
-      const id = Math.random().toString(36).substring(2, 9);
+      const id = nextNotificationId("alert");
       setAlerts((prev) => [...prev, { id, message, title, resolve }]);
     });
   };

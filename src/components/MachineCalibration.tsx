@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   Wrench, 
@@ -38,13 +38,34 @@ interface Machine {
   };
 }
 
+interface CalibrationRemnant {
+  id: string;
+  materialId?: string;
+}
+
+interface CalibrationMaterial {
+  id: string;
+  name: string;
+}
+
+interface CalibrationSettings {
+  scaleX: number;
+  scaleY: number;
+  expectedWidth: number;
+  expectedHeight: number;
+  measuredWidth: number;
+  measuredHeight: number;
+  lastTestCutDate: string;
+  testMaterialId?: string;
+}
+
 interface MachineCalibrationProps {
   machines: Machine[];
   onLogCalibration: (msg: string) => void;
   currentUser: { role: string; fullName: string } | null;
-  remnants: any[];
-  materials: any[];
-  onUpdateMachineCalibration: (machineId: string, settings: any) => Promise<void>;
+  remnants: CalibrationRemnant[];
+  materials: CalibrationMaterial[];
+  onUpdateMachineCalibration: (machineId: string, settings: CalibrationSettings) => Promise<void>;
 }
 
 interface ProbePoint {
@@ -77,7 +98,11 @@ export default function MachineCalibration({
   const [selectedMachineId, setSelectedMachineId] = useState<string>("");
 
   useEffect(() => {
-    if (machines.length > 0 && !selectedMachineId) {
+    if (!machines.length) {
+      setSelectedMachineId("");
+      return;
+    }
+    if (!selectedMachineId || !machines.some((machine) => machine.id === selectedMachineId)) {
       setSelectedMachineId(machines[0].id);
     }
   }, [machines, selectedMachineId]);
@@ -123,6 +148,32 @@ export default function MachineCalibration({
   const [scaleX, setScaleX] = useState<number>(80);
   const [scaleY, setScaleY] = useState<number>(80);
   const [testCutSuccess, setTestCutSuccess] = useState<boolean>(false);
+  const mountedRef = useRef(true);
+  const cutIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const scheduleTimer = (callback: () => void, delay: number) => {
+    const timer = setTimeout(() => {
+      timersRef.current = timersRef.current.filter((entry) => entry !== timer);
+      if (mountedRef.current) callback();
+    }, delay);
+    timersRef.current.push(timer);
+    return timer;
+  };
+
+  const clearSimulationTimers = () => {
+    if (cutIntervalRef.current) {
+      clearInterval(cutIntervalRef.current);
+      cutIntervalRef.current = null;
+    }
+    for (const timer of timersRef.current) clearTimeout(timer);
+    timersRef.current = [];
+  };
+
+  useEffect(() => () => {
+    mountedRef.current = false;
+    clearSimulationTimers();
+  }, []);
 
   // Sync scale settings on machine change
   useEffect(() => {
@@ -146,10 +197,15 @@ export default function MachineCalibration({
     setCutProgress(0);
     
     // Simulate cutting progress
-    const interval = setInterval(() => {
-      setCutProgress(prev => {
+    if (cutIntervalRef.current) clearInterval(cutIntervalRef.current);
+    cutIntervalRef.current = setInterval(() => {
+      if (!mountedRef.current) return;
+      setCutProgress((prev) => {
         if (prev >= 100) {
-          clearInterval(interval);
+          if (cutIntervalRef.current) {
+            clearInterval(cutIntervalRef.current);
+            cutIntervalRef.current = null;
+          }
           setIsCutting(false);
           setTestCutStep('measure_results');
           playLaserSound();
@@ -193,7 +249,7 @@ export default function MachineCalibration({
     
     onLogCalibration(`[معايرة الأبعاد] تم بنجاح إجراء قطع اختبار على فضلات "${matName}" للماكينة "${activeMachine.name}". الأبعاد المطلوبة: ${expectedWidth}x${expectedHeight} مم، المقاسة: ${mWidthNum}x${mHeightNum} مم. تم تصحيح معامل الخطوات إلى (X: ${calculatedScaleX}، Y: ${calculatedScaleY}).`);
     
-    setTimeout(() => {
+    scheduleTimer(() => {
       setTestCutSuccess(false);
     }, 5000);
   };
@@ -205,7 +261,7 @@ export default function MachineCalibration({
   // Synthesize laser audio pulse using Web Audio API
   const playLaserSound = () => {
     try {
-      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioContext = window.AudioContext;
       if (!AudioContext) return;
       const ctx = new AudioContext();
       const osc = ctx.createOscillator();
@@ -223,6 +279,7 @@ export default function MachineCalibration({
       gain.connect(ctx.destination);
       osc.start();
       osc.stop(ctx.currentTime + 0.18);
+      scheduleTimer(() => { void ctx.close().catch(() => undefined); }, 250);
     } catch (e) {
       // Audio context might be blocked or unsupported in iframe, ignore gracefully
     }
@@ -235,7 +292,7 @@ export default function MachineCalibration({
     setIsNozzleMoving(true);
     
     // Simulate head traveling speed
-    setTimeout(() => {
+    scheduleTimer(() => {
       setNozzleX(pt.x);
       setNozzleY(pt.y);
       setIsNozzleMoving(false);
@@ -278,7 +335,7 @@ export default function MachineCalibration({
     }));
 
     // Simulate probing touch
-    setTimeout(() => {
+    scheduleTimer(() => {
       setPoints(prev => prev.map(p => {
         if (p.id === activePointId) {
           return { ...p, value: 0.0, status: "calibrated" };
@@ -302,18 +359,21 @@ export default function MachineCalibration({
       setIsNozzleMoving(true);
       
       // Move to point
-      await new Promise(resolve => setTimeout(resolve, 600));
+      await new Promise<void>((resolve) => scheduleTimer(resolve, 600));
+      if (!mountedRef.current) return;
       setNozzleX(pt.x);
       setNozzleY(pt.y);
       setIsNozzleMoving(false);
       
       // Start probing
       setPoints(prev => prev.map(p => p.id === pt.id ? { ...p, status: "calibrating" } : p));
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise<void>((resolve) => scheduleTimer(resolve, 500));
+      if (!mountedRef.current) return;
       playLaserSound();
       
       // Probe touch down & calibrate
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise<void>((resolve) => scheduleTimer(resolve, 500));
+      if (!mountedRef.current) return;
       setPoints(prev => prev.map(p => p.id === pt.id ? { ...p, value: 0.0, status: "calibrated" } : p));
     }
     
@@ -326,7 +386,7 @@ export default function MachineCalibration({
     setIsFiring(true);
     playLaserSound();
 
-    setTimeout(() => {
+    scheduleTimer(() => {
       // Burn spot is calculated relative to central target (100, 100)
       // AlignmentX and AlignmentY shift where the burn spot lands.
       // Perfect alignment (0,0) lands precisely on the bullseye center.
@@ -379,13 +439,12 @@ export default function MachineCalibration({
   const handleSaveCalibrationReport = () => {
     if (!activeMachine) return;
     
-    const today = new Date().toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     const logMsg = `[معايرة الماكينة] تم بنجاح ضبط استواء السطح ومحاذاة شعاع الليزر لجهاز "${activeMachine.name}" (${activeMachine.type === "laser_co2" ? "CO2 Laser" : "Fiber Laser"}) بنسبة دقة 100% وانحراف بصري 0.00 مم بواسطة الفني ${currentUser?.fullName || "فني التشغيل"}.`;
     
     onLogCalibration(logMsg);
     setCalibrationSuccess(true);
     
-    setTimeout(() => {
+    scheduleTimer(() => {
       setCalibrationSuccess(false);
     }, 5000);
   };
