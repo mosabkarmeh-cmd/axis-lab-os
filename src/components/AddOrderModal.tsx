@@ -414,7 +414,6 @@ export default function AddOrderModal({
           totalPrice: totalPrice,
           taxPercent: taxPercentVal,
           discount: discountAmountVal,
-          createdById: currentUser?.id || "u-1",
           deliveryDateExpected: orderDeliveryDate
         })
       });
@@ -464,7 +463,7 @@ export default function AddOrderModal({
 
       setAiAnalysisResult(data);
       addTerminalLog("AI", "تم استلام التوجيهات والبارامترات المقترحة من Gemini بنجاح ✓");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("AI Order Analysis error:", err);
       setAiAnalysisError(err.message || "عذراً، حدث خطأ أثناء الاتصال بمساعد الذكاء الاصطناعي.");
       addTerminalLog("ERROR", `فشل تحليل الطلب ذكياً: ${err.message}`);
@@ -516,7 +515,7 @@ export default function AddOrderModal({
       } else {
         addTerminalLog("SUCCESS", "فحص توفر المواد: جميع المواد متوفرة والمخزون المتبقي فوق الحد الأدنى.");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Material availability check error:", err);
       setMaterialCheckError(err.message || "حدث خطأ أثناء فحص توفر المواد بالمستودع.");
       addTerminalLog("ERROR", `فشل فحص توفر المواد: ${err.message}`);

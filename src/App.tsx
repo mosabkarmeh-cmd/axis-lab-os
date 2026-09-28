@@ -20,7 +20,8 @@ import { useAiMemoryActions } from "./hooks/useAiMemoryActions";
 import { useTerminalActions } from "./hooks/useTerminalActions";
 import { useSupplyActions } from "./hooks/useSupplyActions";
 import { useAiToolsActions } from "./hooks/useAiToolsActions";
-import { extractMaterialName, materialPriceUSD } from "./lib/materials";
+import CutProgressInteractiveTable from "./components/CutProgressInteractiveTable.tsx";
+import { calculateOrderProgress } from "./utils/orderProgress";
 import { getOrderStatusBadge, getPaymentStatusBadge } from "./components/StatusBadges";
 import { DEFAULT_EXCHANGE_RATE, EXCHANGE_RATE_STORAGE_KEY, sanitizeExchangeRate, sypToUsd, usdToSyp } from "./lib/currency";
 import {
@@ -143,25 +144,22 @@ import SupplierPriceComparisonModal from "./components/SupplierPriceComparisonMo
 import HelpModal from "./components/HelpModal";
 import HelpTooltip from "./components/HelpTooltip";
 import AddOrderModal from "./components/AddOrderModal";
+import LoginScreen from "./components/LoginScreen";
 import AutoLogoutTimer from "./components/AutoLogoutTimer";
 import CurrencyConverterModal from "./components/CurrencyConverterModal";
 import FirstRunPasswordModal from "./components/FirstRunPasswordModal";
 
-const USERS = [
-  { id: "u-1", email: "admin@axislab.com", fullName: "المدير العام", role: "admin" },
-  { id: "u-2", email: "employee@axislab.com", fullName: "فني تشغيل الليزر", role: "employee" },
-  { id: "u-3", email: "accountant@axislab.com", fullName: "المحاسب المالي", role: "accountant" }
-];
 
 export default function App() {
   // Authentication states
-  const [token, setToken] = useState<string | null>(null);
+  const [sessionActive, setSessionActive] = useState(false);
   const [theme, setTheme] = useLocalStorage<"dark" | "light">("axislab_theme", "dark");
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authEmail, setAuthEmail] = useState<string>("admin@axislab.com");
   const [authPassword, setAuthPassword] = useState<string>("");
   const [authFullName, setAuthFullName] = useState<string>("");
   const [authRole, setAuthRole] = useState<'admin' | 'employee' | 'accountant'>("employee");
+  const [users, setUsers] = useState<Array<{ id: string; email: string; fullName: string; role: string; isActive?: boolean }>>([]);
   const [isRegisterMode, setIsRegisterMode] = useState<boolean>(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState<boolean>(false);
@@ -664,7 +662,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
       } else {
         window.showAlert?.("حدث خطأ أثناء المشاركة: " + data.message, "فشل المشاركة");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       window.showAlert?.("فشل الاتصال بالخادم لمشاركة الطلب", "خطأ في الاتصال");
     } finally {
@@ -741,7 +739,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
   const lowStockCount = materialStats?.lowStock ?? materials.filter(m => m.inventory ? m.inventory.availableQuantity < m.minimumStock : m.minimumStock > 0).length;
   const laserMachines = machines.filter(m => m.type === 'laser_co2' || m.type === 'fiber_laser');
   const runningLasersCount = laserMachines.filter(m => m.status === 'running').length;
-  const todayDateStr = "2026-07-10";
+  const todayDateStr = new Date().toLocaleDateString("en-CA");
   const todayLaserJobs = productionJobs.filter(job => {
     const isToday = job.createdAt && job.createdAt.slice(0, 10) === todayDateStr;
     const isLaser = job.machineName ? (job.machineName.toLowerCase().includes('laser') || job.machineName.toLowerCase().includes('co2')) : true;
@@ -763,6 +761,10 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     fetchOrderStatuses();
   }, []);
 
+  useEffect(() => {
+    if (currentUser) void fetchAssignableUsers();
+  }, [currentUser?.id]);
+
   // One coordinated LAN sync keeps all clients consistent without overlapping requests.
   useEffect(() => {
     const pollInterval = setInterval(() => {
@@ -772,54 +774,46 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     return () => clearInterval(pollInterval);
   }, [currentUser?.id]);
 
-  // Auto-verify saved JWT token on mount
+  // Restore the authenticated session from the server-side HttpOnly cookie.
   useEffect(() => {
-    const savedToken = localStorage.getItem("axislab_token");
-    if (savedToken) {
-      addTerminalLog("SYSTEM", "استعادة الجلسة: يتم فحص صلاحية رمز JWT المخزن...");
-      fetch("/api/auth/verify", {
-        headers: { "Authorization": `Bearer ${savedToken}` }
-      })
+    addTerminalLog("SYSTEM", "فحص جلسة العمل الآمنة عبر ملف تعريف الارتباط المحمي...");
+    fetch("/api/auth/verify", { credentials: "include" })
       .then(res => {
         if (res.ok) return res.json();
-        throw new Error("Expired or invalid");
+        throw new Error("No active session");
       })
       .then(data => {
-        setToken(savedToken);
+        setSessionActive(true);
         setCurrentUser(data.user);
-        if (data.user.role === "accountant") {
-          setActiveView("accounting");
-        } else if (data.user.role === "employee") {
-          setActiveView("production");
-        } else {
-          setActiveView("dashboard");
-        }
-        addTerminalLog("JWT", `مرحباً بعودتك فني ${data.user.fullName}! تم التحقق من سلامة رمز JWT واستعادة الجلسة الآمنة.`);
+        fetchAssignableUsers();
+        if (data.user.role === "accountant") setActiveView("accounting");
+        else if (data.user.role === "employee") setActiveView("production");
+        else setActiveView("dashboard");
+        addTerminalLog("JWT", `مرحباً بعودتك ${data.user.fullName}! تم التحقق من جلسة HttpOnly الآمنة.`);
         fetchLogs();
       })
       .catch(() => {
-        addTerminalLog("WARNING", "انتهت صلاحية رمز المصادقة القديم أو تم التلاعب به. يرجى تسجيل الدخول مجدداً.");
-        localStorage.removeItem("axislab_token");
-        document.cookie = "axislab_token=; path=/; max-age=0; SameSite=Lax";
+        setSessionActive(false);
+        setCurrentUser(null);
       });
-    }
   }, []);
 
   useEffect(() => {
-    if (currentUser?.mustChangePassword && token) {
+    if (currentUser?.mustChangePassword && sessionActive) {
       setFirstRunPasswordCurrent(authPassword || null);
     } else {
       setFirstRunPasswordCurrent(null);
     }
-  }, [currentUser?.mustChangePassword, token, authPassword]);
+  }, [currentUser?.mustChangePassword, sessionActive, authPassword]);
 
   const handleFirstRunPasswordChange = async (currentPassword: string, newPassword: string) => {
-    if (!token) return;
+    if (!sessionActive) return;
     setIsFirstRunPasswordLoading(true);
     try {
       const res = await fetch("/api/auth/change-password", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ currentPassword, newPassword }),
       });
       const data = await res.json();
@@ -828,7 +822,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
       setFirstRunPasswordCurrent(null);
       setAuthError(null);
       addTerminalLog("AUTH", "تم تغيير كلمة مرور المسؤول المؤقتة بنجاح.");
-    } catch (error: any) {
+    } catch (error: unknown) {
       setAuthError(error.message);
       addTerminalLog("ERROR", error.message);
     } finally {
@@ -852,28 +846,25 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     }
   }, [currentUser, activeView]);
 
-  // Decode JWT on state update
+  // JWT is intentionally not decoded in the renderer. The HttpOnly cookie is not readable by JavaScript.
   useEffect(() => {
-    if (token) {
-      try {
-        const parts = token.split(".");
-        if (parts.length === 3) {
-          const payloadDecoded = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
-          setInspectToken({
-            header: { alg: "HS256", typ: "JWT" },
-            payload: payloadDecoded,
-            signature: parts[2]
-          });
-        }
-      } catch (e) {
-        setInspectToken(null);
-      }
+    if (sessionActive) {
+      setInspectToken({
+        header: { mode: "HttpOnly session cookie", algorithm: "HS256 (server-side)" },
+        payload: { session: "authenticated", visibility: "server-only" },
+        signature: "hidden from renderer by HttpOnly cookie"
+      });
     } else {
       setInspectToken(null);
     }
-  }, [token]);
+  }, [sessionActive]);
 
   // Database fetchers use the shared safe API client from src/lib/api.ts.
+  const fetchAssignableUsers = async () => {
+    const data = await safeApiFetch<{ success?: boolean; users?: Array<{ id: string; email: string; fullName: string; role: string; isActive?: boolean }> }>("/api/users/assignable");
+    if (data?.success && Array.isArray(data.users)) setUsers(data.users);
+  };
+
   const fetchMachines = async () => {
     const data = await safeApiFetch("/api/production/machines");
     if (data && data.success) setMachines(data.machines);
@@ -960,39 +951,6 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     }
   };
 
-  const legacyHandleReorderMaterials = (sourceId: string, targetId: string) => {
-    setMaterials((prevMaterials) => {
-      const sourceIdx = prevMaterials.findIndex((item) => item.id === sourceId);
-      const targetIdx = prevMaterials.findIndex((item) => item.id === targetId);
-      if (sourceIdx === -1 || targetIdx === -1) return prevMaterials;
-
-      const updated = [...prevMaterials];
-      const [movedItem] = updated.splice(sourceIdx, 1);
-      updated.splice(targetIdx, 0, movedItem);
-
-      try {
-        const ids = updated.map((mat) => mat.id);
-        localStorage.setItem("axislab_materials_order_ids", JSON.stringify(ids));
-      } catch (err) {
-        console.error("Failed to save material order to localStorage", err);
-      }
-
-      return updated;
-    });
-
-    if (materialSortBy !== 'default') {
-      setMaterialSortBy('default');
-    }
-
-    setTerminalLogs((prev) => [
-      ...prev,
-      {
-        time: new Date().toLocaleTimeString('ar-EG'),
-        type: 'SUCCESS',
-        msg: '🔄 تم إعادة ترتيب المواد الخام بالسحب والإفلات وحفظ الترتيب المفضل بنجاح'
-      }
-    ]);
-  };
 
   const fetchMaterialCategories = async () => {
     const data = await safeApiFetch("/api/materials/categories");
@@ -1035,8 +993,9 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
 
   const { handleLogin, handleRegister, setAuthPreset } = useAuthActions({
     authEmail, authPassword, authFullName, authRole,
-    setToken, setCurrentUser, setAuthError, setIsAuthLoading, setIsRegisterMode,
+    setSessionActive, setCurrentUser, setAuthError, setIsAuthLoading, setIsRegisterMode,
     setActivePreset, setAuthEmail, setAuthPassword, setActiveView,
+    rememberMe,
     addTerminalLog, fetchLogs,
   });
 
@@ -1047,7 +1006,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
   const [selectedMemoryLayer, setSelectedMemoryLayer] = useState<string>("short_term");
   const {
     terminalLogs, setTerminalLogs, commandInput, setCommandInput, handleTerminalSubmit, executeTerminalCommand,
-  } = useTerminalActions({ currentUser, token, users: USERS, addTerminalLog });
+  } = useTerminalActions({ currentUser, sessionActive, users, addTerminalLog });
   useEffect(() => {
     terminalBottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [terminalLogs]);
@@ -1150,818 +1109,8 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     editingOrder, setEditingOrder, editOrderItems,
   });
 
-  const { handleLogout } = useLogoutAction({ setToken, setCurrentUser, addTerminalLog });
+  const { handleLogout } = useLogoutAction({ setSessionActive, setCurrentUser, addTerminalLog });
 
-  // Helper to calculate technical order completion progress based on each part/item and material breakdown (حسب تفاصيل كل مادة وعدد القطع والتكرارات)
-  const calculateOrderProgress = (ord: any, jobsList: any[] = productionJobs) => {
-    if (!ord) {
-      return { 
-        percentage: 0, 
-        totalJobs: 0, 
-        completedJobs: 0, 
-        runningJobs: 0, 
-        totalUnits: 0, 
-        completedUnits: 0, 
-        totalItems: 0, 
-        completedItems: 0, 
-        itemsBreakdown: [], 
-        materialsBreakdown: [],
-        hasJobs: false, 
-        label: "0%" 
-      };
-    }
-
-    const items = ord.items || ord.orderItems || [];
-    const linkedJobs = (jobsList || []).filter(j => 
-      (j.orderId && j.orderId === ord.id) || 
-      (j.orderNumber && j.orderNumber === ord.orderNumber)
-    );
-
-
-    // If order has items, calculate completion progress for each part/item & material group
-    if (items.length > 0) {
-      let totalUnits = 0;
-      let completedUnits = 0;
-      let completedItems = 0;
-
-      const materialMap: Record<string, {
-        materialName: string;
-        totalUnits: number;
-        completedUnits: number;
-        itemsCount: number;
-        items: any[];
-      }> = {};
-
-      const itemsBreakdown = items.map((it: any, idx: number) => {
-        const q = Math.max(1, Number(it.quantity) || 1);
-        const matName = extractMaterialName(it);
-        
-        let c = 0;
-        if (it.completedQuantity !== undefined && it.completedQuantity !== null) {
-          c = Number(it.completedQuantity);
-        } else if (it.isCompleted || it.status === 'completed') {
-          c = q;
-        } else {
-          // Check matching production job for this item/part
-          const matchingJob = linkedJobs.find(j => 
-            (j.title && j.title.toLowerCase().includes((it.productName || "").toLowerCase())) ||
-            (j.notes && j.notes.toLowerCase().includes((it.productName || "").toLowerCase()))
-          );
-          if (matchingJob) {
-            if (matchingJob.status === 'completed') {
-              c = q;
-            } else if (matchingJob.completedQuantity !== undefined) {
-              c = Math.min(q, Number(matchingJob.completedQuantity));
-            } else if (matchingJob.progress) {
-              c = Math.round(((matchingJob.progress || 0) / 100) * q);
-            }
-          }
-        }
-
-        c = Math.max(0, Math.min(q, c));
-
-        // Global status overrides if delivered or ready or cancelled
-        if (ord.status === 'ready' || ord.status === 'delivered') {
-          c = q;
-        } else if (ord.status === 'cancelled') {
-          c = 0;
-        }
-
-        if (c >= q) {
-          completedItems++;
-        }
-
-        totalUnits += q;
-        completedUnits += c;
-
-        const partPct = Math.min(100, Math.round((c / q) * 100));
-
-        const itemObj = {
-          id: it.id || `item-${idx}`,
-          productName: it.productName || "جزء/مادة القص",
-          materialName: matName,
-          quantity: q,
-          completedQuantity: c,
-          remainingQuantity: Math.max(0, q - c),
-          percentage: partPct,
-          isCompleted: c >= q,
-          unitPrice: Number(it.unitPrice) || 0,
-          totalPrice: Number(it.totalPrice) || (q * (Number(it.unitPrice) || 0)),
-          notes: it.notes || ""
-        };
-
-        if (!materialMap[matName]) {
-          materialMap[matName] = {
-            materialName: matName,
-            totalUnits: 0,
-            completedUnits: 0,
-            itemsCount: 0,
-            items: []
-          };
-        }
-        materialMap[matName].totalUnits += q;
-        materialMap[matName].completedUnits += c;
-        materialMap[matName].itemsCount += 1;
-        materialMap[matName].items.push(itemObj);
-
-        return itemObj;
-      });
-
-      const materialsBreakdown = Object.values(materialMap).map(m => {
-        const matPct = m.totalUnits > 0 ? Math.min(100, Math.round((m.completedUnits / m.totalUnits) * 100)) : 0;
-        const remainingUnits = Math.max(0, m.totalUnits - m.completedUnits);
-        return {
-          materialName: m.materialName,
-          totalUnits: m.totalUnits,
-          completedUnits: m.completedUnits,
-          remainingUnits,
-          percentage: matPct,
-          itemsCount: m.itemsCount,
-          isCompleted: m.completedUnits >= m.totalUnits,
-          items: m.items
-        };
-      });
-
-      let overallPct = totalUnits > 0 ? Math.min(100, Math.round((completedUnits / totalUnits) * 100)) : 0;
-      if (ord.status === 'ready' || ord.status === 'delivered') overallPct = 100;
-      if (ord.status === 'cancelled') overallPct = 0;
-
-      const completedCountJobs = linkedJobs.filter(j => j.status === 'completed').length;
-      const runningCountJobs = linkedJobs.filter(j => j.status === 'running' || j.status === 'paused').length;
-
-      const remainingUnitsOverall = Math.max(0, totalUnits - completedUnits);
-      const label = remainingUnitsOverall > 0 
-        ? `${materialsBreakdown.length} خامات | ${completedUnits}/${totalUnits} قطعة (${overallPct}%) • متبقي ${remainingUnitsOverall} قطعة`
-        : `${materialsBreakdown.length} خامات | مكتمل بالكامل (100%)`;
-
-      return {
-        percentage: overallPct,
-        totalItems: items.length,
-        completedItems,
-        totalUnits,
-        completedUnits,
-        remainingUnits: remainingUnitsOverall,
-        itemsBreakdown,
-        materialsBreakdown,
-        hasJobs: linkedJobs.length > 0,
-        totalJobs: linkedJobs.length,
-        completedJobs: completedCountJobs,
-        runningJobs: runningCountJobs,
-        label
-      };
-    }
-
-    // Fallback if no items array exists but linked jobs exist
-    if (linkedJobs.length > 0) {
-      let totalUnits = 0;
-      let completedUnits = 0;
-      let totalProgressWeighted = 0;
-
-      linkedJobs.forEach(j => {
-        const qty = Number(j.quantity) || Number((j as any).usedQuantity) || 1;
-        totalUnits += qty;
-        
-        if (j.status === 'completed') {
-          completedUnits += qty;
-          totalProgressWeighted += 100 * qty;
-        } else if (j.status === 'running' || j.status === 'paused') {
-          const compQty = (j as any).completedQuantity !== undefined 
-            ? Number((j as any).completedQuantity) 
-            : Math.round(((j.progress || 25) / 100) * qty);
-          const jobProg = Math.min(100, Math.max(10, Math.round((compQty / qty) * 100)));
-          completedUnits += Math.min(qty, compQty);
-          totalProgressWeighted += jobProg * qty;
-        } else {
-          const jobProg = j.progress || 0;
-          totalProgressWeighted += jobProg * qty;
-        }
-      });
-
-      const rawAvg = totalUnits > 0 ? (totalProgressWeighted / totalUnits) : 0;
-      const avgProgress = Math.min(100, Math.round(rawAvg));
-      const completedCount = linkedJobs.filter(j => j.status === 'completed').length;
-      const runningCount = linkedJobs.filter(j => j.status === 'running' || j.status === 'paused').length;
-      
-      return {
-        percentage: avgProgress,
-        totalItems: linkedJobs.length,
-        completedItems: completedCount,
-        totalUnits,
-        completedUnits,
-        itemsBreakdown: [],
-        hasJobs: true,
-        totalJobs: linkedJobs.length,
-        completedJobs: completedCount,
-        runningJobs: runningCount,
-        label: `${completedCount}/${linkedJobs.length} مهام (${completedUnits}/${totalUnits} قطعة - ${avgProgress}%)`
-      };
-    }
-    
-    // Fallback estimation based on order status
-    let fallbackPercentage = 0;
-    let label = "جديد (0%)";
-
-    if (ord.status === 'ready' || ord.status === 'delivered') {
-      fallbackPercentage = 100;
-      label = ord.status === 'delivered' ? 'مكتمل ومسلم (100%)' : 'جاهز للتسليم (100%)';
-    } else if (ord.status === 'in_progress') {
-      fallbackPercentage = 50;
-      label = "قيد التنفيذ والقص (50%)";
-    } else if (ord.status === 'cancelled') {
-      fallbackPercentage = 0;
-      label = "ملغي (0%)";
-    } else {
-      fallbackPercentage = 0;
-      label = "جديد / بانتظار الإنتاج (0%)";
-    }
-    
-    return {
-      percentage: fallbackPercentage,
-      totalItems: 0,
-      completedItems: 0,
-      totalUnits: 0,
-      completedUnits: 0,
-      itemsBreakdown: [],
-      hasJobs: false,
-      totalJobs: 0,
-      completedJobs: 0,
-      runningJobs: 0,
-      label
-    };
-  };
-
-  // Helper to render interactive Cut Progress Table (جدول تحديد شو يلي انقص وشو يلي لسا)
-  const renderCutProgressInteractiveTable = (targetOrder: Order) => {
-    if (!targetOrder) return null;
-    const prog = calculateOrderProgress(targetOrder, productionJobs);
-
-    const totalRequiredPieces = prog.itemsBreakdown.reduce((sum: number, item: any) => sum + Math.max(0, Number(item.quantity) || 0), 0);
-    const totalCompletedPieces = prog.itemsBreakdown.reduce((sum: number, item: any) => sum + Math.min(Math.max(0, Number(item.completedQuantity) || 0), Math.max(0, Number(item.quantity) || 0)), 0);
-    const totalRemainingPieces = Math.max(0, totalRequiredPieces - totalCompletedPieces);
-    const completedItemsCount = prog.itemsBreakdown.filter((item: any) => item.isCompleted).length;
-
-    return (
-      <div className="space-y-4 font-sans text-right">
-        {/* Top Total Progress Banner */}
-        <div className="bg-gradient-to-r from-zinc-950 via-zinc-900 to-zinc-950 border border-zinc-800 p-4 rounded-xl shadow-xl space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-zinc-300">نسبة إنجاز الطلب الإجمالية:</span>
-                <span className={`font-mono font-extrabold text-xl px-3 py-0.5 rounded-lg border ${
-                  prog.percentage === 100 
-                    ? "bg-emerald-950/80 text-emerald-400 border-emerald-800" 
-                    : prog.percentage > 0 
-                    ? "bg-cyan-950/80 text-cyan-300 border-cyan-800" 
-                    : "bg-zinc-900 text-zinc-400 border-zinc-800"
-                }`}>
-                  {prog.percentage}%
-                </span>
-                <span className="text-[11px] font-medium text-zinc-400">({prog.label})</span>
-              </div>
-              <p className="text-[11px] text-zinc-400 leading-relaxed">
-                تُحسب نسبة الإنجاز تلقائياً بنسبة (مجموع القطع التي انقصت ÷ إجمالي القطع المطلوبة × 100). حدد أدناه <strong className="text-emerald-400">شو يلي انقص</strong> أو <strong className="text-amber-400">شو يلي لسا</strong> وسيتحدث المؤشر فوراً.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => handleUpdateItemProgress(targetOrder.id, { setAllCompleted: true })}
-                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs transition-colors flex items-center gap-1.5 shadow-lg shadow-emerald-950/50 cursor-pointer"
-                title="تحديد كافة القطع كمكتملة 100% (شو يلي انقص = الكلي)"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>إكمال كل القطع</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleUpdateItemProgress(targetOrder.id, { resetAll: true })}
-                className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 font-bold rounded-lg text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
-                title="تصفير إنجاز كافة القطع (0 انقص / كامل الكمية لسا)"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>إعادة الكل للبداية</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowAddCutItemForm(!showAddCutItemForm)}
-                className="px-3 py-1.5 bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-800 font-bold rounded-lg text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>إضافة بند جديد</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Overall Progress Bar Gauge */}
-          <div className="w-full bg-zinc-950 border border-zinc-800 rounded-full h-3 overflow-hidden p-0.5 relative shadow-inner">
-            <div
-              className={`h-full rounded-full transition-all duration-500 ${
-                prog.percentage === 100
-                  ? "bg-gradient-to-r from-emerald-500 to-teal-400 shadow-[0_0_12px_rgba(16,185,129,0.6)]"
-                  : prog.percentage > 0
-                  ? "bg-gradient-to-r from-blue-600 via-indigo-500 to-cyan-400 animate-pulse shadow-[0_0_10px_rgba(6,182,212,0.5)]"
-                  : "bg-zinc-800"
-              }`}
-              style={{ width: `${Math.max(prog.percentage, 2)}%` }}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-            <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 px-3 py-2 text-center">
-              <div className="text-[10px] text-zinc-500">إجمالي القطع المطلوبة</div>
-              <div className="mt-1 text-base font-black font-mono text-zinc-100">{totalRequiredPieces.toLocaleString()}</div>
-              <div className="text-[9px] text-zinc-600">قطعة</div>
-            </div>
-            <div className="rounded-lg border border-emerald-900/60 bg-emerald-950/20 px-3 py-2 text-center">
-              <div className="text-[10px] text-emerald-300/80">القطع المنجزة</div>
-              <div className="mt-1 text-base font-black font-mono text-emerald-400">{totalCompletedPieces.toLocaleString()}</div>
-              <div className="text-[9px] text-emerald-500/70">تم قصها</div>
-            </div>
-            <div className="rounded-lg border border-amber-900/60 bg-amber-950/20 px-3 py-2 text-center">
-              <div className="text-[10px] text-amber-300/80">القطع المتبقية</div>
-              <div className="mt-1 text-base font-black font-mono text-amber-300">{totalRemainingPieces.toLocaleString()}</div>
-              <div className="text-[9px] text-amber-500/70">بانتظار القص</div>
-            </div>
-            <div className="rounded-lg border border-cyan-900/60 bg-cyan-950/20 px-3 py-2 text-center">
-              <div className="text-[10px] text-cyan-300/80">البنود المكتملة</div>
-              <div className="mt-1 text-base font-black font-mono text-cyan-300">{completedItemsCount} / {prog.itemsBreakdown.length}</div>
-              <div className="text-[9px] text-cyan-500/70">بنود الإنتاج</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Add new cut item form */}
-        {showAddCutItemForm && (
-          <div className="bg-zinc-900/90 border border-zinc-800 p-3.5 rounded-xl space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-zinc-200">إضافة بند أو مادة جديدة لجدول القص</span>
-              <button
-                type="button"
-                onClick={() => setShowAddCutItemForm(false)}
-                className="text-zinc-500 hover:text-zinc-300 text-xs"
-              >
-                إغلاق ×
-              </button>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
-              <input
-                type="text"
-                placeholder="اسم البند (مثال: أحرف أكريليك 5 ملم)"
-                value={newCutItemName}
-                onChange={(e) => setNewCutItemName(e.target.value)}
-                className="bg-zinc-950 border border-zinc-800 text-zinc-200 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-cyan-500 sm:col-span-2"
-              />
-              <input
-                type="number"
-                min={1}
-                placeholder="العدد"
-                value={newCutItemQty}
-                onChange={(e) => setNewCutItemQty(Math.max(1, Number(e.target.value) || 1))}
-                className="bg-zinc-950 border border-zinc-800 text-zinc-200 text-xs rounded-lg px-3 py-1.5 text-center font-mono focus:outline-none focus:border-cyan-500"
-              />
-              <select
-                value={newCutItemMat}
-                onChange={(e) => setNewCutItemMat(e.target.value)}
-                className="bg-zinc-950 border border-zinc-800 text-zinc-200 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-cyan-500"
-              >
-                <option value="أكريليك">أكريليك</option>
-                <option value="خشب MDF">خشب MDF</option>
-                <option value="خشب طبيعي/معاكس">خشب طبيعي/معاكس</option>
-                <option value="جلود وقماش">جلود وقماش</option>
-                <option value="معادن وستانلس">معادن وستانلس</option>
-              </select>
-            </div>
-            <div className="flex justify-end">
-              <button
-                type="button"
-                disabled={!newCutItemName.trim()}
-                onClick={() => {
-                  if (!newCutItemName.trim()) return;
-                  handleUpdateItemProgress(targetOrder.id, {
-                    addItem: {
-                      productName: newCutItemName.trim(),
-                      quantity: newCutItemQty,
-                      materialName: newCutItemMat,
-                      unitPrice: 0
-                    }
-                  });
-                  setNewCutItemName("");
-                  setNewCutItemQty(1);
-                  setShowAddCutItemForm(false);
-                }}
-                className="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
-              >
-                حفظ وإضافة لجدول القص
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Interactive Table of Cut & Remaining Pieces */}
-        {prog.itemsBreakdown.length === 0 ? (
-          <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-8 text-center space-y-3">
-            <Scissors className="w-10 h-10 text-zinc-600 mx-auto" />
-            <div className="text-zinc-300 font-bold text-sm">لا توجد بنود أو خامات مسجلة في جدول القص لهذا الطلب</div>
-            <p className="text-zinc-500 text-xs max-w-md mx-auto">
-              قم بإضافة البنود أو المواد المطلوبة وقائمة القطع ليتمكن العمال من تحديد شو يلي انقص وشو يلي لسا بدقة.
-            </p>
-            <button
-              type="button"
-              onClick={() => setShowAddCutItemForm(true)}
-              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded-lg inline-flex items-center gap-2 cursor-pointer shadow-lg shadow-cyan-950/50"
-            >
-              <Plus className="w-4 h-4" />
-              <span>إضافة بند / خامة للقص الآن</span>
-            </button>
-          </div>
-        ) : (
-          <div className="bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden shadow-inner">
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-right">
-                <thead>
-                  <tr className="bg-zinc-900 border-b border-zinc-800 text-zinc-400 font-semibold">
-                    <th className="p-3 text-right min-w-[160px]">البند والمادة الخام</th>
-                    <th className="p-3 text-center min-w-[90px]">الكمية المطلوبة (الكلي)</th>
-                        <th className="p-3 text-center min-w-[210px] bg-emerald-950/20 text-emerald-300 font-bold border-x border-zinc-800">
-                      المنجز ✅
-                      <span className="block text-[10px] font-normal text-emerald-400/70 mt-0.5">ما تم قصّه فعليًا</span>
-                    </th>
-                        <th className="p-3 text-center min-w-[210px] bg-amber-950/20 text-amber-300 font-bold border-x border-zinc-800">
-                      المتبقي ⚠️
-                      <span className="block text-[10px] font-normal text-amber-400/70 mt-0.5">ما يجب قصّه بعد</span>
-                    </th>
-                    <th className="p-3 text-center min-w-[110px]">نسبة إنجاز البند</th>
-                    <th className="p-3 text-center min-w-[100px]">حالة القص</th>
-                    <th className="p-3 text-center w-10">حذف</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-900">
-                  {prog.itemsBreakdown.map((it: any) => {
-                    const rem = Math.max(0, it.quantity - (it.completedQuantity || 0));
-
-                    return (
-                      <tr
-                        key={it.id}
-                        className={`transition-colors ${
-                          it.isCompleted ? "bg-emerald-950/15 hover:bg-emerald-950/25" : "hover:bg-zinc-900/40"
-                        }`}
-                      >
-                        {/* Item Name & Material Badge */}
-                        <td className="p-3 text-right">
-                          <div className="font-bold text-zinc-200 flex flex-wrap items-center gap-1.5">
-                            <span>{it.productName}</span>
-                            <span className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 text-amber-300 rounded text-[10px] font-mono">
-                              {it.materialName}
-                            </span>
-                          </div>
-                          {it.notes && (
-                            <div className="text-[10px] text-zinc-500 mt-1">{it.notes}</div>
-                          )}
-                        </td>
-
-                        {/* Total Required Quantity Q */}
-                        <td className="p-3 text-center">
-                          <span className="inline-flex items-center justify-center px-2.5 py-1 bg-zinc-900 border border-zinc-800 rounded-lg font-mono font-extrabold text-sm text-zinc-200">
-                            {it.quantity}
-                          </span>
-                          <span className="block text-[10px] text-zinc-500 mt-0.5">قطعة</span>
-                        </td>
-
-                        {/* column: شو يلي انقص ✅ (Cut pieces) */}
-                        <td className="p-3 text-center bg-emerald-950/10 border-x border-zinc-800/60">
-                          <div className="inline-flex items-center gap-1 bg-zinc-900 border border-emerald-900/60 p-1 rounded-xl shadow-sm">
-                            <button
-                              type="button"
-                              disabled={it.completedQuantity <= 0}
-                              onClick={() =>
-                                handleUpdateItemProgress(targetOrder.id, {
-                                  itemId: it.id,
-                                  completedQuantity: it.completedQuantity - 1,
-                                })
-                              }
-                              className="w-6 h-6 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 disabled:opacity-30 disabled:cursor-not-allowed font-bold text-xs flex items-center justify-center transition-colors cursor-pointer"
-                              title="-1 قطعة انقصت"
-                            >
-                              -
-                            </button>
-
-                            <input
-                              type="number"
-                              min={0}
-                              max={it.quantity}
-                              value={it.completedQuantity}
-                              onChange={(e) => {
-                                const val = Math.max(0, Math.min(it.quantity, Number(e.target.value) || 0));
-                                handleUpdateItemProgress(targetOrder.id, {
-                                  itemId: it.id,
-                                  completedQuantity: val,
-                                });
-                              }}
-                              className="w-12 text-center font-mono font-extrabold text-sm bg-zinc-950 border border-emerald-800/80 text-emerald-400 rounded py-0.5 focus:outline-none focus:border-emerald-500"
-                            />
-
-                            <button
-                              type="button"
-                              disabled={it.completedQuantity >= it.quantity}
-                              onClick={() =>
-                                handleUpdateItemProgress(targetOrder.id, {
-                                  itemId: it.id,
-                                  completedQuantity: it.completedQuantity + 1,
-                                })
-                              }
-                              className="w-6 h-6 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 disabled:opacity-30 disabled:cursor-not-allowed font-bold text-xs flex items-center justify-center transition-colors cursor-pointer"
-                              title="+1 قطعة انقصت"
-                            >
-                              +
-                            </button>
-
-                            {it.quantity >= 5 && (
-                              <button
-                                type="button"
-                                disabled={it.completedQuantity >= it.quantity}
-                                onClick={() =>
-                                  handleUpdateItemProgress(targetOrder.id, {
-                                    itemId: it.id,
-                                    completedQuantity: Math.min(it.quantity, it.completedQuantity + 5),
-                                  })
-                                }
-                                className="px-1.5 py-0.5 bg-zinc-800 hover:bg-zinc-700 text-cyan-300 border border-zinc-700 rounded text-[10px] font-mono font-bold transition-colors cursor-pointer"
-                                title="+5 قطع انقصت"
-                              >
-                                +5
-                              </button>
-                            )}
-
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleUpdateItemProgress(targetOrder.id, {
-                                  itemId: it.id,
-                                  completedQuantity: it.quantity,
-                                })
-                              }
-                              disabled={it.isCompleted}
-                              className="px-2 py-0.5 bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-800 rounded text-[10px] font-bold ml-0.5 transition-colors disabled:opacity-40 cursor-pointer"
-                              title="تحديد إنجاز هذا البند بالكامل (100% انقص)"
-                            >
-                              كلها
-                            </button>
-                          </div>
-                          <div className="text-[10px] font-bold text-emerald-400 mt-1">
-                            انقص: <span className="font-mono">{it.completedQuantity}</span> من <span className="font-mono">{it.quantity}</span>
-                          </div>
-                        </td>
-
-                        {/* column: شو يلي لسا ⚠️ (Remaining pieces) */}
-                        <td className="p-3 text-center bg-amber-950/10 border-x border-zinc-800/60">
-                          <div className="inline-flex items-center gap-1 bg-zinc-900 border border-amber-900/60 p-1 rounded-xl shadow-sm">
-                            <button
-                              type="button"
-                              disabled={rem <= 0}
-                              onClick={() => {
-                                const newRem = rem - 1;
-                                const newCut = Math.max(0, it.quantity - newRem);
-                                handleUpdateItemProgress(targetOrder.id, {
-                                  itemId: it.id,
-                                  completedQuantity: newCut,
-                                });
-                              }}
-                              className="w-6 h-6 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 disabled:opacity-30 disabled:cursor-not-allowed font-bold text-xs flex items-center justify-center transition-colors cursor-pointer"
-                              title="-1 من المتبقي"
-                            >
-                              -
-                            </button>
-
-                            <input
-                              type="number"
-                              min={0}
-                              max={it.quantity}
-                              value={rem}
-                              onChange={(e) => {
-                                const newRem = Math.max(0, Math.min(it.quantity, Number(e.target.value) || 0));
-                                const newCut = Math.max(0, it.quantity - newRem);
-                                handleUpdateItemProgress(targetOrder.id, {
-                                  itemId: it.id,
-                                  completedQuantity: newCut,
-                                });
-                              }}
-                              className="w-12 text-center font-mono font-extrabold text-sm bg-zinc-950 border border-amber-800/80 text-amber-300 rounded py-0.5 focus:outline-none focus:border-amber-500"
-                            />
-
-                            <button
-                              type="button"
-                              disabled={rem >= it.quantity}
-                              onClick={() => {
-                                const newRem = rem + 1;
-                                const newCut = Math.max(0, it.quantity - newRem);
-                                handleUpdateItemProgress(targetOrder.id, {
-                                  itemId: it.id,
-                                  completedQuantity: newCut,
-                                });
-                              }}
-                              className="w-6 h-6 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 disabled:opacity-30 disabled:cursor-not-allowed font-bold text-xs flex items-center justify-center transition-colors cursor-pointer"
-                              title="+1 إلى المتبقي"
-                            >
-                              +
-                            </button>
-
-                            {rem >= 5 && (
-                              <button
-                                type="button"
-                                disabled={rem < 5}
-                                onClick={() => {
-                                  const newRem = Math.max(0, rem - 5);
-                                  const newCut = Math.max(0, it.quantity - newRem);
-                                  handleUpdateItemProgress(targetOrder.id, {
-                                    itemId: it.id,
-                                    completedQuantity: newCut,
-                                  });
-                                }}
-                                className="px-1.5 py-0.5 bg-zinc-800 hover:bg-zinc-700 text-amber-300 border border-zinc-700 rounded text-[10px] font-mono font-bold transition-colors cursor-pointer"
-                                title="-5 من المتبقي"
-                              >
-                                -5
-                              </button>
-                            )}
-
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleUpdateItemProgress(targetOrder.id, {
-                                  itemId: it.id,
-                                  completedQuantity: it.quantity,
-                                })
-                              }
-                              disabled={rem === 0}
-                              className="px-2 py-0.5 bg-amber-950 hover:bg-amber-900 text-amber-300 border border-amber-800 rounded text-[10px] font-bold ml-0.5 transition-colors disabled:opacity-40 cursor-pointer"
-                              title="0 متبقي (تم إنجاز القص)"
-                            >
-                              0 لسا
-                            </button>
-                          </div>
-                          <div className={`text-[10px] font-bold mt-1 ${rem > 0 ? "text-amber-400" : "text-zinc-500"}`}>
-                            {rem > 0 ? `لسا باقي: ${rem} قطعة` : "لا يوجد متبقي ✓"}
-                          </div>
-                        </td>
-
-                        {/* Item Percentage Bar */}
-                        <td className="p-3 text-center">
-                          <div className="w-24 sm:w-28 mx-auto space-y-1">
-                            <div className="flex justify-between text-[10px] font-mono">
-                              <span className="text-zinc-500">{it.completedQuantity}/{it.quantity}</span>
-                              <span className={it.isCompleted ? "text-emerald-400 font-bold" : "text-cyan-300 font-bold"}>
-                                {it.percentage}%
-                              </span>
-                            </div>
-                            <div className="w-full bg-zinc-900 border border-zinc-800 rounded-full h-2 overflow-hidden">
-                              <div
-                                className={`h-full rounded-full transition-all duration-300 ${
-                                  it.isCompleted ? "bg-emerald-500" : it.percentage > 0 ? "bg-cyan-400" : "bg-zinc-800"
-                                }`}
-                                style={{ width: `${Math.max(it.percentage, 3)}%` }}
-                              />
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Item Status Badge */}
-                        <td className="p-3 text-center">
-                          {it.isCompleted ? (
-                            <span className="inline-flex items-center gap-1 bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 px-2.5 py-1 rounded-lg font-bold text-[11px]">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                              <span>مكتمل ✓</span>
-                            </span>
-                          ) : it.percentage > 0 ? (
-                            <span className="inline-flex items-center gap-1 bg-cyan-950/80 text-cyan-300 border border-cyan-800/80 px-2.5 py-1 rounded-lg font-bold text-[11px]">
-                              <RefreshCw className="w-3.5 h-3.5 text-cyan-400 animate-spin" />
-                              <span>قيد القص</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 bg-zinc-900 text-zinc-400 border border-zinc-800 px-2.5 py-1 rounded-lg font-medium text-[11px]">
-                              <Clock className="w-3.5 h-3.5 text-zinc-500" />
-                              <span>لم يبدأ بعد</span>
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Delete Item button */}
-                        <td className="p-3 text-center">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (confirm(`هل أنت متأكد من حذف البند (${it.productName}) من جدول القص؟`)) {
-                                handleUpdateItemProgress(targetOrder.id, { removeItemId: it.id });
-                              }
-                            }}
-                            className="text-zinc-600 hover:text-rose-400 transition-colors p-1"
-                            title="حذف هذا البند من جدول القص"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // Export Materials & Inventory CSV for external stock auditing
-  const legacyHandleExportMaterialsCSV = (materialsList: any[] = materials) => {
-    if (!materialsList || materialsList.length === 0) {
-      addTerminalLog("WARN", "لا يوجد خامات للتصدير");
-      return;
-    }
-
-    const headers = [
-      "كود المادة",
-      "اسم المادة والخامة",
-      "التصنيف",
-      "السماكة (ملم)",
-      "اللون / المواصفة",
-      "حالة الجودة الفنية",
-      "سعر الشراء للوحدة ($)",
-      "سعر الوحدة بالليرة (ل.س)",
-      "مساحة اللوح (م²)",
-      "تكلفة المتر المربع (ل.س/م²)",
-      "تكلفة المتر المربع ($/م²)",
-      "الرصيد المتاح الحالي",
-      "الوحدة",
-      "الكمية المحجوزة للإنتاج",
-      "حد الطلب الأدنى",
-      "موقع التخزين / المستودع",
-      "حالة المخزون والطلب",
-      "إجمالي قيمة المخزون ($)"
-    ];
-
-    const rows = materialsList.map(m => {
-      const qty = m.inventory?.quantity ?? 0;
-      const reserved = m.inventory?.reservedQuantity ?? 0;
-      const min = m.minimumStock || 0;
-      const priceUSD = m.pricePerUnit || 0;
-      const priceSYP = Math.round(priceUSD * exchangeRate);
-      const totalVal = (qty * priceUSD).toFixed(2);
-      const quality = m.qualityStatus === 'defective' ? 'معيبة' : m.qualityStatus === 'in_preparation' ? 'قيد التجهيز' : 'مفحوصة';
-      const statusText = qty <= 0 ? 'نافذ بالكامل' : qty <= min ? 'منخفض / يتطلب توريد' : 'سليم ومتوفر';
-
-      const widthM = m.width ? Number(m.width) / 1000 : 0;
-      const heightM = m.height ? Number(m.height) / 1000 : 0;
-      const areaM2 = widthM * heightM;
-      const costPerM2SYP = areaM2 > 0 ? Math.round(priceSYP / areaM2) : '-';
-      const costPerM2USD = areaM2 > 0 ? (priceUSD / areaM2).toFixed(2) : '-';
-
-      return [
-        m.id,
-        m.name || '',
-        m.category || '',
-        m.thickness || '-',
-        m.color || '-',
-        quality,
-        priceUSD,
-        priceSYP,
-        areaM2 > 0 ? areaM2.toFixed(2) : '-',
-        costPerM2SYP,
-        costPerM2USD,
-        qty,
-        m.unit || 'وحدة',
-        reserved,
-        min,
-        m.inventory?.location || 'المستودع الرئيسي',
-        statusText,
-        totalVal
-      ];
-    });
-
-    const csvContent = "\uFEFF" + [
-      headers.join(","),
-      ...rows.map(row => row.map(val => {
-        const str = String(val).replace(/"/g, '""');
-        return str.includes(",") || str.includes("\n") || str.includes('"') ? `"${str}"` : str;
-      }).join(","))
-    ].join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    const dateStr = new Date().toISOString().slice(0, 10);
-    link.setAttribute("download", `AXIS_LAB_Materials_Inventory_Audit_${dateStr}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
-    addTerminalLog("EXPORT", `تم تصدير سجل المواد والمخزون (${materialsList.length} خامة) كملف CSV للتدقيق الخارجي وحصر الأصول`);
-  };
 
   // Running job live progress update simulation interval
   useEffect(() => {
@@ -2023,117 +1172,6 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     return () => clearInterval(interval);
   }, [activeRunningJob]);
 
-  // Smart Auto-Replenishment Supply Proposal Engine
-  const legacyHandleOpenSmartSupplyModal = () => {
-    const lowStock = materials.filter(m => (m.inventory?.quantity ?? 0) <= (m.minimumStock || 0));
-
-    if (lowStock.length === 0) {
-      window.showAlert?.(
-        "ممتاز! جميع الخامات والمواد في المستودع حالياً تتجاوز الحدود الدنيا للأمان. لا توجد مواد بحاجة لإعادة التوريد الذكي حالياً.",
-        "حالة المستودع ممتازة ✨"
-      );
-      return;
-    }
-
-    const proposals = lowStock.map(m => {
-      const currentStock = m.inventory?.quantity ?? 0;
-      const minStock = m.minimumStock || 10;
-      const suggestedQty = Math.max(10, (minStock * 2) - currentStock);
-      const unitPrice = m.pricePerUnit !== undefined && m.pricePerUnit !== null 
-        ? Number(m.pricePerUnit) 
-        : (m.price !== undefined ? Number(m.price) : 15);
-
-      let targetSupId = m.supplierId || (m.supplier && m.supplier.id) || "";
-      if (!targetSupId && suppliers.length > 0) {
-        targetSupId = suppliers[0].id;
-      }
-      const matchedSup = suppliers.find(s => s.id === targetSupId);
-
-      return {
-        materialId: m.id,
-        materialName: m.name,
-        category: m.category || "عام",
-        unit: m.unit || "وحدة",
-        currentStock,
-        minimumStock: minStock,
-        suggestedQty,
-        unitPrice,
-        supplierId: targetSupId,
-        supplierName: matchedSup ? matchedSup.name : "المورد الرئيسي المعتمد",
-        selected: true
-      };
-    });
-
-    setSmartSupplyItems(proposals);
-    setShowSmartSupplyModal(true);
-    addTerminalLog("PROD", `تم فحص واقتراح توليد توريد ذكي لعدد ${proposals.length} خامات منخفضة المخزون`);
-  };
-
-  const legacyHandleExecuteSmartSupplyOrders = async () => {
-    const selectedProposals = smartSupplyItems.filter(item => item.selected && item.suggestedQty > 0);
-
-    if (selectedProposals.length === 0) {
-      window.showAlert?.("يرجى تحديد خامة واحدة على الأقل وبكمية مطلوبة أكبر من صفر لإكمال الطلب الذكي", "تنبيه الاختيار");
-      return;
-    }
-
-    const isManagerApproved = currentUser?.role !== "employee" && currentUser?.role !== "accountant";
-    const totalEst = selectedProposals.reduce((sum, i) => sum + (i.suggestedQty * i.unitPrice), 0);
-
-    const confirmed = await window.showConfirm?.(
-      `هل أنت متأكد من ${isManagerApproved ? "اعتماد وإصدار" : "تقديم"} عدد (${selectedProposals.length}) طلبات توريد ذكية بقيمة إجمالية مقدرة $${totalEst.toFixed(2)}؟\n${!isManagerApproved ? "سيتطلب الطلب موافقة نهائية من مسؤول الورشة قبل الإرسال." : "سيتم تسجيل طلبات التوريد رسمياً بصفة معتمدة."}`,
-      "تأكيد الطلب الذكي"
-    );
-
-    if (!confirmed) return;
-
-    setIsSubmittingSmartSupply(true);
-
-    try {
-      let createdCount = 0;
-      const expectedDate = new Date();
-      expectedDate.setDate(expectedDate.getDate() + 4);
-      const expectedDateStr = expectedDate.toISOString().split("T")[0];
-
-      for (const prop of selectedProposals) {
-        const res = await fetch("/api/supply-orders", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            supplierId: prop.supplierId || (suppliers[0]?.id || "s-1"),
-            materialId: prop.materialId,
-            quantity: prop.suggestedQty,
-            unitPrice: prop.unitPrice,
-            expectedDeliveryDate: expectedDateStr,
-            notes: `طلب توريد ذكي تلقائي (Smart Auto-Replenish) - ${isManagerApproved ? "معتمد من المسؤول: " + (currentUser?.fullName || "المسؤول") : "بانتظار موافقة الإدارة"}`
-          })
-        });
-
-        const data = await res.json();
-        if (data.success) {
-          createdCount++;
-        }
-      }
-
-      await fetchSupplyOrders();
-      setShowSmartSupplyModal(false);
-
-      addTerminalLog(
-        "PROD", 
-        `تم إنشاء ${createdCount} طلبات توريد ذكية بموافقة واعتماد المسؤول (${currentUser?.fullName || "Admin"})`
-      );
-
-      window.showAlert?.(
-        `تم توليد وتسجيل (${createdCount}) طلبات توريد ذكية بنجاح في سجل الشراء ${isManagerApproved ? "بحالة معتمدة ومجهزة للشحن" : "وفي انتظار موافقة المسؤول"}.`,
-        "اكتمل التوليد الذكي ⚡"
-      );
-    } catch (err) {
-      console.error("Smart supply error:", err);
-      window.showAlert?.("حدث خطأ أثناء الاتصال بالخادم لتسجيل طلبات التوريد الذكية", "خطأ في الشبكة");
-    } finally {
-      setIsSubmittingSmartSupply(false);
-    }
-  };
 
   // Edit Order Draft Items helpers
   const appendEditOrderDraftItem = () => {
@@ -2217,418 +1255,48 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
 
   // Unauthenticated login screen
   if (!currentUser) {
-    return (
-      <div className={`flex min-h-screen bg-[#07070a] items-center justify-center p-4 md:p-8 ${theme === "light" ? "theme-light bg-slate-100" : ""}`}>
-        <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-stretch my-auto">
-          
-          {/* Left Column: AXIS LAB Brand Hero & Platform Overview */}
-          <div className="lg:col-span-7 flex flex-col justify-between p-6 md:p-8 bg-zinc-950/90 border border-zinc-850/80 rounded-3xl relative overflow-hidden shadow-2xl backdrop-blur-xl">
-            {/* Gradient Background Aesthetics */}
-            <div className="absolute -top-24 -right-24 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
-            <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
-            
-            <div className="relative z-10 space-y-6">
-              {/* Header Logo & Live Status */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-zinc-850/80 pb-6">
-                <AxisLabLogoFull className="mb-1" logoSrc={companySettings?.logo} showSubtext={true} />
-                <div className="flex items-center gap-2 bg-emerald-950/60 border border-emerald-800/60 px-3 py-1.5 rounded-full text-[11px] font-mono text-emerald-300 shrink-0">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                  </span>
-                  <span>خادم الورشة والجلسات نشط</span>
-                </div>
-              </div>
+    const renderCutProgressInteractiveTable = (targetOrder: Order) => (
+    <CutProgressInteractiveTable
+      targetOrder={targetOrder}
+      productionJobs={productionJobs}
+      onUpdateItemProgress={handleUpdateItemProgress}
+      showAddCutItemForm={showAddCutItemForm}
+      setShowAddCutItemForm={setShowAddCutItemForm}
+      newCutItemName={newCutItemName}
+      setNewCutItemName={setNewCutItemName}
+      newCutItemQty={newCutItemQty}
+      setNewCutItemQty={setNewCutItemQty}
+      newCutItemMat={newCutItemMat}
+      setNewCutItemMat={setNewCutItemMat}
+    />
+  );
 
-              {/* Title & Description */}
-              <div className="space-y-3">
-                <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-zinc-100 tracking-tight leading-snug">
-                  نظام تشغيل ورش القص والنقش بالليزر <span className="text-[#c59257]">AXIS LAB OS</span>
-                </h1>
-                <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed font-sans max-w-xl">
-                  منصة ERP هجينة متكاملة مخصصة لورش الليزر والـ CNC. تجمع بين إدارة العملاء، الفواتير بالعملتين (SYP/USD)، تتبع المخزون والقصاصات، ومترجم G-Code ذكي لجدولة الماكينات.
-                </p>
-              </div>
-
-              {/* Feature Grid Highlights */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                <div className="p-3.5 rounded-xl bg-zinc-900/60 border border-zinc-850/80 hover:border-amber-500/30 transition-all flex items-start gap-3 group">
-                  <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 group-hover:scale-105 transition-transform shrink-0">
-                    <ShieldCheck className="w-4 h-4" />
-                  </div>
-                  <div className="space-y-0.5">
-                    <h2 className="text-xs font-bold text-zinc-200">حماية الجلسات وصلاحيات JWT</h2>
-                    <p className="text-[11px] text-zinc-500 leading-normal">توزيع أدوار دقيقة (مدير، فني تشغيل، محاسب) مع توثيق سجل الأمان.</p>
-                  </div>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-zinc-900/60 border border-zinc-850/80 hover:border-indigo-500/30 transition-all flex items-start gap-3 group">
-                  <div className="p-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 group-hover:scale-105 transition-transform shrink-0">
-                    <Cpu className="w-4 h-4" />
-                  </div>
-                  <div className="space-y-0.5">
-                    <h2 className="text-xs font-bold text-zinc-200">مترجم وشبكة G-Code CNC</h2>
-                    <p className="text-[11px] text-zinc-500 leading-normal">تحويل التصاميم إلى مسارات حقيقية مع حساب زمن الليزر الفعلي.</p>
-                  </div>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-zinc-900/60 border border-zinc-850/80 hover:border-emerald-500/30 transition-all flex items-start gap-3 group">
-                  <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 group-hover:scale-105 transition-transform shrink-0">
-                    <Scissors className="w-4 h-4" />
-                  </div>
-                  <div className="space-y-0.5">
-                    <h2 className="text-xs font-bold text-zinc-200">المخزون والقصاصات (Remnants)</h2>
-                    <p className="text-[11px] text-zinc-500 leading-normal">إدارة الأكريليك والخشب مع استغلال بقايا المواد وتجنب الهالك.</p>
-                  </div>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-zinc-900/60 border border-zinc-850/80 hover:border-amber-500/30 transition-all flex items-start gap-3 group">
-                  <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[#c59257] group-hover:scale-105 transition-transform shrink-0">
-                    <DollarSign className="w-4 h-4" />
-                  </div>
-                  <div className="space-y-0.5">
-                    <h2 className="text-xs font-bold text-zinc-200">محاسبة مزدوجة USD ⇌ SYP</h2>
-                    <p className="text-[11px] text-zinc-500 leading-normal">تحويل لحظي وسندات مقبوضات مع حماية بيانات العملاء الحساسة.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Bottom Credits & System Specs */}
-            <div className="pt-6 mt-6 border-t border-zinc-850/80 flex flex-wrap items-center justify-between text-[10px] font-mono text-zinc-500 gap-2">
-              <div className="flex items-center gap-3">
-                <span className="text-zinc-400 font-bold">AXIS LAB v0.15.0</span>
-                <span>•</span>
-                <span>SQLite Local ERP Engine</span>
-              </div>
-              <div className="flex items-center gap-2 text-zinc-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                <span>1$ = {exchangeRate.toLocaleString()} ل.س</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column: Interactive Login / Register Auth Card */}
-          <div className="lg:col-span-5 bg-[#0b0b0e] border border-zinc-800/90 rounded-3xl p-6 sm:p-7 flex flex-col justify-between shadow-2xl relative overflow-hidden">
-            <div className="space-y-5">
-              
-              {/* Header Bar with Segment Control Tabs & Theme Switcher */}
-              <div className="flex items-center justify-between gap-2 border-b border-zinc-850 pb-4">
-                {/* Mode Selector Tabs */}
-                <div className="flex items-center bg-zinc-950 p-1 rounded-xl border border-zinc-850 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsRegisterMode(false);
-                      setAuthError(null);
-                    }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      !isRegisterMode
-                        ? "bg-[#c59257] text-zinc-950 shadow-md"
-                        : "text-zinc-400 hover:text-zinc-200"
-                    }`}
-                  >
-                    تسجيل الدخول
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsRegisterMode(true);
-                      setAuthError(null);
-                      if (authRole === "admin") setAuthRole("employee");
-                    }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      isRegisterMode
-                        ? "bg-[#c59257] text-zinc-950 shadow-md"
-                        : "text-zinc-400 hover:text-zinc-200"
-                    }`}
-                  >
-                    حساب جديد
-                  </button>
-                </div>
-
-                {/* Theme Switcher Button */}
-                <button
-                  type="button"
-                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                  className="w-8 h-8 rounded-xl bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 flex items-center justify-center transition-all text-zinc-400 hover:text-zinc-200"
-                  title="تغيير المظهر"
-                >
-                  {theme === "dark" ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-400" />}
-                </button>
-              </div>
-
-              {/* Title Header */}
-              <div>
-                <h2 className="text-base font-bold text-zinc-100 flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-[#c59257]" />
-                  <span>{isRegisterMode ? "إنشاء حساب فني في الورشة" : "بوابة التحكم والتشغيل المركزية"}</span>
-                </h2>
-                <p className="text-[11px] text-zinc-500 mt-0.5">
-                  {isRegisterMode
-                    ? "أدخل البيانات المطلوبة لإصدار رمز الدخول وتحديد الدور الوظيفي"
-                    : "قم بتسجيل الدخول للوصول إلى الماكينات، الطلبات، والمحاسبة"}
-                </p>
-              </div>
-
-              {/* Auth Error Banner */}
-              {authError && (
-                <motion.div
-                  initial={{ opacity: 0, y: -6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="p-3 rounded-xl bg-rose-950/30 border border-rose-800/50 flex items-start gap-2.5 text-xs text-rose-300"
-                >
-                  <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
-                  <span className="leading-snug">{authError}</span>
-                </motion.div>
-              )}
-
-              {/* Authentication Form */}
-              <form onSubmit={isRegisterMode ? handleRegister : handleLogin} className="space-y-3.5 font-sans">
-                {/* Full Name Input (Register Mode) */}
-                {isRegisterMode && (
-                  <div>
-                    <label className="text-[11px] font-medium text-zinc-400 block mb-1">الاسم الكامل</label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        required
-                        placeholder="مثال: م. أحمد الروابدة"
-                        value={authFullName}
-                        onChange={(e) => setAuthFullName(e.target.value)}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pr-9 pl-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-[#c59257] transition-all"
-                      />
-                      <UserIcon className="w-4 h-4 text-zinc-500 absolute right-3 top-2.5 pointer-events-none" />
-                    </div>
-                  </div>
-                )}
-
-                {/* Email Input */}
-                <div>
-                  <label className="text-[11px] font-medium text-zinc-400 block mb-1">البريد الإلكتروني</label>
-                  <div className="relative">
-                    <input
-                      type="email"
-                      required
-                      placeholder="admin@axislab.com"
-                      value={authEmail}
-                      onChange={(e) => setAuthEmail(e.target.value)}
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pr-9 pl-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-[#c59257] transition-all font-mono dir-ltr text-right"
-                    />
-                    <Mail className="w-4 h-4 text-zinc-500 absolute right-3 top-2.5 pointer-events-none" />
-                  </div>
-                </div>
-
-                {/* Password Input with Show/Hide Eye Toggle */}
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-[11px] font-medium text-zinc-400 block">كلمة المرور</label>
-                  </div>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      required
-                      placeholder="••••••••"
-                      value={authPassword}
-                      onChange={(e) => setAuthPassword(e.target.value)}
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pr-9 pl-9 py-2 text-xs text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-[#c59257] transition-all font-mono dir-ltr text-right"
-                    />
-                    <Lock className="w-4 h-4 text-zinc-500 absolute right-3 top-2.5 pointer-events-none" />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute left-2.5 top-2 text-zinc-500 hover:text-zinc-300 transition-colors p-0.5 rounded-lg"
-                      title={showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
-                    >
-                      {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Role Select (Register Mode - Operational roles only) */}
-                {isRegisterMode && (
-                  <div>
-                    <label className="text-[11px] font-medium text-zinc-400 block mb-1">الدور الوظيفي بالورشة</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setAuthRole("employee")}
-                        className={`p-2.5 rounded-xl border text-center transition-all flex flex-col items-center gap-1.5 cursor-pointer ${
-                          authRole === "employee"
-                            ? "bg-emerald-500/10 border-emerald-500 text-emerald-400 shadow-sm"
-                            : "bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-zinc-700"
-                        }`}
-                      >
-                        <Cpu className="w-4 h-4" />
-                        <span className="text-[11px] font-bold">فني تشغيل ليزر</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setAuthRole("accountant")}
-                        className={`p-2.5 rounded-xl border text-center transition-all flex flex-col items-center gap-1.5 cursor-pointer ${
-                          authRole === "accountant"
-                            ? "bg-amber-500/10 border-amber-500 text-amber-400 shadow-sm"
-                            : "bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-zinc-700"
-                        }`}
-                      >
-                        <DollarSign className="w-4 h-4" />
-                        <span className="text-[11px] font-bold">محاسب مالي</span>
-                      </button>
-                    </div>
-
-                    <div className="mt-2.5 p-2.5 rounded-xl bg-amber-950/20 border border-amber-800/30 text-[10px] text-amber-300/90 leading-relaxed flex items-start gap-2">
-                      <Lock className="w-3.5 h-3.5 text-[#c59257] shrink-0 mt-0.5" />
-                      <span>
-                        <strong>تنويه أمني:</strong> لا يمكن تسجيل حساب مدير (Admin) من النافذة الخارجية. يتم إنشاء وإضافة المدراء حصرياً من داخل لوحة التحكم بواسطة مدير النظام الحفاظ على الخصوصية والأمان.
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Extra Options: Remember Me & Encryption note */}
-                {!isRegisterMode && (
-                  <div className="flex items-center justify-between text-[11px] pt-1">
-                    <label className="flex items-center gap-2 text-zinc-400 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={rememberMe}
-                        onChange={(e) => setRememberMe(e.target.checked)}
-                        className="rounded border-zinc-800 bg-zinc-950 text-[#c59257] focus:ring-0 focus:ring-offset-0 cursor-pointer"
-                      />
-                      <span>تذكر بيانات الجلسة</span>
-                    </label>
-                    <span className="text-[10px] text-zinc-500 font-mono flex items-center gap-1">
-                      <Lock className="w-3 h-3 text-zinc-600" />
-                      <span>256-bit JWT</span>
-                    </span>
-                  </div>
-                )}
-
-                {/* Submit Action Button */}
-                <button
-                  type="submit"
-                  disabled={isAuthLoading}
-                  className="w-full py-2.5 bg-gradient-to-r from-[#c59257] to-amber-600 hover:from-amber-500 hover:to-amber-600 text-zinc-950 font-black rounded-xl text-xs transition-all shadow-lg shadow-amber-500/10 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2"
-                >
-                  {isAuthLoading ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>جاري التحقق وإصدار الجلسة...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Shield className="w-4 h-4" />
-                      <span>{isRegisterMode ? "إتمام التسجيل وإصدار المفتاح" : "تسجيل الدخول الآمن"}</span>
-                    </>
-                  )}
-                </button>
-              </form>
-
-              {/* Quick Demo Preset Accounts */}
-              {!isRegisterMode && (
-                <div className="pt-4 border-t border-zinc-850">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider font-mono">
-                      حسابات التجربة السريعة (Demo Accounts)
-                    </span>
-                    <span className="text-[9px] text-[#c59257] font-mono">اختيار الحساب</span>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-2">
-                    {/* Admin Preset */}
-                    <button
-                      type="button"
-                      onClick={() => setAuthPreset("admin", "admin@axislab.com", "")}
-                      className={`w-full p-2.5 rounded-xl border text-right transition-all flex items-center justify-between group cursor-pointer ${
-                        activePreset === "admin"
-                          ? "bg-amber-950/40 border-[#c59257]/60 text-zinc-100"
-                          : "bg-zinc-950 border-zinc-850 hover:border-zinc-700 text-zinc-300"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[#c59257] flex items-center justify-center shrink-0">
-                          <ShieldCheck className="w-3.5 h-3.5" />
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold flex items-center gap-1.5">
-                            <span>مدير النظام</span>
-                            <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-amber-950 text-amber-300 border border-amber-800/50">Admin</span>
-                          </div>
-                          <div className="text-[10px] font-mono text-zinc-500 dir-ltr text-right">admin@axislab.com</div>
-                        </div>
-                      </div>
-                      {activePreset === "admin" && (
-                        <CheckCircle2 className="w-4 h-4 text-[#c59257]" />
-                      )}
-                    </button>
-
-                    {/* Laser Tech Preset */}
-                    <button
-                      type="button"
-                      onClick={() => setAuthPreset("employee", "employee@axislab.com", "")}
-                      className={`w-full p-2.5 rounded-xl border text-right transition-all flex items-center justify-between group cursor-pointer ${
-                        activePreset === "employee"
-                          ? "bg-emerald-950/40 border-emerald-500/60 text-zinc-100"
-                          : "bg-zinc-950 border-zinc-850 hover:border-zinc-700 text-zinc-300"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0">
-                          <Cpu className="w-3.5 h-3.5" />
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold flex items-center gap-1.5">
-                            <span>فني تشغيل ليزر</span>
-                            <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-300 border border-emerald-800/50">Tech</span>
-                          </div>
-                          <div className="text-[10px] font-mono text-zinc-500 dir-ltr text-right">employee@axislab.com</div>
-                        </div>
-                      </div>
-                      {activePreset === "employee" && (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                      )}
-                    </button>
-
-                    {/* Finance Preset */}
-                    <button
-                      type="button"
-                      onClick={() => setAuthPreset("accountant", "accountant@axislab.com", "")}
-                      className={`w-full p-2.5 rounded-xl border text-right transition-all flex items-center justify-between group cursor-pointer ${
-                        activePreset === "accountant"
-                          ? "bg-amber-950/40 border-amber-500/60 text-zinc-100"
-                          : "bg-zinc-950 border-zinc-850 hover:border-zinc-700 text-zinc-300"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0">
-                          <DollarSign className="w-3.5 h-3.5" />
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold flex items-center gap-1.5">
-                            <span>محاسب مالي</span>
-                            <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-amber-950 text-amber-300 border border-amber-800/50">Finance</span>
-                          </div>
-                          <div className="text-[10px] font-mono text-zinc-500 dir-ltr text-right">accountant@axislab.com</div>
-                        </div>
-                      </div>
-                      {activePreset === "accountant" && (
-                        <CheckCircle2 className="w-4 h-4 text-amber-400" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Security Notice Footer */}
-            <div className="text-[10px] text-zinc-500 text-center font-mono mt-4 pt-3 border-t border-zinc-850/80 flex items-center justify-center gap-1.5">
-              <Lock className="w-3 h-3 text-[#c59257]" />
-              <span>نظام موثق ببروتوكولات التشفير القياسية AXIS LAB Security</span>
-            </div>
-          </div>
-
-        </div>
-      </div>
+  return (
+      <LoginScreen
+        theme={theme}
+        setTheme={setTheme}
+        companySettings={companySettings}
+        exchangeRate={exchangeRate}
+        isRegisterMode={isRegisterMode}
+        setIsRegisterMode={setIsRegisterMode}
+        authError={authError}
+        authEmail={authEmail}
+        setAuthEmail={setAuthEmail}
+        authPassword={authPassword}
+        setAuthPassword={setAuthPassword}
+        authFullName={authFullName}
+        setAuthFullName={setAuthFullName}
+        authRole={authRole}
+        setAuthRole={setAuthRole}
+        rememberMe={rememberMe}
+        setRememberMe={setRememberMe}
+        isAuthLoading={isAuthLoading}
+        activePreset={activePreset}
+        setAuthPreset={setAuthPreset}
+        setAuthError={setAuthError}
+        handleLogin={handleLogin}
+        handleRegister={handleRegister}
+      />
     );
   }
 
@@ -2655,7 +1323,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
   // Authenticated Workspace Header & Framework
   return (
     <div id="axis-system" dir="rtl" className={`flex flex-col h-screen w-full bg-[#09090b] text-zinc-300 font-sans overflow-hidden ${theme === "light" ? "theme-light" : ""}`}>
-      <AutoLogoutTimer token={token} onLogout={() => handleLogout(true)} />
+      <AutoLogoutTimer sessionActive={sessionActive} onLogout={() => handleLogout(true)} />
       {firstRunPasswordCurrent && (
         <FirstRunPasswordModal
           initialCurrentPassword={firstRunPasswordCurrent}
@@ -3245,7 +1913,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
                 />
               )}              {activeView === "database" && (
                 <DatabasePage
-                  {...{ USERS, activeView, addTerminalLog, archiveDaysThreshold, calculateOrderProgress, currentUser, customers, databaseTab, exchangeRate, executeTerminalCommand, fetchCustomers, fetchLogs, fetchOrders, getOrderStatusBadge, productionJobs, handleArchiveOrder: orderHandleArchive, handleExportCustomersCSV, handleOpenEditCustomer, handleRestoreOrder: orderHandleRestore, handleRunAutoArchive: orderHandleAutoArchive, logs, orderTabFilter, orders, pageTransition, pageVariants, products, setArchiveDaysThreshold, setDatabaseTab, setOrderTabFilter, setSelectedCustomerIdForOrder, setShowAddOrder }}
+                  {...{ USERS: users, activeView, addTerminalLog, archiveDaysThreshold, calculateOrderProgress, currentUser, customers, databaseTab, exchangeRate, executeTerminalCommand, fetchCustomers, fetchLogs, fetchOrders, getOrderStatusBadge, productionJobs, handleArchiveOrder: orderHandleArchive, handleExportCustomersCSV, handleOpenEditCustomer, handleRestoreOrder: orderHandleRestore, handleRunAutoArchive: orderHandleAutoArchive, logs, orderTabFilter, orders, pageTransition, pageVariants, products, setArchiveDaysThreshold, setDatabaseTab, setOrderTabFilter, setSelectedCustomerIdForOrder, setShowAddOrder }}
                 />
               )}              {(activeView === "products" || activeView === "gcode") && (
                 <InventoryPage
@@ -3479,7 +2147,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
           </aside>
         )}
       <GlobalDialogs
-        {...{ USERS, activeView, addTerminalLog, appendEditOrderDraftItem, calculateOrderProgress, companySettings, currentUser, customers, deleteConfirmTarget, deliveryBlockedOrder, editCustAddress, editCustCategory, editCustCompany, editCustEmail, editCustName, editCustNotes, editCustPhone, editCustWhatsapp, editFocusedItemIdx, editOrderDiscountAmountVal, editOrderItems, editOrderRemaining, editOrderSubtotal, editOrderTaxAmount, editOrderTaxPercentVal, editOrderTotalPrice, editingCustomer, editingOrder, editingProduct, adjustQty, adjustReason, adjustType, aiClassificationResult, editingMaterial, getPaymentStatusBadge, isAiClassifying, isCurrencyConverterOpen, isSubmittingSmartSupply, jobRemHeight, jobRemLocation, jobRemWidth, matCategory, matColor, matHeight, matLocation, matMinStock, matNotes, matPrice, matSubCategory, matSupplierId, matThickness, matUnit, matWidth, materials, newJobEstTime, newJobItemName, newJobLaserPower, newJobLaserSpeed, newJobMaterialId, newJobOrderId, priceComparisonMaterial, productionJobs, setAdjustQty, setAdjustReason, setAdjustType, setAiClassificationResult, setEditingMaterial, setIsCurrencyConverterOpen, setJobRemHeight, setJobRemLocation, setJobRemWidth, setMatCategory, setMatColor, setMatHeight, setMatLocation, setMatMinStock, setMatName, setMatNotes, setMatPrice, setMatSubCategory, setMatSupplierId, setMatThickness, setMatUnit, setMatWidth, setNewJobEstTime, setNewJobItemName, setNewJobLaserPower, setNewJobLaserSpeed, setNewJobMaterialId, setNewJobOrderId, setPriceComparisonMaterial, setShowAddJob, setShowAddMaterial, setShowAdjustStock, setShowRemnantRegister, setShowSmartSupplyModal, setSmartSupplyItems, showAddJob, showAddMaterial, showAdjustStock, showRemnantRegister, showSmartSupplyModal, smartSupplyItems, suppliers, exchangeRate, fetchCustomers, fetchLogs, fetchOrders, handleAdjustStockSubmit, handleAiClassifyMaterial, handleAssignOrderWorkers, handleCompileOrderGCode, handleCopyText, handleCreateDirectSupplyOrder, handleCreateMaterial, handleCreateProduct, handleCreateProductionJob, handleCreateRemnant, handleDeleteCustomer, handleDeletePayment, handleDeleteProduct, handleDirectCompleteJob, handleEditOrderSubmit, handleRateOrder, handleExecuteSmartSupplyOrders: smartHandleExecute, handleRecordPaymentSubmit, handleRegisterRemnantOnJobComplete, handleSaveEditCustomer, handleSendEmailShare, handleSettleRemainingAndDeliver, handleUpdateItemProgress, handleUpdateMaterial, handleUpdateProduct, isCompilingOrderGcode, isHelpGuideOpen, isProcessingQuickFullPay, isQuickActionsOpen, isSearchPaletteOpen, isSearching, isSharingEmail, matName, newPaymentAmount, newPaymentNotes, newPaymentSYPAmount, orderDetailsTab, orderGcodeResult, orders, pageTransition, pageVariants, paymentInputCurrency, printTicketOrder, prodCategory, prodCode, prodDescription, prodName, prodPrice, prodStock, products, progressModalOrder, refreshInventoryData, remHeight, remLocation, remMatId, remQty, remWidth, removeEditOrderDraftItem, renderCutProgressInteractiveTable, searchQuery, searchResults, selectedCustomerFiles, selectedCustomerIdForOrder, selectedMaterialFiles, selectedOrder, selectedPaymentMethod, selectedPaymentReceipt, selectedProductFiles, setActiveView, setDeleteConfirmTarget, setDeliveryBlockedOrder, setEditCustAddress, setEditCustCategory, setEditCustCompany, setEditCustEmail, setEditCustName, setEditCustNotes, setEditCustPhone, setEditCustWhatsapp, setEditFocusedItemIdx, setEditOrderItems, setEditingCustomer, setEditingOrder, setEditingProduct, setIsHelpGuideOpen, setIsQuickActionsOpen, setIsSearchPaletteOpen, setNewPaymentAmount, setNewPaymentNotes, setNewPaymentSYPAmount, setOrderDetailsTab, setPaymentInputCurrency, setPrintTicketOrder, setProdCategory, setProdCode, setProdDescription, setProdName, setProdPrice, setProdStock, setProgressModalOrder, setRemHeight, setRemLocation, setRemMatId, setRemQty, setRemWidth, setSearchQuery, setSearchResults, setSelectedCustomerFiles, setSelectedCustomerIdForOrder, setSelectedMaterialFiles, setSelectedOrder, setSelectedPaymentMethod, setSelectedPaymentReceipt, setSelectedProductFiles, setShareBody, setShareEmail, setShareEmailSuccess, setShareMethod, setShareSubject, setShowAddOrder, setShowAddProduct, setShowAddRemnant, setShowHelpModal, setShowShareModal, shareBody, shareEmail, shareEmailSuccess, shareMethod, shareMsgCopied, sharePdfCopied, shareSubject, showAddOrder, showAddProduct, showAddRemnant, showHelpModal, showShareModal, updateEditOrderDraftItem, updateRate }}
+        {...{ USERS: users, activeView, addTerminalLog, appendEditOrderDraftItem, calculateOrderProgress, companySettings, currentUser, customers, deleteConfirmTarget, deliveryBlockedOrder, editCustAddress, editCustCategory, editCustCompany, editCustEmail, editCustName, editCustNotes, editCustPhone, editCustWhatsapp, editFocusedItemIdx, editOrderDiscountAmountVal, editOrderItems, editOrderRemaining, editOrderSubtotal, editOrderTaxAmount, editOrderTaxPercentVal, editOrderTotalPrice, editingCustomer, editingOrder, editingProduct, adjustQty, adjustReason, adjustType, aiClassificationResult, editingMaterial, getPaymentStatusBadge, isAiClassifying, isCurrencyConverterOpen, isSubmittingSmartSupply, jobRemHeight, jobRemLocation, jobRemWidth, matCategory, matColor, matHeight, matLocation, matMinStock, matNotes, matPrice, matSubCategory, matSupplierId, matThickness, matUnit, matWidth, materials, newJobEstTime, newJobItemName, newJobLaserPower, newJobLaserSpeed, newJobMaterialId, newJobOrderId, priceComparisonMaterial, productionJobs, setAdjustQty, setAdjustReason, setAdjustType, setAiClassificationResult, setEditingMaterial, setIsCurrencyConverterOpen, setJobRemHeight, setJobRemLocation, setJobRemWidth, setMatCategory, setMatColor, setMatHeight, setMatLocation, setMatMinStock, setMatName, setMatNotes, setMatPrice, setMatSubCategory, setMatSupplierId, setMatThickness, setMatUnit, setMatWidth, setNewJobEstTime, setNewJobItemName, setNewJobLaserPower, setNewJobLaserSpeed, setNewJobMaterialId, setNewJobOrderId, setPriceComparisonMaterial, setShowAddJob, setShowAddMaterial, setShowAdjustStock, setShowRemnantRegister, setShowSmartSupplyModal, setSmartSupplyItems, showAddJob, showAddMaterial, showAdjustStock, showRemnantRegister, showSmartSupplyModal, smartSupplyItems, suppliers, exchangeRate, fetchCustomers, fetchLogs, fetchOrders, handleAdjustStockSubmit, handleAiClassifyMaterial, handleAssignOrderWorkers, handleCompileOrderGCode, handleCopyText, handleCreateDirectSupplyOrder, handleCreateMaterial, handleCreateProduct, handleCreateProductionJob, handleCreateRemnant, handleDeleteCustomer, handleDeletePayment, handleDeleteProduct, handleDirectCompleteJob, handleEditOrderSubmit, handleRateOrder, handleExecuteSmartSupplyOrders: smartHandleExecute, handleRecordPaymentSubmit, handleRegisterRemnantOnJobComplete, handleSaveEditCustomer, handleSendEmailShare, handleSettleRemainingAndDeliver, handleUpdateItemProgress, handleUpdateMaterial, handleUpdateProduct, isCompilingOrderGcode, isHelpGuideOpen, isProcessingQuickFullPay, isQuickActionsOpen, isSearchPaletteOpen, isSearching, isSharingEmail, matName, newPaymentAmount, newPaymentNotes, newPaymentSYPAmount, orderDetailsTab, orderGcodeResult, orders, pageTransition, pageVariants, paymentInputCurrency, printTicketOrder, prodCategory, prodCode, prodDescription, prodName, prodPrice, prodStock, products, progressModalOrder, refreshInventoryData, remHeight, remLocation, remMatId, remQty, remWidth, removeEditOrderDraftItem, renderCutProgressInteractiveTable, searchQuery, searchResults, selectedCustomerFiles, selectedCustomerIdForOrder, selectedMaterialFiles, selectedOrder, selectedPaymentMethod, selectedPaymentReceipt, selectedProductFiles, setActiveView, setDeleteConfirmTarget, setDeliveryBlockedOrder, setEditCustAddress, setEditCustCategory, setEditCustCompany, setEditCustEmail, setEditCustName, setEditCustNotes, setEditCustPhone, setEditCustWhatsapp, setEditFocusedItemIdx, setEditOrderItems, setEditingCustomer, setEditingOrder, setEditingProduct, setIsHelpGuideOpen, setIsQuickActionsOpen, setIsSearchPaletteOpen, setNewPaymentAmount, setNewPaymentNotes, setNewPaymentSYPAmount, setOrderDetailsTab, setPaymentInputCurrency, setPrintTicketOrder, setProdCategory, setProdCode, setProdDescription, setProdName, setProdPrice, setProdStock, setProgressModalOrder, setRemHeight, setRemLocation, setRemMatId, setRemQty, setRemWidth, setSearchQuery, setSearchResults, setSelectedCustomerFiles, setSelectedCustomerIdForOrder, setSelectedMaterialFiles, setSelectedOrder, setSelectedPaymentMethod, setSelectedPaymentReceipt, setSelectedProductFiles, setShareBody, setShareEmail, setShareEmailSuccess, setShareMethod, setShareSubject, setShowAddOrder, setShowAddProduct, setShowAddRemnant, setShowHelpModal, setShowShareModal, shareBody, shareEmail, shareEmailSuccess, shareMethod, shareMsgCopied, sharePdfCopied, shareSubject, showAddOrder, showAddProduct, showAddRemnant, showHelpModal, showShareModal, updateEditOrderDraftItem, updateRate }}
       />
       <EmployeeStatsModal isOpen={showEmployeeStats} onClose={() => setShowEmployeeStats(false)} />
       </main>
