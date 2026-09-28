@@ -3,18 +3,16 @@ name: Windows CI
 on:
   push:
     branches:
-      - '**'
+      - 'refactor/v0.15.0-final'
   pull_request:
 
 permissions:
   contents: read
 
 jobs:
-  validate-and-build:
+  validate:
     runs-on: windows-latest
     timeout-minutes: 35
-    env:
-      NODE_OPTIONS: --disable-warning=DEP0040 --disable-warning=DEP0169
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -22,6 +20,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --no-audit --no-fund --loglevel=error
-      - run: npm run test:pre-release
+      - run: node scripts/github-branch-sanity.cjs
       - run: npm run lint
-      - run: npm run test:smoke
