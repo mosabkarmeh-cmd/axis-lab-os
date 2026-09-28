@@ -1,0 +1,83 @@
+name: AXIS LAB OS Final Gate
+
+on:
+  push:
+    branches:
+      - 'release/v0.15.0-final'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-final-gate:
+    runs-on: windows-latest
+    env:
+      NODE_OPTIONS: --disable-warning=DEP0040 --disable-warning=DEP0169
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund --loglevel=error
+
+      - name: TypeScript gate
+        run: npm run lint
+
+      - name: Static gates
+        run: npm run test:all-static
+
+      - name: Full application smoke suite
+        run: npm run test:smoke
+
+      - name: Network smoke suite
+        run: npm run test:network
+
+      - name: Excel import smoke suite
+        run: npm run test:excel-import
+
+      - name: Prepare production runtime
+        run: npm run prepare:runtime
+
+      - name: Build current-user Windows installer
+        run: npm run desktop:package:win:current -- --publish never
+
+      - name: Build all-users Windows installer
+        run: npm run desktop:package:win:all -- --publish never
+
+      - name: Verify installers and auto-update metadata
+        shell: pwsh
+        run: |
+          $current = Get-ChildItem -Path dist -Filter '*Setup*.exe' | Select-Object -First 1
+          $blockmap = Get-ChildItem -Path dist -Filter '*.blockmap' | Select-Object -First 1
+          $latest = Get-ChildItem -Path dist -Filter 'latest*.yml' | Select-Object -First 1
+          $allUsers = Get-ChildItem -Path dist-all-users -Filter '*AllUsers*.exe' -Recurse | Select-Object -First 1
+          if (-not $current) { throw 'Current-user installer missing.' }
+          if (-not $blockmap) { throw 'Current-user blockmap missing.' }
+          if (-not $latest) { throw 'latest*.yml auto-update metadata missing.' }
+          if (-not $allUsers) { throw 'All-users installer missing.' }
+          Write-Host "Current-user: $($current.FullName)"
+          Write-Host "All-users:    $($allUsers.FullName)"
+          Write-Host "Blockmap:     $($blockmap.FullName)"
+          Write-Host "Update meta:  $($latest.FullName)"
+
+      - name: Install and launch packaged EXE
+        shell: pwsh
+        run: ./tests/windows-installed-runtime-smoke.ps1
+
+      - name: Upload tested installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: AXIS-LAB-OS-v0.15.0-Windows
+          path: |
+            dist/*Setup*.exe
+            dist/*.blockmap
+            dist/latest*.yml
+            dist-all-users/*Setup*.exe
+          if-no-files-found: error
