@@ -107,7 +107,6 @@ export function useSupplyActions({
           quantity: finalQty,
           type: adjustType,
           reason: adjustReason || "تعديل مخزون يدوي",
-          userId: currentUser?.id || "u-1"
         })
       });
 
@@ -224,7 +223,7 @@ export function useSupplyActions({
       } else {
         window.showAlert?.("فشل إنشاء طلب التوريد: " + data.message, "خطأ إنشاء طلب");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       addTerminalLog("ERROR", `Failed to create supply order: ${err.message}`);
     } finally {
@@ -259,7 +258,7 @@ export function useSupplyActions({
       } else {
         window.showAlert?.("فشل إنشاء طلب التوريد: " + (data.message || ""), "خطأ");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       addTerminalLog("ERROR", `Failed to create direct supply order: ${err.message}`);
     }
@@ -298,7 +297,7 @@ export function useSupplyActions({
       } else {
         window.showAlert?.("فشل تكرار طلب التوريد: " + (data.message || ""), "خطأ النسخ السريع");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       addTerminalLog("ERROR", `Failed to duplicate supply order: ${err.message}`);
     }
@@ -340,7 +339,7 @@ export function useSupplyActions({
       } else {
         window.showAlert?.("فشل تحديث حالة الطلبية: " + data.message, "خطأ تحديث الحالة");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       addTerminalLog("ERROR", `Failed to update supply order: ${err.message}`);
     }

@@ -109,7 +109,7 @@ export function useProductionActions({
       } else {
         addTerminalLog("ERROR", `فشل إضافة ماكينة: ${data.message || "خطأ مجهول"}`);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       addTerminalLog("ERROR", `خطأ أثناء الاتصال بالخادم: ${err.message}`);
     }
   };
@@ -128,7 +128,7 @@ export function useProductionActions({
       } else {
         addTerminalLog("ERROR", `فشل حذف الماكينة: ${data.message || "خطأ مجهول"}`);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       addTerminalLog("ERROR", `خطأ أثناء الاتصال بالخادم: ${err.message}`);
     }
   };
@@ -139,7 +139,7 @@ export function useProductionActions({
       const res = await fetch(`/api/production/jobs/${jobId}/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ machineId, operatorId: currentUser?.id || "u-1" })
+        body: JSON.stringify({ machineId })
       });
       const data = await res.json();
       if (data.success) {
@@ -199,7 +199,7 @@ export function useProductionActions({
       } else {
         addTerminalLog("ERROR", `فشل تحديث المعايرة: ${data.message}`);
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       addTerminalLog("ERROR", `خطأ في الاتصال بالخادم أثناء المعايرة: ${e.message}`);
     }
   };

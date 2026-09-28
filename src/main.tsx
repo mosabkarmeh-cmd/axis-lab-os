@@ -5,18 +5,30 @@ import { NotificationProvider } from './components/NotificationProvider.tsx';
 import AppErrorBoundary from './components/AppErrorBoundary.tsx';
 import './index.css';
 
+// Intercept and ignore Vite's benign WebSocket connection failures in sandboxed environment
 if (typeof window !== 'undefined') {
   window.addEventListener('unhandledrejection', (event) => {
     const reason = event.reason;
     const reasonStr = reason ? (reason.message || reason.stack || reason.toString()) : '';
-    if (reasonStr && (reasonStr.includes('WebSocket') || reasonStr.includes('websocket') || reasonStr.includes('ws://') || reasonStr.includes('wss://'))) {
+    if (reasonStr && (
+      reasonStr.includes('WebSocket') || 
+      reasonStr.includes('websocket') || 
+      reasonStr.includes('ws://') || 
+      reasonStr.includes('wss://')
+    )) {
       event.preventDefault();
       event.stopPropagation();
     }
   });
+
   window.addEventListener('error', (event) => {
     const msg = event.message || '';
-    if (msg && (msg.includes('WebSocket') || msg.includes('websocket') || msg.includes('ws://') || msg.includes('wss://'))) {
+    if (msg && (
+      msg.includes('WebSocket') || 
+      msg.includes('websocket') || 
+      msg.includes('ws://') || 
+      msg.includes('wss://')
+    )) {
       event.preventDefault();
       event.stopPropagation();
     }

@@ -1,4 +1,4 @@
-export function extractMaterialName(item: Record<string, unknown>): string {
+export function extractMaterialName(item: { material?: unknown; materialCategory?: unknown; productName?: unknown; name?: unknown }): string {
   if (typeof item.material === "string" && item.material.trim()) return item.material.trim();
   if (typeof item.materialCategory === "string" && item.materialCategory.trim()) return item.materialCategory.trim();
   const name = String(item.productName || item.name || "").trim();

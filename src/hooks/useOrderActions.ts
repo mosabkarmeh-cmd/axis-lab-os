@@ -1,5 +1,15 @@
 import type React from "react";
 
+export interface OrderItemProgressParams {
+  itemId?: string;
+  materialName?: string;
+  setAllCompleted?: boolean;
+  resetAll?: boolean;
+  addItem?: { productName: string; quantity: number; materialName: string };
+  removeItemId?: string;
+  completedQuantity?: number;
+}
+
 type OrderActionsOptions = {
   orders: any[]; currentUser: any; fetchOrders: () => void | Promise<void>; fetchLogs: () => void | Promise<void>;
   setDeliveryBlockedOrder: (order: any) => void; addTerminalLog: (scope: string, message: string) => void;
@@ -16,7 +26,7 @@ export function useOrderActions(o: OrderActionsOptions) {
     const target = o.orders.find(order => order.id === orderId);
     if (status === "delivered" && target && target.remaining > 0.01) { o.setDeliveryBlockedOrder(target); return; }
     try {
-      const res = await fetch(`/api/orders/${orderId}/status`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status, notes: notesText, changedById: o.currentUser?.id || "u-1" }) });
+      const res = await fetch(`/api/orders/${orderId}/status`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status, notes: notesText }) });
       if (res.ok) { o.addTerminalLog("DB", `Order ${orderId} status transitioned to: ${status}`); await o.fetchOrders(); await o.fetchLogs(); return; }
       const error = await res.json().catch(() => ({}));
       if (error.remainingUSD !== undefined && target) o.setDeliveryBlockedOrder(target); else window.alert(`خطأ أثناء تحديث حالة الطلب: ${error.error || "خطأ غير معروف"}`);
@@ -29,15 +39,14 @@ export function useOrderActions(o: OrderActionsOptions) {
   const handleRestoreOrder = async (id: string) => { try { const res = await fetch(`/api/orders/${id}/restore`, { method: "POST" }); if (res.ok) { o.addTerminalLog("ARCHIVE", `[ORDER RESTORED] Order ${id} restored to active queue.`); await o.fetchOrders(); await o.fetchLogs(); } } catch { o.addTerminalLog("ERROR", "Failed to restore order"); } };
   const handleUpdateItemProgress = async (
     orderId: string,
-    params: { itemId?: string; materialName?: string; setAllCompleted?: boolean; resetAll?: boolean; addItem?: any; removeItemId?: string; completedQuantity?: number }
+    params: OrderItemProgressParams
   ) => {
     try {
       const res = await fetch(`/api/orders/${orderId}/items-progress`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...params,
-          changedById: o.currentUser?.id || "u-1"
+          ...params
         })
       });
 
@@ -111,7 +120,7 @@ export function useOrderActions(o: OrderActionsOptions) {
       const res = await fetch(`/api/orders/${orderId}/assign-workers`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...assignment, changedById: o.currentUser?.id || "u-1" })
+        body: JSON.stringify({ ...assignment })
       });
       if (res.ok) {
         const updated = await res.json();

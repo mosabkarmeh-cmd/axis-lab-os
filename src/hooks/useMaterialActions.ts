@@ -19,7 +19,7 @@ export function useMaterialActions(o: Options) {
       const result = data.classification;
       if (isEdit) o.setEditingMaterial((prev: any) => prev ? { ...prev, category: result.category, subCategory: result.subCategory } : null);
       o.setAiClassificationResult(result); o.addTerminalLog("AI", `Auto-classified material '${name}' as '${result.category}' (${result.subCategory})`); return result;
-    } catch (e: any) { o.addTerminalLog("ERROR", `AI classification failed: ${e.message}`); if (!quiet) window.showAlert?.(e.message, "خطأ التصنيف الذكي"); return null; }
+    } catch (e: unknown) { o.addTerminalLog("ERROR", `AI classification failed: ${e.message}`); if (!quiet) window.showAlert?.(e.message, "خطأ التصنيف الذكي"); return null; }
     finally { o.setIsAiClassifying(false); }
   };
   const handleAiClassifyMaterial = (name: string, thickness: string, color: string, notes: string, isEdit: boolean, quiet = false) => classify(name, thickness, color, notes, isEdit, quiet);
