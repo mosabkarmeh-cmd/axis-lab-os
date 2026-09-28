@@ -186,8 +186,7 @@ export default function VectorCompilerUploader({
       formData.append("file", file);
       formData.append("entityType", "order");
       formData.append("entityId", selectedOrderId);
-      formData.append("uploadedBy", "u-1");
-
+  
       const res = await fetch("/api/files/upload", {
         method: "POST",
         body: formData
@@ -201,7 +200,7 @@ export default function VectorCompilerUploader({
       } else {
         setSaveErrorMsg(data.message || "فشل رفع الملف وربطه بالطلب.");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setSaveErrorMsg("حدث خطأ أثناء الاتصال بالخادم لرفع الملف.");
     } finally {
       setIsSavingToOrder(false);
