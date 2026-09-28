@@ -1,0 +1,11 @@
+const fs = require('node:fs');
+const assert = (value, message) => { if (!value) throw new Error(message); };
+const source = fs.readFileSync('desktop/main.cjs', 'utf8');
+assert(source.includes("autoUpdater.autoDownload = false"), 'autoDownload must remain opt-in');
+assert(source.includes("autoUpdater.autoInstallOnAppQuit = true"), 'autoInstallOnAppQuit must be enabled');
+assert(source.includes("provider: 'github'"), 'GitHub updater provider missing');
+assert(source.includes("owner: 'mosabkarmeh-cmd'"), 'updater owner missing');
+assert(source.includes("repo: 'axis-lab-os'"), 'updater repository missing');
+assert(source.includes("releaseType: 'release'"), 'updater must use release channel');
+assert(source.includes("if (!app.isPackaged && process.env.AXIS_UPDATE_TEST !== '1') return;"), 'dev-mode updater guard missing');
+console.log('desktop-updater-config-smoke: PASS');
