@@ -116,9 +116,6 @@ echo    npm run dev
 echo.
 echo Then open your browser at: http://localhost:3000
 echo.
-echo Default login accounts:
-echo    admin@axislab.com / admin123
-echo    employee@axislab.com / employee123
-echo    accountant@axislab.com / accountant123
+echo First-run admin credentials are generated securely by the desktop app.
 echo.
 pause
