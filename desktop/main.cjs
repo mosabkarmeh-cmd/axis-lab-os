@@ -56,7 +56,16 @@ function getBootstrapAdminPassword() {
     const existing = fs.readFileSync(passwordPath, 'utf8').trim();
     if (existing) return existing;
   } catch {}
-  const initialPassword = '12345';
+  const existing = (() => {
+    try {
+      const current = fs.readFileSync(passwordPath, 'utf8').trim();
+      return current || null;
+    } catch {
+      return null;
+    }
+  })();
+  if (existing) return existing;
+  const initialPassword = crypto.randomBytes(16).toString('base64url');
   fs.mkdirSync(path.dirname(passwordPath), { recursive: true });
   fs.writeFileSync(passwordPath, initialPassword, { encoding: 'utf8', mode: 0o600 });
   bootstrapPasswordCreated = true;
