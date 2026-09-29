@@ -33,20 +33,32 @@ jobs:
         run: npm run test:network
       - name: Stress smoke
         run: npm run test:stress
+      - name: Prepare release assets
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force -Path release-assets | Out-Null
       - name: Build Current User installer
         run: npm run desktop:package:win:current -- --publish never
-      - name: Build All Users installer
-        run: npm run desktop:package:win:all -- --publish never
-      - name: Verify installers
+      - name: Preserve Current User installer
         shell: pwsh
         run: |
           $current = Get-ChildItem -Path dist -Filter '*Setup*.exe' | Select-Object -First 1
+          if (-not $current) { throw 'Current User installer missing immediately after Current User build.' }
+          Copy-Item $current.FullName (Join-Path $env:GITHUB_WORKSPACE 'release-assets\AXIS-LAB-OS-Setup-0.15.0.exe') -Force
+      - name: Build All Users installer
+        run: npm run desktop:package:win:all -- --publish never
+      - name: Preserve All Users installer
+        shell: pwsh
+        run: |
           $allUsers = Get-ChildItem -Path dist-all-users -Filter '*AllUsers*.exe' -Recurse | Select-Object -First 1
-          if (-not $current) { throw 'Current User installer missing.' }
-          if (-not $allUsers) { throw 'All Users installer missing.' }
-          New-Item -ItemType Directory -Force -Path release-assets | Out-Null
-          Copy-Item $current.FullName release-assets/
-          Copy-Item $allUsers.FullName release-assets/
+          if (-not $allUsers) { throw 'All Users installer missing immediately after All Users build.' }
+          Copy-Item $allUsers.FullName (Join-Path $env:GITHUB_WORKSPACE 'release-assets\AXIS-LAB-OS-Setup-0.15.0-AllUsers.exe') -Force
+      - name: Verify installers
+        shell: pwsh
+        run: |
+          $current = Join-Path $env:GITHUB_WORKSPACE 'release-assets\AXIS-LAB-OS-Setup-0.15.0.exe'
+          $allUsers = Join-Path $env:GITHUB_WORKSPACE 'release-assets\AXIS-LAB-OS-Setup-0.15.0-AllUsers.exe'
+          if (-not (Test-Path $current)) { throw 'Current User installer was not preserved.' }
+          if (-not (Test-Path $allUsers)) { throw 'All Users installer was not preserved.' }
           Get-ChildItem release-assets | Format-Table Name,Length
       - name: Create GitHub release and tag
         env:
@@ -56,7 +68,7 @@ jobs:
           $tag = 'v0.15.0'
           $existing = gh release view $tag --json tagName 2>$null
           if (-not $existing) {
-            gh release create $tag release-assets/*Setup*.exe release-assets/*AllUsers*.exe --title 'AXIS LAB OS v0.15.0' --generate-notes
+            gh release create $tag release-assets/*Setup*.exe --title 'AXIS LAB OS v0.15.0' --generate-notes
           } else {
-            gh release upload $tag release-assets/*Setup*.exe release-assets/*AllUsers*.exe --clobber
+            gh release upload $tag release-assets/*Setup*.exe --clobber
           }
