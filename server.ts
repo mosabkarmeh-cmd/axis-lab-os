@@ -2184,7 +2184,7 @@ async function startServer() {
     user.passwordHash = await bcrypt.hash(newPassword, 12);
     user.mustChangePassword = false;
     schedulePersist();
-    res.json({ success: true, user: publicUser(user), token });
+    res.json({ success: true, user: publicUser(user) });
   });
 
   // Test-only GUI session fixture. This route exists only when the desktop runner explicitly enables AXIS_GUI_TEST=1.
@@ -2197,7 +2197,7 @@ async function startServer() {
     if (!user) { res.status(404).json({ error: "No active GUI test user for role" }); return; }
     const token = generateJWT(user);
     res.cookie("axislab_token", token, { maxAge: 10 * 60 * 1000, httpOnly: true, secure: false, path: "/", sameSite: "lax" });
-    res.json({ success: true, user: publicUser(user) });
+    res.json({ success: true, user: publicUser(user), token });
   });
 
   // API - Auth Register
