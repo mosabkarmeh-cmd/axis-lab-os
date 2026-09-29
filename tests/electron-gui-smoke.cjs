@@ -25,15 +25,31 @@ async function main() {
     await page.locator('input[type="password"]').waitFor();
 
     // Obtain an employee session only through the CI-only fixture endpoint.
-    const session = await page.evaluate(async () => {
-      const response = await fetch("http://127.0.0.1:3210/api/test/gui-session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role: "employee" }), credentials: "include" });
-      const raw = await response.text();
-      let body;
-      try { body = JSON.parse(raw); } catch { body = { raw: raw.slice(0, 500) }; }
-      return { ok: response.ok, status: response.status, body };
+    // Acquire the CI-only session outside the renderer, then install the exact HttpOnly cookie into the Electron browser context.
+    const fixtureResponse = await fetch("http://127.0.0.1:3210/api/test/gui-session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role: "employee" })
     });
-    if (!session.ok) throw new Error(`GUI employee session fixture failed: HTTP ${session.status} body=${JSON.stringify(session.body)}`);
-    if (session.body?.user?.role !== "employee") throw new Error("GUI session fixture did not return an employee user");
+    const fixtureBody = await fixtureResponse.json().catch(() => ({}));
+    if (!fixtureResponse.ok) throw new Error("GUI employee session fixture failed: HTTP " + fixtureResponse.status + " body=" + JSON.stringify(fixtureBody));
+    if (fixtureBody?.user?.role !== "employee") throw new Error("GUI session fixture did not return an employee user");
+    const setCookies = typeof fixtureResponse.headers.getSetCookie === "function"
+      ? fixtureResponse.headers.getSetCookie()
+      : [fixtureResponse.headers.get("set-cookie")].filter(Boolean);
+    const sessionCookie = setCookies.find((value) => /^axislab_token=/i.test(value || ""));
+    if (!sessionCookie) throw new Error("GUI session fixture did not return axislab_token cookie");
+    const tokenMatch = sessionCookie.match(/^axislab_token=([^;]+)/i);
+    if (!tokenMatch) throw new Error("Unable to parse axislab_token cookie");
+    await electronApp.context().addCookies([{
+      name: "axislab_token",
+      value: tokenMatch[1],
+      domain: "127.0.0.1",
+      path: "/",
+      httpOnly: true,
+      secure: false,
+      sameSite: "Lax"
+    }]);
     await page.reload();
     await page.getByText("AXIS LAB v0.15.0", { exact: false }).waitFor();
     try {
