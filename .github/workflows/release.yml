@@ -13,6 +13,7 @@ jobs:
     runs-on: windows-latest
     env:
       NODE_OPTIONS: --disable-warning=DEP0040 --disable-warning=DEP0169
+      HAS_CODE_SIGNING: ${{ secrets.CSC_CERT_BASE64 != '' && secrets.CSC_KEY_PASSWORD != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -31,7 +32,7 @@ jobs:
       - name: Run security smoke test
         run: npm run test:smoke
       - name: Configure Windows code signing
-        if: ${{ secrets.CSC_CERT_BASE64 != '' && secrets.CSC_KEY_PASSWORD != '' }}
+        if: ${{ env.HAS_CODE_SIGNING == 'true' }}
         shell: pwsh
         env:
           CSC_CERT_BASE64: ${{ secrets.CSC_CERT_BASE64 }}
@@ -43,7 +44,7 @@ jobs:
           "CSC_KEY_PASSWORD=$env:CSC_KEY_PASSWORD" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           Write-Host 'Windows code signing certificate configured.'
       - name: Report unsigned release mode
-        if: ${{ secrets.CSC_CERT_BASE64 == '' || secrets.CSC_KEY_PASSWORD == '' }}
+        if: ${{ env.HAS_CODE_SIGNING != 'true' }}
         run: Write-Host 'No CSC_CERT_BASE64/CSC_KEY_PASSWORD secrets configured; installers will be unsigned.'
       - name: Build Windows installer (Current User)
         run: npm run desktop:package:win:current -- --publish never
