@@ -47,6 +47,8 @@ jobs:
         shell: pwsh
         env:
           AXIS_APP_PATH: ${{ github.workspace }}\dist\win-unpacked\AXIS LAB OS.exe
+          NODE_ENV: development
+          ALLOW_PUBLIC_REGISTRATION: "true"
         run: |
           if (-not (Test-Path $env:AXIS_APP_PATH)) { throw "Packaged Electron application not found: $env:AXIS_APP_PATH" }
           node tests/electron-gui-smoke.cjs
