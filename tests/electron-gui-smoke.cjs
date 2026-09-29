@@ -18,7 +18,7 @@ async function main() {
     await page.getByText("AXIS LAB OS", { exact: false }).first().waitFor();
 
     // The production authentication UI must be present before the test-only session fixture is injected.
-    await page.getByRole("button", { name: "تسجيل الدخول" }).waitFor();
+    await page.getByRole("button", { name: "تسجيل الدخول", exact: true }).waitFor();
     await page.locator('input[type="email"]').waitFor();
     await page.locator('input[type="password"]').waitFor();
 
