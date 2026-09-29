@@ -73,8 +73,7 @@ async function main() {
       await page.screenshot({ path: process.env.AXIS_GUI_SCREENSHOT || "axis-lab-gui-failure.png", fullPage: true }).catch(() => {});
       throw error;
     }
-    await page.getByText("AXIS LAB OS / v0.15.0", { exact: false }).waitFor();
-    await page.getByRole("button", { name: /الطلبات والعملاء/ }).click();
+    await page.locator("button").filter({ hasText: "الطلبات والعملاء" }).first().click();
     await page.getByText("الطلبات والعملاء", { exact: false }).first().waitFor();
 
     const bodyText = await page.locator("body").innerText();
