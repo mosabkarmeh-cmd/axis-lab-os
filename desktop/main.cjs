@@ -51,7 +51,6 @@ let mainWindow;
 let bootstrapPasswordCreated = false;
 
 function getBootstrapAdminPassword() {
-  if (process.env.AXIS_GUI_TEST === '1') return 'axis-gui-test-admin';
   const passwordPath = path.join(app.getPath('userData'), 'bootstrap-admin-password.txt');
   try {
     const existing = fs.readFileSync(passwordPath, 'utf8').trim();
@@ -258,6 +257,7 @@ function startServer() {
       APP_URL: process.env.AXIS_APP_URL || `http://${IS_CENTRAL_SERVER ? 'localhost' : '127.0.0.1'}:${PORT}`,
       SERVER_HOST: process.env.AXIS_SERVER_HOST || (IS_CENTRAL_SERVER ? '0.0.0.0' : '127.0.0.1'),
       ALLOW_PUBLIC_REGISTRATION: 'false',
+      AXIS_GUI_TEST: process.env.AXIS_GUI_TEST === '1' ? '1' : undefined,
       BOOTSTRAP_ADMIN_PASSWORD: getBootstrapAdminPassword(),
       JWT_SECRET: getDesktopJwtSecret(),
     },
