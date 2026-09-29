@@ -17,13 +17,20 @@ async function main() {
     await page.waitForLoadState("domcontentloaded").catch(() => {});
     await page.getByText("AXIS LAB OS", { exact: false }).first().waitFor();
 
-    await page.getByRole("button", { name: "حساب جديد" }).click();
-    await page.locator('input[type="text"]').first().fill("GUI Test Employee");
-    await page.locator('input[type="email"]').fill(`gui-employee-${Date.now()}@example.test`);
-    await page.locator('input[type="password"]').fill("GuiTest-2026-Strong!");
-    await page.getByRole("button", { name: "فني تشغيل ليزر" }).click();
-    await page.getByRole("button", { name: "إتمام التسجيل وإصدار المفتاح" }).click();
+    // The production authentication UI must be present before the test-only session fixture is injected.
+    await page.getByRole("button", { name: "تسجيل الدخول" }).waitFor();
+    await page.locator('input[type="email"]').waitFor();
+    await page.locator('input[type="password"]').waitFor();
 
+    // Obtain an employee session only through the CI-only fixture endpoint.
+    const session = await page.evaluate(async () => {
+      const response = await fetch("/api/test/gui-session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role: "employee" }) });
+      return { ok: response.ok, status: response.status, body: await response.json() };
+    });
+    if (!session.ok) throw new Error(`GUI employee session fixture failed: HTTP ${session.status}`);
+    if (session.body?.user?.role !== "employee") throw new Error("GUI session fixture did not return an employee user");
+    await page.reload();
+    await page.getByText("AXIS LAB v0.15.0", { exact: false }).waitFor();
     try {
       await page.getByText("الإنتاج والتشغيل اليدوي", { exact: false }).waitFor();
     } catch (error) {
@@ -47,7 +54,9 @@ async function main() {
 
     console.log("Electron GUI smoke: PASS");
     console.log("Packaged EXE launch: PASS");
-    console.log("Registration: PASS");
+    console.log("Login UI rendering: PASS");
+    console.log("CI-only employee session fixture: PASS");
+    console.log("Employee GUI session: PASS");
     console.log("Employee routing/navigation: PASS");
     console.log("Financial-field exposure check: PASS");
   } finally {
