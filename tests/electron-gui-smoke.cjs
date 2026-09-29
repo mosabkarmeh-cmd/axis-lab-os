@@ -24,7 +24,13 @@ async function main() {
     await page.getByRole("button", { name: "فني تشغيل ليزر" }).click();
     await page.getByRole("button", { name: "إتمام التسجيل وإصدار المفتاح" }).click();
 
-    await page.getByText("الإنتاج والتشغيل اليدوي", { exact: false }).waitFor();
+    try {
+      await page.getByText("الإنتاج والتشغيل اليدوي", { exact: false }).waitFor();
+    } catch (error) {
+      console.error("POST-REGISTER BODY:\n" + (await page.locator("body").innerText()).slice(0, 12000));
+      await page.screenshot({ path: process.env.AXIS_GUI_SCREENSHOT || "axis-lab-gui-failure.png", fullPage: true }).catch(() => {});
+      throw error;
+    }
     await page.getByText("AXIS LAB OS / v0.15.0", { exact: false }).waitFor();
     await page.getByRole("button", { name: /الطلبات والعملاء/ }).click();
     await page.getByText("الطلبات والعملاء", { exact: false }).first().waitFor();
