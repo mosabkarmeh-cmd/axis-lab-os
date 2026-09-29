@@ -26,7 +26,7 @@ async function main() {
 
     // Obtain an employee session only through the CI-only fixture endpoint.
     const session = await page.evaluate(async () => {
-      const response = await fetch("/api/test/gui-session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role: "employee" }), credentials: "include" });
+      const response = await fetch("http://127.0.0.1:3210/api/test/gui-session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role: "employee" }), credentials: "include" });
       return { ok: response.ok, status: response.status, body: await response.json() };
     });
     if (!session.ok) throw new Error(`GUI employee session fixture failed: HTTP ${session.status}`);
