@@ -15,8 +15,6 @@ extraResources:
     to: dist/assets
   - from: assets/icon.ico
     to: icon.ico
-  - from: .runtime/node_modules
-    to: node_modules
   - from: node_modules/sql.js/dist/sql-wasm.wasm
     to: sql-wasm.wasm
   - from: dist/logo.jpg
