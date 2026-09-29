@@ -103,7 +103,7 @@ async function main() {
     await modal.getByPlaceholder("مادة القص (مثال: أكريليك شفاف 4ملم)").last().fill(itemName);
     await modal.getByPlaceholder("الكمية").last().fill("2");
     await modal.getByPlaceholder("السعر").last().fill("500000");
-    await modal.getByLabel("المبلغ المقبوض سلفاً (ل.س)").fill("300000");
+    await modal.locator("label").filter({ hasText: "المبلغ المقبوض سلفاً (ل.س)" }).locator("..").locator("input").fill("300000");
 
     await modal.getByText("المبلغ الإجمالي النهائي", { exact: true }).waitFor();
     const summaryText = await modal.innerText();
