@@ -2184,7 +2184,7 @@ async function startServer() {
     user.passwordHash = await bcrypt.hash(newPassword, 12);
     user.mustChangePassword = false;
     schedulePersist();
-    res.json({ success: true, user: publicUser(user) });
+    res.json({ success: true, user: publicUser(user), token });
   });
 
   // Test-only GUI session fixture. This route exists only when the desktop runner explicitly enables AXIS_GUI_TEST=1.

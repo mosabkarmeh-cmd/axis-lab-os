@@ -34,6 +34,8 @@ async function main() {
     const fixtureBody = await fixtureResponse.json().catch(() => ({}));
     if (!fixtureResponse.ok) throw new Error("GUI employee session fixture failed: HTTP " + fixtureResponse.status + " body=" + JSON.stringify(fixtureBody));
     if (fixtureBody?.user?.role !== "employee") throw new Error("GUI session fixture did not return an employee user");
+    if (!fixtureBody?.token) throw new Error("GUI session fixture did not return a CI token");
+    await page.evaluate((token) => localStorage.setItem("axislab_token", token), fixtureBody.token);
     const setCookies = typeof fixtureResponse.headers.getSetCookie === "function"
       ? fixtureResponse.headers.getSetCookie()
       : [fixtureResponse.headers.get("set-cookie")].filter(Boolean);
