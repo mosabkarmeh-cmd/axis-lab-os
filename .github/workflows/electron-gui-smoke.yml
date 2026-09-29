@@ -49,7 +49,8 @@ jobs:
           AXIS_APP_PATH: ${{ github.workspace }}\dist\win-unpacked\AXIS LAB OS.exe
           AXIS_GUI_SCREENSHOT: ${{ runner.temp }}\axis-lab-gui-failure.png
           NODE_ENV: development
-          ALLOW_PUBLIC_REGISTRATION: "true"
+          ALLOW_PUBLIC_REGISTRATION: "false"
+          AXIS_GUI_TEST: "1"
         run: |
           if (-not (Test-Path $env:AXIS_APP_PATH)) { throw "Packaged Electron application not found: $env:AXIS_APP_PATH" }
           node tests/electron-gui-smoke.cjs
