@@ -12,7 +12,7 @@ permissions:
 jobs:
   validate:
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       NODE_OPTIONS: --disable-warning=DEP0040 --disable-warning=DEP0169
     steps:
@@ -42,12 +42,62 @@ jobs:
       - name: Verify installer outputs
         shell: pwsh
         run: |
-          $current = Get-ChildItem -Path dist -Filter '*Setup*.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
-          $allUsers = Get-ChildItem -Path dist-all-users -Filter '*AllUsers*.exe' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          $current = Get-ChildItem -Path dist -Filter '*Setup*.exe' | Select-Object -First 1
+          $allUsers = Get-ChildItem -Path dist-all-users -Filter '*AllUsers*.exe' -Recurse | Select-Object -First 1
           if (-not $current) { throw 'Current User installer was not produced.' }
           if (-not $allUsers) { throw 'All Users installer was not produced.' }
           Write-Host "Current User: $($current.FullName)"
           Write-Host "All Users: $($allUsers.FullName)"
+      - name: Install and launch current-user installer
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem -Path dist -Filter '*Setup*.exe' | Select-Object -First 1
+          $target = Join-Path $env:RUNNER_TEMP 'axis-lab-current-user'
+          Start-Process -FilePath $setup.FullName -ArgumentList '/S', "/D=$target" -Wait
+          $app = Join-Path $target 'AXIS LAB OS.exe'
+          if (-not (Test-Path $app)) { throw "Current User application was not installed: $app" }
+          $process = Start-Process -FilePath $app -PassThru
+          try {
+            $deadline = (Get-Date).AddMinutes(2)
+            $healthy = $false
+            while ((Get-Date) -lt $deadline) {
+              try {
+                $response = Invoke-WebRequest -Uri 'http://127.0.0.1:3210/api/health' -UseBasicParsing -TimeoutSec 3
+                if ($response.StatusCode -eq 200 -and $response.Content -match '"database":"sqlite"') { $healthy = $true; break }
+              } catch { }
+              Start-Sleep -Seconds 2
+            }
+            if (-not $healthy) { throw 'Current User installed application did not expose a healthy SQLite API.' }
+            Write-Host 'Current User installer/runtime: PASS'
+          } finally {
+            Get-Process -Name 'AXIS LAB OS' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+            if (-not $process.HasExited) { $process.Kill() }
+          }
+      - name: Install and launch all-users installer
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem -Path dist-all-users -Filter '*AllUsers*.exe' -Recurse | Select-Object -First 1
+          $target = Join-Path $env:RUNNER_TEMP 'axis-lab-all-users'
+          Start-Process -FilePath $setup.FullName -ArgumentList '/S', "/D=$target" -Wait
+          $app = Join-Path $target 'AXIS LAB OS.exe'
+          if (-not (Test-Path $app)) { throw "All Users application was not installed: $app" }
+          $process = Start-Process -FilePath $app -PassThru
+          try {
+            $deadline = (Get-Date).AddMinutes(2)
+            $healthy = $false
+            while ((Get-Date) -lt $deadline) {
+              try {
+                $response = Invoke-WebRequest -Uri 'http://127.0.0.1:3210/api/health' -UseBasicParsing -TimeoutSec 3
+                if ($response.StatusCode -eq 200 -and $response.Content -match '"database":"sqlite"') { $healthy = $true; break }
+              } catch { }
+              Start-Sleep -Seconds 2
+            }
+            if (-not $healthy) { throw 'All Users installed application did not expose a healthy SQLite API.' }
+            Write-Host 'All Users installer/runtime: PASS'
+          } finally {
+            Get-Process -Name 'AXIS LAB OS' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+            if (-not $process.HasExited) { $process.Kill() }
+          }
       - name: Upload Windows installers
         uses: actions/upload-artifact@v4
         with:
