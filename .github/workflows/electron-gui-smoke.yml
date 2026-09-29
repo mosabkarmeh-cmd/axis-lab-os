@@ -47,6 +47,7 @@ jobs:
         shell: pwsh
         env:
           AXIS_APP_PATH: ${{ github.workspace }}\dist\win-unpacked\AXIS LAB OS.exe
+          AXIS_GUI_SCREENSHOT: ${{ runner.temp }}\axis-lab-gui-failure.png
           NODE_ENV: development
           ALLOW_PUBLIC_REGISTRATION: "true"
         run: |
@@ -60,4 +61,5 @@ jobs:
           path: |
             ${{ runner.temp }}/axis-lab-gui.stdout.log
             ${{ runner.temp }}/axis-lab-gui.stderr.log
+            ${{ runner.temp }}/axis-lab-gui-failure.png
           if-no-files-found: ignore
