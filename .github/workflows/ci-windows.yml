@@ -12,13 +12,47 @@ permissions:
 jobs:
   validate:
     runs-on: windows-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
+    env:
+      NODE_OPTIONS: --disable-warning=DEP0040 --disable-warning=DEP0169
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
-      - run: npm ci --no-audit --no-fund --loglevel=error
-      - run: node scripts/github-branch-sanity.cjs
-      - run: npm run lint
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund --loglevel=error
+      - name: TypeScript validation
+        run: npm run lint
+      - name: Static architecture/security validation
+        run: npm run test:all-static
+      - name: Full backend smoke suite
+        run: npm run test:smoke
+      - name: Network smoke
+        run: npm run test:network
+      - name: Stress smoke
+        run: npm run test:stress
+      - name: Windows current-user installer
+        run: npm run desktop:package:win:current -- --publish never
+      - name: Windows all-users installer
+        run: npm run desktop:package:win:all -- --publish never
+      - name: Verify installer outputs
+        shell: pwsh
+        run: |
+          $current = Get-ChildItem -Path dist -Filter '*Setup*.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+          $allUsers = Get-ChildItem -Path dist-all-users -Filter '*AllUsers*.exe' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $current) { throw 'Current User installer was not produced.' }
+          if (-not $allUsers) { throw 'All Users installer was not produced.' }
+          Write-Host "Current User: $($current.FullName)"
+          Write-Host "All Users: $($allUsers.FullName)"
+      - name: Upload Windows installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: axis-lab-os-v0.15.0-windows-installers
+          if-no-files-found: error
+          path: |
+            dist/*Setup*.exe
+            dist-all-users/**/*AllUsers*.exe
