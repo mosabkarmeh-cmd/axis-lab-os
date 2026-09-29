@@ -27,8 +27,12 @@ jobs:
         run: npm ci --no-audit --no-fund --loglevel=error
       - name: TypeScript validation
         run: npm run lint
-      - name: Static architecture/security validation
-        run: npm run test:all-static
+      - name: Architecture audit
+        run: npm run test:architecture
+      - name: Static security audit
+        run: npm run test:security-static
+      - name: Desktop security smoke
+        run: npm run test:desktop-security
       - name: Full backend smoke suite
         run: npm run test:smoke
       - name: Network smoke
