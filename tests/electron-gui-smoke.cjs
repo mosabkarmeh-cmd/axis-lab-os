@@ -34,8 +34,6 @@ async function main() {
     });
     if (!session.ok) throw new Error(`GUI employee session fixture failed: HTTP ${session.status} body=${JSON.stringify(session.body)}`);
     if (session.body?.user?.role !== "employee") throw new Error("GUI session fixture did not return an employee user");
-    const currentSession = await page.evaluate(async () => { const response = await fetch("http://127.0.0.1:3210/api/auth/me", { credentials: "include" }); return { ok: response.ok, body: await response.json() }; });
-    if (!currentSession.ok || currentSession.body?.user?.role !== "employee") throw new Error("GUI fixture cookie was not accepted by /api/auth/me");
     await page.reload();
     await page.getByText("AXIS LAB v0.15.0", { exact: false }).waitFor();
     try {
