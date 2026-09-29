@@ -1,0 +1,1 @@
+Final v0.15.0 release trigger. Source QA and Windows installers were already validated on commit 9db4e49db82f0957b013577108306ebe0b5e58ca.
