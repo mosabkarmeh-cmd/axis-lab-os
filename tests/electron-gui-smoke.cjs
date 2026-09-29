@@ -24,11 +24,13 @@ async function main() {
 
     // Obtain an employee session only through the CI-only fixture endpoint.
     const session = await page.evaluate(async () => {
-      const response = await fetch("/api/test/gui-session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role: "employee" }) });
+      const response = await fetch("/api/test/gui-session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role: "employee" }), credentials: "include" });
       return { ok: response.ok, status: response.status, body: await response.json() };
     });
     if (!session.ok) throw new Error(`GUI employee session fixture failed: HTTP ${session.status}`);
     if (session.body?.user?.role !== "employee") throw new Error("GUI session fixture did not return an employee user");
+    const currentSession = await page.evaluate(async () => { const response = await fetch("/api/auth/me", { credentials: "include" }); return { ok: response.ok, body: await response.json() }; });
+    if (!currentSession.ok || currentSession.body?.user?.role !== "employee") throw new Error("GUI fixture cookie was not accepted by /api/auth/me");
     await page.reload();
     await page.getByText("AXIS LAB v0.15.0", { exact: false }).waitFor();
     try {
