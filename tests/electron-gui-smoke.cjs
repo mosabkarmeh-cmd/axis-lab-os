@@ -19,9 +19,9 @@ async function main() {
   await page.waitForLoadState("domcontentloaded").catch(() => {});
   await page.getByText("AXIS LAB OS", { exact: false }).first().waitFor();
   await page.getByRole("button", { name: "حساب جديد" }).click();
-  await page.getByLabel("الاسم الكامل").fill("GUI Test Employee");
-  await page.getByLabel("البريد الإلكتروني").fill(`gui-employee-${Date.now()}@example.test`);
-  await page.getByLabel("كلمة المرور").fill("GuiTest-2026-Strong!");
+  await page.locator('input[type="text"]').first().fill("GUI Test Employee");
+  await page.locator('input[type="email"]').fill(`gui-employee-${Date.now()}@example.test`);
+  await page.locator('input[type="password"]').fill("GuiTest-2026-Strong!");
   await page.getByRole("button", { name: "فني تشغيل ليزر" }).click();
   await page.getByRole("button", { name: "إتمام التسجيل وإصدار المفتاح" }).click();
   await page.getByText("الإنتاج والتشغيل اليدوي", { exact: false }).waitFor();
