@@ -51,6 +51,7 @@ let mainWindow;
 let bootstrapPasswordCreated = false;
 
 function getBootstrapAdminPassword() {
+  if (process.env.AXIS_GUI_TEST === '1') return 'axis-gui-test-admin';
   const passwordPath = path.join(app.getPath('userData'), 'bootstrap-admin-password.txt');
   try {
     const existing = fs.readFileSync(passwordPath, 'utf8').trim();
