@@ -1904,7 +1904,7 @@ async function startServer() {
   // Central API boundary: only health and authentication bootstrap are public.
   // Every business endpoint must have a verified active user before its handler runs.
   app.use("/api", (req, res, next) => {
-    const publicPaths = new Set(["/health", "/auth/login", "/auth/register", "/auth/change-password"]);
+    const publicPaths = new Set(["/health", "/auth/login", "/auth/register", "/auth/change-password", ...(process.env.AXIS_GUI_TEST === "1" ? ["/test/gui-session"] : [])]);
     if (req.method === "OPTIONS" || publicPaths.has(req.path)) {
       next();
       return;
