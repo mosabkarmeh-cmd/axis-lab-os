@@ -52,8 +52,20 @@ async function main() {
       secure: false,
       sameSite: "Lax"
     }]);
+    const verifyBeforeReload = await page.evaluate(async () => {
+      const response = await fetch("/api/auth/verify", { headers: { "Authorization": "Bearer " + localStorage.getItem("axislab_token") } });
+      return { status: response.status, body: await response.text() };
+    });
+    if (verifyBeforeReload.status !== 200) throw new Error("GUI token verification before reload failed: " + JSON.stringify(verifyBeforeReload));
     await page.reload();
-    await page.getByText("AXIS LAB v0.15.0", { exact: false }).waitFor();
+    try {
+      await page.getByText("AXIS LAB v0.15.0", { exact: false }).waitFor();
+    } catch (error) {
+      console.error("POST-RELOAD URL: " + page.url());
+      console.error("POST-RELOAD TOKEN PRESENT: " + String(await page.evaluate(() => Boolean(localStorage.getItem("axislab_token")))));
+      console.error("POST-RELOAD BODY:\n" + (await page.locator("body").innerText()).slice(0, 12000));
+      throw error;
+    }
     try {
       await page.getByText("الإنتاج والتشغيل اليدوي", { exact: false }).waitFor();
     } catch (error) {
