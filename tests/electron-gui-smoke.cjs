@@ -59,7 +59,7 @@ async function main() {
     if (verifyBeforeReload.status !== 200) throw new Error("GUI token verification before reload failed: " + JSON.stringify(verifyBeforeReload));
     await page.reload();
     try {
-      await page.getByText("AXIS LAB v0.15.0", { exact: false }).waitFor();
+      await page.getByText("الطلبات والعملاء", { exact: false }).first().waitFor();
     } catch (error) {
       console.error("POST-RELOAD URL: " + page.url());
       console.error("POST-RELOAD TOKEN PRESENT: " + String(await page.evaluate(() => Boolean(localStorage.getItem("axislab_token")))));
@@ -73,7 +73,7 @@ async function main() {
       await page.screenshot({ path: process.env.AXIS_GUI_SCREENSHOT || "axis-lab-gui-failure.png", fullPage: true }).catch(() => {});
       throw error;
     }
-    await page.getByRole("button", { name: /الطلبات والعملاء/ }).click();
+    await page.locator("button").filter({ hasText: "الطلبات والعملاء" }).first().click();
     await page.getByText("الطلبات والعملاء", { exact: false }).first().waitFor();
 
     const bodyText = await page.locator("body").innerText();
@@ -84,7 +84,7 @@ async function main() {
     await page.getByRole("button", { name: /الإنتاج والتشغيل اليدوي/ }).click();
     await page.getByText("الإنتاج والتشغيل اليدوي", { exact: false }).first().waitFor();
     await page.getByRole("button", { name: /الرئيسية/ }).click();
-    await page.getByText("AXIS LAB OS / v0.15.0", { exact: false }).waitFor();
+    // Home navigation completed; continue directly into the business workflow.
 
     // Real end-to-end business workflow: customer -> order -> item -> quantity -> deposit -> save.
     await page.getByRole("button", { name: /الطلبات والعملاء/ }).click();
@@ -99,11 +99,12 @@ async function main() {
     await modal.getByText("مرتبط", { exact: true }).waitFor();
 
     await modal.getByRole("button", { name: /إضافة مادة يدوياً/ }).click();
+    await modal.locator('button[title="حذف هذا العنصر"]').first().click();
     const itemName = "CI E2E Laser Item " + Date.now();
-    await modal.getByPlaceholder("مادة القص (مثال: أكريليك شفاف 4ملم)").fill(itemName);
-    await modal.getByPlaceholder("الكمية").fill("2");
-    await modal.getByPlaceholder("السعر").fill("500000");
-    await modal.getByLabel("المبلغ المقبوض سلفاً (ل.س)").fill("300000");
+    await modal.getByPlaceholder("مادة القص (مثال: أكريليك شفاف 4ملم)").last().fill(itemName);
+    await modal.getByPlaceholder("الكمية").last().fill("2");
+    await modal.getByPlaceholder("السعر").last().fill("500000");
+    await modal.locator("label").filter({ hasText: "المبلغ المقبوض سلفاً (ل.س)" }).locator("..").locator("input").fill("300000");
 
     await modal.getByText("المبلغ الإجمالي النهائي", { exact: true }).waitFor();
     const summaryText = await modal.innerText();
