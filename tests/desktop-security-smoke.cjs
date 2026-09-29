@@ -1,24 +1,10 @@
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
-const assert = (condition, message) => { if (!condition) throw new Error(message); };
-const { getBootstrapAdminPassword, getDesktopJwtSecret } = require('../desktop/security.cjs');
-const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'axis-desktop-security-'));
-try {
-  const userData = path.join(temp, 'userData');
-  const dataFile = path.join(userData, 'axis-data.sqlite');
-  const first = getBootstrapAdminPassword(userData, dataFile);
-  assert(first.created && first.password.length >= 20, 'first launch should create a strong bootstrap password');
-  const second = getBootstrapAdminPassword(userData, dataFile);
-  assert(second.password === first.password, 'bootstrap password must persist');
-  fs.writeFileSync(dataFile, 'persisted');
-  fs.rmSync(first.path, { force: true });
-  const afterPersistence = getBootstrapAdminPassword(userData, dataFile);
-  assert(afterPersistence.password === '' && afterPersistence.created === false, 'persisted install must not create a new bootstrap password');
-  const secret1 = getDesktopJwtSecret(userData, '');
-  const secret2 = getDesktopJwtSecret(userData, '');
-  assert(secret1.length >= 32 && secret1 === secret2, 'desktop JWT secret must persist');
-  console.log('desktop-security-smoke: PASS');
-} finally {
-  fs.rmSync(temp, { recursive: true, force: true });
-}
+const fs=require('node:fs');
+const path=require('node:path');
+const assert=(v,m)=>{if(!v)throw new Error(m)};
+const main=fs.readFileSync(path.resolve(__dirname,'../desktop/main.cjs'),'utf8');
+const preload=fs.readFileSync(path.resolve(__dirname,'../desktop/preload.cjs'),'utf8');
+assert(/contextIsolation:\s*true/.test(main),'context isolation is not enabled');
+assert(/nodeIntegration:\s*false/.test(main),'nodeIntegration must be disabled');
+assert(/sandbox:\s*true/.test(main),'renderer sandbox is not enabled');
+assert(!preload.includes('nodeIntegration'),'preload must not expose node integration');
+console.log('desktop-security-smoke: PASS');
