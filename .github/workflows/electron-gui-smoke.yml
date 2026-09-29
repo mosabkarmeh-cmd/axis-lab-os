@@ -43,37 +43,13 @@ jobs:
       - name: Build unpacked Current User application
         run: npx electron-builder --win dir --config electron-builder.yml --publish never
 
-      - name: Launch real packaged Electron application with CDP
+      - name: Launch and drive the real packaged Electron application
         shell: pwsh
+        env:
+          AXIS_APP_PATH: ${{ github.workspace }}\dist\win-unpacked\AXIS LAB OS.exe
         run: |
-          $app = Join-Path $env:GITHUB_WORKSPACE 'dist\win-unpacked\AXIS LAB OS.exe'
-          if (-not (Test-Path $app)) { throw "Packaged Electron application not found: $app" }
-          $stdout = Join-Path $env:RUNNER_TEMP 'axis-lab-gui.stdout.log'
-          $stderr = Join-Path $env:RUNNER_TEMP 'axis-lab-gui.stderr.log'
-          $process = Start-Process -FilePath $app -ArgumentList '--remote-debugging-port=9222' -WorkingDirectory (Split-Path $app) -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
-          try {
-            $deadline = (Get-Date).AddMinutes(2)
-            $cdpReady = $false
-            while ((Get-Date) -lt $deadline) {
-              try {
-                $response = Invoke-WebRequest -Uri 'http://127.0.0.1:9222/json/version' -UseBasicParsing -TimeoutSec 3
-                if ($response.StatusCode -eq 200) { $cdpReady = $true; break }
-              } catch { }
-              Start-Sleep -Seconds 2
-            }
-            if (-not $cdpReady) {
-              if (Test-Path $stdout) { Get-Content $stdout }
-              if (Test-Path $stderr) { Get-Content $stderr }
-              throw 'Electron DevTools Protocol endpoint did not become ready.'
-            }
-            node tests/electron-gui-smoke.cjs
-          } finally {
-            if (Test-Path $stdout) { Get-Content $stdout }
-            if (Test-Path $stderr) { Get-Content $stderr }
-            Get-Process -Name 'AXIS LAB OS' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-            Get-Process -Name 'electron' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-          }
-
+          if (-not (Test-Path $env:AXIS_APP_PATH)) { throw "Packaged Electron application not found: $env:AXIS_APP_PATH" }
+          node tests/electron-gui-smoke.cjs
       - name: Upload GUI diagnostics on failure
         if: failure()
         uses: actions/upload-artifact@v6
