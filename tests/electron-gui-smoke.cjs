@@ -84,7 +84,7 @@ async function main() {
     await page.getByRole("button", { name: /الإنتاج والتشغيل اليدوي/ }).click();
     await page.getByText("الإنتاج والتشغيل اليدوي", { exact: false }).first().waitFor();
     await page.getByRole("button", { name: /الرئيسية/ }).click();
-    await page.getByText("AXIS LAB OS / v0.15.0", { exact: false }).waitFor();
+    await page.getByText("AXIS LAB v0.15.0", { exact: false }).waitFor();
 
     // Real end-to-end business workflow: customer -> order -> item -> quantity -> deposit -> save.
     await page.getByRole("button", { name: /الطلبات والعملاء/ }).click();
