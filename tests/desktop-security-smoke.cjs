@@ -1,0 +1,10 @@
+const fs=require('node:fs');
+const path=require('node:path');
+const assert=(v,m)=>{if(!v)throw new Error(m)};
+const main=fs.readFileSync(path.resolve(__dirname,'../desktop/main.cjs'),'utf8');
+const preload=fs.readFileSync(path.resolve(__dirname,'../desktop/preload.cjs'),'utf8');
+assert(/contextIsolation:\s*true/.test(main),'context isolation is not enabled');
+assert(/nodeIntegration:\s*false/.test(main),'nodeIntegration must be disabled');
+assert(/sandbox:\s*true/.test(main),'renderer sandbox is not enabled');
+assert(!preload.includes('nodeIntegration'),'preload must not expose node integration');
+console.log('desktop-security-smoke: PASS');

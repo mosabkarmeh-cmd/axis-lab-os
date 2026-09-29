@@ -52,7 +52,9 @@ const ai = new GoogleGenAI({
 const DB_MODE = process.env.DB_MODE || "auto";
 const USE_POSTGRES = DB_MODE === "postgres" || (DB_MODE === "auto" && Boolean(process.env.SQL_HOST && process.env.SQL_DB_NAME));
 const USE_SQLITE = DB_MODE === "sqlite";
+const APP_RUNTIME_ROOT = process.env.AXIS_APP_ROOT || process.cwd();
 const LOCAL_DATA_FILE = process.env.AXIS_DATA_FILE || path.join(os.homedir(), "AppData", "Roaming", "AXIS LAB OS", "axis-data.sqlite");
+const RESOURCE_FONT_PATH = process.env.AXIS_FONT_PATH || path.join(APP_RUNTIME_ROOT, "Amiri-Regular.ttf");
 const LOCAL_LEGACY_DATA_FILE = process.env.AXIS_LEGACY_DATA_FILE || path.join(os.homedir(), "AppData", "Roaming", "Electron", "axis-data.json");
 const LOCAL_SCHEMA_VERSION = 6;
 let activityLogSequence = 0;
@@ -94,7 +96,7 @@ let localSqlite: any = null;
 async function initLocalSqlite() {
   if (localSqlite) return localSqlite;
   const SQL = await initSqlJs({
-    locateFile: (file: string) => process.env.SQLITE_WASM_PATH || path.join(process.cwd(), "node_modules", "sql.js", "dist", file),
+    locateFile: (file: string) => process.env.SQLITE_WASM_PATH || path.join(APP_RUNTIME_ROOT, "node_modules", "sql.js", "dist", file),
   });
   const openDatabase = (candidateBytes?: Uint8Array) => {
     let database: any = null;
@@ -9056,7 +9058,7 @@ Role Guidelines:
       }
       await persistStateNow();
       const safetyBackup = await createSqliteBackup("safety");
-      const SQL = await initSqlJs({ locateFile: (file: string) => process.env.SQLITE_WASM_PATH || path.join(process.cwd(), "node_modules", "sql.js", "dist", file) });
+      const SQL = await initSqlJs({ locateFile: (file: string) => process.env.SQLITE_WASM_PATH || path.join(APP_RUNTIME_ROOT, "node_modules", "sql.js", "dist", file) });
       localSqlite = new SQL.Database(fs.readFileSync(backupObj.filePath));
       await loadPersistedState();
       if (safetyBackup) BACKUPS.unshift(safetyBackup);
@@ -9209,7 +9211,7 @@ Role Guidelines:
   });
 
   // ==================== REPORT EXPORTS API ====================
-  const FONT_PATH = path.join(process.cwd(), "Amiri-Regular.ttf");
+  const FONT_PATH = RESOURCE_FONT_PATH;
 
   async function ensureFontExists(): Promise<string | null> {
     if (fs.existsSync(FONT_PATH)) return FONT_PATH;
