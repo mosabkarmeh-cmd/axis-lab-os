@@ -12,7 +12,7 @@ async function main() {
   let electronApp;
   const tracePath = process.env.AXIS_GUI_TRACE || "axis-lab-gui-trace.zip";
   try {
-    electronApp = await electron.launch({ executablePath: appPath, timeout: 30000 });
+    electronApp = await electron.launch({ executablePath: appPath, timeout: 30000, env: { ...process.env, AXIS_GUI_TEST: "1", NODE_ENV: "production", ALLOW_PUBLIC_REGISTRATION: "false" } });
     await electronApp.context().tracing.start({ screenshots: true, snapshots: true, sources: true });
     const page = await electronApp.firstWindow({ timeout: 30000 });
     page.setDefaultTimeout(10000);
@@ -27,9 +27,12 @@ async function main() {
     // Obtain an employee session only through the CI-only fixture endpoint.
     const session = await page.evaluate(async () => {
       const response = await fetch("http://127.0.0.1:3210/api/test/gui-session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role: "employee" }), credentials: "include" });
-      return { ok: response.ok, status: response.status, body: await response.json() };
+      const raw = await response.text();
+      let body;
+      try { body = JSON.parse(raw); } catch { body = { raw: raw.slice(0, 500) }; }
+      return { ok: response.ok, status: response.status, body };
     });
-    if (!session.ok) throw new Error(`GUI employee session fixture failed: HTTP ${session.status}`);
+    if (!session.ok) throw new Error(`GUI employee session fixture failed: HTTP ${session.status} body=${JSON.stringify(session.body)}`);
     if (session.body?.user?.role !== "employee") throw new Error("GUI session fixture did not return an employee user");
     const currentSession = await page.evaluate(async () => { const response = await fetch("/api/auth/me", { credentials: "include" }); return { ok: response.ok, body: await response.json() }; });
     if (!currentSession.ok || currentSession.body?.user?.role !== "employee") throw new Error("GUI fixture cookie was not accepted by /api/auth/me");
