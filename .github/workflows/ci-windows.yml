@@ -41,21 +41,27 @@ jobs:
         run: npm run test:stress
       - name: Windows current-user installer
         run: npm run desktop:package:win:current -- --publish never
+      - name: Preserve current-user installer
+        shell: pwsh
+        run: |
+          $current = Get-ChildItem -Path dist -Filter '*Setup*.exe' | Select-Object -First 1
+          if (-not $current) { throw 'Current User installer was not produced.' }
+          Copy-Item $current.FullName (Join-Path $env:RUNNER_TEMP 'axis-lab-current-user-setup.exe')
       - name: Windows all-users installer
         run: npm run desktop:package:win:all -- --publish never
       - name: Verify installer outputs
         shell: pwsh
         run: |
-          $current = Get-ChildItem -Path dist -Filter '*Setup*.exe' | Select-Object -First 1
+          $current = Get-Item (Join-Path $env:RUNNER_TEMP 'axis-lab-current-user-setup.exe')
           $allUsers = Get-ChildItem -Path dist-all-users -Filter '*AllUsers*.exe' -Recurse | Select-Object -First 1
-          if (-not $current) { throw 'Current User installer was not produced.' }
+          if (-not $current) { throw 'Current User installer was not preserved.' }
           if (-not $allUsers) { throw 'All Users installer was not produced.' }
           Write-Host "Current User: $($current.FullName)"
           Write-Host "All Users: $($allUsers.FullName)"
       - name: Install and launch current-user installer
         shell: pwsh
         run: |
-          $setup = Get-ChildItem -Path dist -Filter '*Setup*.exe' | Select-Object -First 1
+          $setup = Get-Item (Join-Path $env:RUNNER_TEMP 'axis-lab-current-user-setup.exe')
           $target = Join-Path $env:RUNNER_TEMP 'axis-lab-current-user'
           Start-Process -FilePath $setup.FullName -ArgumentList '/S', "/D=$target" -Wait
           $app = Join-Path $target 'AXIS LAB OS.exe'
@@ -108,5 +114,5 @@ jobs:
           name: axis-lab-os-v0.15.0-windows-installers
           if-no-files-found: error
           path: |
-            dist/*Setup*.exe
+            ${{ runner.temp }}/axis-lab-current-user-setup.exe
             dist-all-users/**/*AllUsers*.exe
