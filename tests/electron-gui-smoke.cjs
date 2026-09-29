@@ -59,7 +59,7 @@ async function main() {
     if (verifyBeforeReload.status !== 200) throw new Error("GUI token verification before reload failed: " + JSON.stringify(verifyBeforeReload));
     await page.reload();
     try {
-      await page.getByText("AXIS LAB v0.15.0", { exact: false }).waitFor();
+      await page.getByText("الطلبات والعملاء", { exact: false }).first().waitFor();
     } catch (error) {
       console.error("POST-RELOAD URL: " + page.url());
       console.error("POST-RELOAD TOKEN PRESENT: " + String(await page.evaluate(() => Boolean(localStorage.getItem("axislab_token")))));
