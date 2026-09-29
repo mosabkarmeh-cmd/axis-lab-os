@@ -10,8 +10,10 @@ async function main() {
   }, 90000);
 
   let electronApp;
+  const tracePath = process.env.AXIS_GUI_TRACE || "axis-lab-gui-trace.zip";
   try {
     electronApp = await electron.launch({ executablePath: appPath, timeout: 30000 });
+    await electronApp.context().tracing.start({ screenshots: true, snapshots: true, sources: true });
     const page = await electronApp.firstWindow({ timeout: 30000 });
     page.setDefaultTimeout(10000);
     await page.waitForLoadState("domcontentloaded").catch(() => {});
@@ -54,6 +56,40 @@ async function main() {
     await page.getByRole("button", { name: /الرئيسية/ }).click();
     await page.getByText("AXIS LAB OS / v0.15.0", { exact: false }).waitFor();
 
+    // Real end-to-end business workflow: customer -> order -> item -> quantity -> deposit -> save.
+    await page.getByRole("button", { name: /الطلبات والعملاء/ }).click();
+    await page.getByText("الطلبات والعملاء", { exact: false }).first().waitFor();
+    await page.getByRole("button", { name: /طلب جديد لعميل/ }).click();
+    const modal = page.locator("#add-order-modal-container");
+    await modal.waitFor();
+
+    const customerName = "CI E2E Customer " + Date.now();
+    await modal.getByPlaceholder("ابحث أو اختر العميل (مثال: الأمل)...").fill(customerName);
+    await modal.getByRole("button", { name: new RegExp('إضافة "' + customerName + '".*عميل سريع جديد') }).click();
+    await modal.getByText("مرتبط", { exact: true }).waitFor();
+
+    await modal.getByRole("button", { name: /إضافة مادة يدوياً/ }).click();
+    const itemName = "CI E2E Laser Item " + Date.now();
+    await modal.getByPlaceholder("مادة القص (مثال: أكريليك شفاف 4ملم)").fill(itemName);
+    await modal.getByPlaceholder("الكمية").fill("2");
+    await modal.getByPlaceholder("السعر").fill("500000");
+    await modal.getByLabel("المبلغ المقبوض سلفاً (ل.س)").fill("300000");
+
+    await modal.getByText("المبلغ الإجمالي النهائي", { exact: true }).waitFor();
+    const summaryText = await modal.innerText();
+    if (!(summaryText.includes("1,000,000") || summaryText.includes("1000000"))) throw new Error("GUI pricing calculation did not reach expected 1,000,000 ل.س total");
+    if (!(summaryText.includes("700,000") || summaryText.includes("700000"))) throw new Error("GUI deposit/remaining calculation did not reach expected 700,000 ل.س remaining");
+
+    await modal.getByRole("button", { name: /تأكيد وتسجيل الطلب بالكامل/ }).click();
+    await modal.waitFor({ state: "hidden", timeout: 15000 });
+    await page.getByText(customerName, { exact: false }).first().waitFor({ timeout: 15000 });
+
+    console.log("Customer creation through GUI: PASS");
+    console.log("Order creation through GUI: PASS");
+    console.log("Order item + quantity entry: PASS");
+    console.log("Deposit + remaining calculation: PASS");
+    console.log("Order persistence visible in GUI: PASS");
+
     console.log("Electron GUI smoke: PASS");
     console.log("Packaged EXE launch: PASS");
     console.log("Login UI rendering: PASS");
@@ -63,7 +99,10 @@ async function main() {
     console.log("Financial-field exposure check: PASS");
   } finally {
     clearTimeout(killer);
-    if (electronApp) await electronApp.close().catch(() => {});
+    if (electronApp) {
+      await electronApp.context().tracing.stop({ path: tracePath }).catch(() => {});
+      await electronApp.close().catch(() => {});
+    }
   }
 }
 

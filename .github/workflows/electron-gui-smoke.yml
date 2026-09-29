@@ -63,4 +63,5 @@ jobs:
             ${{ runner.temp }}/axis-lab-gui.stdout.log
             ${{ runner.temp }}/axis-lab-gui.stderr.log
             ${{ runner.temp }}/axis-lab-gui-failure.png
+            ${{ runner.temp }}/axis-lab-gui-trace.zip
           if-no-files-found: ignore
