@@ -99,6 +99,7 @@ async function main() {
     await modal.getByText("مرتبط", { exact: true }).waitFor();
 
     await modal.getByRole("button", { name: /إضافة مادة يدوياً/ }).click();
+    await modal.locator('button[title="حذف هذا العنصر"]').first().click();
     const itemName = "CI E2E Laser Item " + Date.now();
     await modal.getByPlaceholder("مادة القص (مثال: أكريليك شفاف 4ملم)").last().fill(itemName);
     await modal.getByPlaceholder("الكمية").last().fill("2");
