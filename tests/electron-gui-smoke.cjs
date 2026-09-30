@@ -108,6 +108,8 @@ async function main() {
     await modal.locator("label").filter({ hasText: "المبلغ المقبوض سلفاً (ل.س)" }).locator("..").locator("input").fill("300000");
 
     await modal.getByText("المبلغ الإجمالي النهائي", { exact: true }).waitFor();
+    const customerBackdrop = modal.locator("div.fixed.inset-0.z-40.bg-transparent");
+    if (await customerBackdrop.count()) await customerBackdrop.click({ position: { x: 1, y: 1 } });
     const summaryText = await modal.innerText();
     if (!(summaryText.includes("1,000,000") || summaryText.includes("1000000"))) throw new Error("GUI pricing calculation did not reach expected 1,000,000 ل.س total");
     if (!(summaryText.includes("700,000") || summaryText.includes("700000"))) throw new Error("GUI deposit/remaining calculation did not reach expected 700,000 ل.س remaining");
