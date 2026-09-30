@@ -1996,6 +1996,14 @@ export const serverRuntime: any = {
   supplyOrdersTable: supplyOrdersTable,
   syncNormalizedFinancialEntities: syncNormalizedFinancialEntities,
   syncNormalizedLocalEntities: syncNormalizedLocalEntities,
+  loadPersistedState: loadPersistedState,
+  refreshWarehouseCache: refreshWarehouseCache,
+  initLocalSqlite: initLocalSqlite,
+  resetBusinessData: resetBusinessData,
+  persistMutationWithFastDurability: persistMutationWithFastDurability,
+  sendProductionJobEmailNotification: sendProductionJobEmailNotification,
+  createSqliteBackup: createSqliteBackup,
+  flushLocalSqlite: flushLocalSqlite,
   sypToUsd: sypToUsd
 };
 Object.defineProperties(serverRuntime, {
