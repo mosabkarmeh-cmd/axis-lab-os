@@ -97,6 +97,8 @@ async function main() {
     await modal.getByText("مرتبط", { exact: true }).waitFor();
 
     await modal.getByRole("button", { name: /إضافة مادة يدوياً/ }).click();
+    // The modal starts with a seeded draft row; remove it so this test has exactly one priced item.
+    await modal.getByTitle("حذف هذا العنصر").first().click();
     const itemName = "CI E2E Laser Item " + Date.now();
     await modal.getByPlaceholder("مادة القص (مثال: أكريليك شفاف 4ملم)").last().fill(itemName);
     await modal.getByPlaceholder("الكمية").last().fill("2");
