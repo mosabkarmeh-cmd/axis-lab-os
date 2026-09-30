@@ -27,15 +27,15 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import initSqlJs from "sql.js";
-import { materialPriceUSD } from "./src/lib/materials.ts";
-import { sypToUsd } from "./src/lib/currency.ts";
+import { materialPriceUSD } from "../lib/materials.ts";
+import { sypToUsd } from "../lib/currency.ts";
 
-import customersRouter from "./src/server/routes/customers.ts";
-import productsRouter from "./src/server/routes/products.ts";
-import materialsRouter from "./src/server/routes/materials.ts";
-import productionRouter from "./src/server/routes/production.ts";
-import { db } from "./src/db/index.ts";
-import { appState, customers as customersTable, products as productsTable, materials as materialsTable, inventory as inventoryTable, inventoryTransactions as inventoryTransactionsTable, remnants as remnantsTable, suppliers as suppliersTable, supplyOrders as supplyOrdersTable, supplierQuotes as supplierQuotesTable, machines as machinesTable } from "./src/db/schema.ts";
+import customersRouter from "./routes/customers.ts";
+import productsRouter from "./routes/products.ts";
+import materialsRouter from "./routes/materials.ts";
+import productionRouter from "./routes/production.ts";
+import { db } from "../db/index.ts";
+import { appState, customers as customersTable, products as productsTable, materials as materialsTable, inventory as inventoryTable, inventoryTransactions as inventoryTransactionsTable, remnants as remnantsTable, suppliers as suppliersTable, supplyOrders as supplyOrdersTable, supplierQuotes as supplierQuotesTable, machines as machinesTable } from "../db/schema.ts";
 import { eq, desc } from "drizzle-orm";
 
 // Initialize Gemini Client safely
