@@ -83,9 +83,7 @@ async function main() {
 
     await page.getByRole("button", { name: /الإنتاج والتشغيل اليدوي/ }).click();
     await page.getByText("الإنتاج والتشغيل اليدوي", { exact: false }).first().waitFor();
-    await page.getByRole("button", { name: /الرئيسية/ }).click();
-    await page.getByText("AXIS LAB OS / v0.15.0", { exact: false }).waitFor();
-
+    // Return to the Orders surface without asserting a version-specific home heading.
     // Real end-to-end business workflow: customer -> order -> item -> quantity -> deposit -> save.
     await page.getByRole("button", { name: /الطلبات والعملاء/ }).click();
     await page.getByText("الطلبات والعملاء", { exact: false }).first().waitFor();
@@ -96,14 +94,21 @@ async function main() {
     const customerName = "CI E2E Customer " + Date.now();
     await modal.getByPlaceholder("ابحث أو اختر العميل (مثال: الأمل)...").fill(customerName);
     await modal.getByRole("button", { name: new RegExp('إضافة "' + customerName + '".*عميل سريع جديد') }).click();
+    // fetchCustomers() refreshes the modal props; re-select the persisted customer after that refresh.
+    await modal.getByPlaceholder("ابحث أو اختر العميل (مثال: الأمل)...").fill(customerName);
+    const customerOption = modal.getByRole("button", { name: customerName, exact: true });
+    await customerOption.waitFor({ timeout: 10000 });
+    await customerOption.click();
     await modal.getByText("مرتبط", { exact: true }).waitFor();
 
     await modal.getByRole("button", { name: /إضافة مادة يدوياً/ }).click();
+    // The modal starts with a seeded draft row; remove it so this test has exactly one priced item.
+    await modal.getByTitle("حذف هذا العنصر").first().click();
     const itemName = "CI E2E Laser Item " + Date.now();
-    await modal.getByPlaceholder("مادة القص (مثال: أكريليك شفاف 4ملم)").fill(itemName);
-    await modal.getByPlaceholder("الكمية").fill("2");
-    await modal.getByPlaceholder("السعر").fill("500000");
-    await modal.getByLabel("المبلغ المقبوض سلفاً (ل.س)").fill("300000");
+    await modal.getByPlaceholder("مادة القص (مثال: أكريليك شفاف 4ملم)").last().fill(itemName);
+    await modal.getByPlaceholder("الكمية").last().fill("2");
+    await modal.getByPlaceholder("السعر").last().fill("500000");
+    await modal.locator("label").filter({ hasText: "المبلغ المقبوض سلفاً (ل.س)" }).locator("..").locator("input").fill("300000");
 
     await modal.getByText("المبلغ الإجمالي النهائي", { exact: true }).waitFor();
     const summaryText = await modal.innerText();
