@@ -214,7 +214,7 @@ export default function AddOrderModal({
       setMaterialCheckResult(null);
       setMaterialCheckError(null);
     }
-  }, [isOpen, initialCustomerId, customers]);
+  }, [isOpen, initialCustomerId]);
 
   // Real-time calculations
   const taxPercentVal = Number(orderTaxPercent) || 0;
