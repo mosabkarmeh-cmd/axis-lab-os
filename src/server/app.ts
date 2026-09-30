@@ -28,9 +28,6 @@ export async function startServer() {
   const PORT = Number(process.env.PORT || 3000);
   const allowedOrigin = process.env.APP_URL || `http://localhost:${PORT}`;
 
-  const PORT = Number(process.env.PORT || 3000);
-  const allowedOrigin = process.env.APP_URL || `http://localhost:${PORT}`;
-
   app.set("trust proxy", 1);
   app.use(cors({
     origin: process.env.NODE_ENV === "production" ? allowedOrigin : true,
