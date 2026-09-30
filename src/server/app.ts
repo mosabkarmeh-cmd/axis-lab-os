@@ -121,6 +121,14 @@ export async function startServer(runtime: any) {
     supplyOrdersTable,
     syncNormalizedFinancialEntities,
     syncNormalizedLocalEntities,
+    loadPersistedState,
+    refreshWarehouseCache,
+    initLocalSqlite,
+    resetBusinessData,
+    persistMutationWithFastDurability,
+    sendProductionJobEmailNotification,
+    createSqliteBackup,
+    flushLocalSqlite,
     sypToUsd
   } = runtime;
 
