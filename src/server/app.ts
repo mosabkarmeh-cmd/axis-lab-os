@@ -126,6 +126,7 @@ export async function startServer(runtime: any) {
     initLocalSqlite,
     resetBusinessData,
     persistMutationWithFastDurability,
+    persistStateNow,
     sendProductionJobEmailNotification,
     createSqliteBackup,
     flushLocalSqlite,
