@@ -94,6 +94,10 @@ async function main() {
     const customerName = "CI E2E Customer " + Date.now();
     await modal.getByPlaceholder("ابحث أو اختر العميل (مثال: الأمل)...").fill(customerName);
     await modal.getByRole("button", { name: new RegExp('إضافة "' + customerName + '".*عميل سريع جديد') }).click();
+    // fetchCustomers() refreshes the modal props; re-select the persisted customer after that refresh.
+    const customerOption = modal.getByRole("button", { name: customerName, exact: true });
+    await customerOption.waitFor({ timeout: 10000 });
+    await customerOption.click();
     await modal.getByText("مرتبط", { exact: true }).waitFor();
 
     await modal.getByRole("button", { name: /إضافة مادة يدوياً/ }).click();
