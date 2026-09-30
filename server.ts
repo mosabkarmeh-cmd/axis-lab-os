@@ -2001,6 +2001,7 @@ export const serverRuntime: any = {
   initLocalSqlite: initLocalSqlite,
   resetBusinessData: resetBusinessData,
   persistMutationWithFastDurability: persistMutationWithFastDurability,
+  persistStateNow: persistStateNow,
   sendProductionJobEmailNotification: sendProductionJobEmailNotification,
   createSqliteBackup: createSqliteBackup,
   flushLocalSqlite: flushLocalSqlite,
