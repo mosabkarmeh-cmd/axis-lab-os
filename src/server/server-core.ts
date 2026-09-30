@@ -92,6 +92,10 @@ export function benchmarkSnapshot(target: Map<string, BenchmarkBucket>) {
 export const NORMALIZED_LOCAL_COLLECTIONS = ["CUSTOMERS", "PRODUCTS", "MATERIALS", "INVENTORY", "INVENTORY_TRANSACTIONS", "REMNANTS", "SUPPLIERS", "SUPPLY_ORDERS", "SUPPLIER_QUOTES", "MACHINES", "ORDERS", "ACTIVITY_LOGS", "NOTIFICATIONS", "PRODUCTION_JOBS"] as const;
 export const NORMALIZED_FINANCIAL_COLLECTIONS = ["INVOICES", "EXPENSES"] as const;
 export let localSqlite: any = null;
+export function setLocalSqlite(database: any) {
+  localSqlite = database;
+  return localSqlite;
+}
 
 export async function initLocalSqlite() {
   if (localSqlite) return localSqlite;
