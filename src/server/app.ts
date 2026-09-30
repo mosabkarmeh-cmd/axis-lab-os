@@ -125,4 +125,45 @@ export async function startServer() {
   await registerRoutes(app);
 
 
+
+  // Vite middleware for development or static serving for production
+  const isElectronProduction = process.env.ELECTRON_RUN_AS_NODE === "1";
+  if (!isElectronProduction && process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
+    const vite = await createViteServer({
+      server: {
+        middlewareMode: true,
+        hmr: process.env.DISABLE_HMR === 'true' ? false : { port: 0 },
+        watch: process.env.DISABLE_HMR === 'true' ? null : {},
+      },
+      appType: "spa",
+    });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  }
+
+  const HOST = process.env.SERVER_HOST || "127.0.0.1";
+  app.listen(PORT, HOST, () => {
+    console.log(`Server running on http://${HOST}:${PORT}`);
+  });
+
+  // Flush any pending state save on a normal shutdown (Ctrl+C, systemd stop, etc.)
+  // so the last few seconds of work aren't lost.
+  const gracefulShutdown = async () => {
+    console.log("[STATE] Shutting down, saving latest data before exit...");
+    if (persistTimer) clearTimeout(persistTimer);
+    try {
+      await persistStateNow();
+    } finally {
+      process.exit(0);
+    }
+  };
+  process.on("SIGINT", gracefulShutdown);
+  process.on("SIGTERM", gracefulShutdown);
+
 }
