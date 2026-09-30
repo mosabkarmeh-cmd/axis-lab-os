@@ -95,6 +95,7 @@ async function main() {
     await modal.getByPlaceholder("ابحث أو اختر العميل (مثال: الأمل)...").fill(customerName);
     await modal.getByRole("button", { name: new RegExp('إضافة "' + customerName + '".*عميل سريع جديد') }).click();
     // fetchCustomers() refreshes the modal props; re-select the persisted customer after that refresh.
+    await modal.getByPlaceholder("ابحث أو اختر العميل (مثال: الأمل)...").fill(customerName);
     const customerOption = modal.getByRole("button", { name: customerName, exact: true });
     await customerOption.waitFor({ timeout: 10000 });
     await customerOption.click();
