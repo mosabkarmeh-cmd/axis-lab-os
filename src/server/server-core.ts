@@ -27,15 +27,15 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import initSqlJs from "sql.js";
-import { materialPriceUSD } from "../lib/materials.ts";
-import { sypToUsd } from "../lib/currency.ts";
+import { materialPriceUSD } from "./src/lib/materials.ts";
+import { sypToUsd } from "./src/lib/currency.ts";
 
-import customersRouter from "./routes/customers.ts";
-import productsRouter from "./routes/products.ts";
-import materialsRouter from "./routes/materials.ts";
-import productionRouter from "./routes/production.ts";
-import { db } from "../db/index.ts";
-import { appState, customers as customersTable, products as productsTable, materials as materialsTable, inventory as inventoryTable, inventoryTransactions as inventoryTransactionsTable, remnants as remnantsTable, suppliers as suppliersTable, supplyOrders as supplyOrdersTable, supplierQuotes as supplierQuotesTable, machines as machinesTable } from "../db/schema.ts";
+import customersRouter from "./src/server/routes/customers.ts";
+import productsRouter from "./src/server/routes/products.ts";
+import materialsRouter from "./src/server/routes/materials.ts";
+import productionRouter from "./src/server/routes/production.ts";
+import { db } from "./src/db/index.ts";
+import { appState, customers as customersTable, products as productsTable, materials as materialsTable, inventory as inventoryTable, inventoryTransactions as inventoryTransactionsTable, remnants as remnantsTable, suppliers as suppliersTable, supplyOrders as supplyOrdersTable, supplierQuotes as supplierQuotesTable, machines as machinesTable } from "./src/db/schema.ts";
 import { eq, desc } from "drizzle-orm";
 
 // Initialize Gemini Client safely
@@ -72,8 +72,8 @@ export const orderCreateBenchmarks = new Map<string, BenchmarkBucket>();
 export const persistenceBenchmarks = new Map<string, BenchmarkBucket>();
 export const persistQueueStats = { scheduled: 0, coalesced: 0, completed: 0, failed: 0 };
 export function recordBenchmark(target: Map<string, BenchmarkBucket>, name: string, startedAt: number) {
-  export const elapsed = Math.max(0, performance.now() - startedAt);
-  export const bucket = target.get(name) || { count: 0, totalMs: 0, maxMs: 0, samples: [] };
+  const elapsed = Math.max(0, performance.now() - startedAt);
+  const bucket = target.get(name) || { count: 0, totalMs: 0, maxMs: 0, samples: [] };
   bucket.count += 1;
   bucket.totalMs += elapsed;
   bucket.maxMs = Math.max(bucket.maxMs, elapsed);
@@ -84,8 +84,8 @@ export function recordBenchmark(target: Map<string, BenchmarkBucket>, name: stri
 }
 export function benchmarkSnapshot(target: Map<string, BenchmarkBucket>) {
   return [...target.entries()].map(([name, bucket]) => {
-    export const sorted = [...bucket.samples].sort((a, b) => a - b);
-    export const p95 = sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] : 0;
+    const sorted = [...bucket.samples].sort((a, b) => a - b);
+    const p95 = sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] : 0;
     return { name, count: bucket.count, avgMs: Number((bucket.totalMs / Math.max(1, bucket.count)).toFixed(2)), p95Ms: Number(p95.toFixed(2)), maxMs: Number(bucket.maxMs.toFixed(2)) };
   });
 }
@@ -95,11 +95,11 @@ export let localSqlite: any = null;
 
 export async function initLocalSqlite() {
   if (localSqlite) return localSqlite;
-  export const SQL = await initSqlJs({
+  const SQL = await initSqlJs({
     locateFile: (file: string) => process.env.SQLITE_WASM_PATH || path.join(APP_RUNTIME_ROOT, "node_modules", "sql.js", "dist", file),
   });
-  export const openDatabase = (candidateBytes?: Uint8Array) => {
-    export let database: any = null;
+  const openDatabase = (candidateBytes?: Uint8Array) => {
+    let database: any = null;
     try {
       database = candidateBytes ? new SQL.Database(candidateBytes) : new SQL.Database();
       database.run("PRAGMA foreign_keys = ON");
@@ -121,13 +121,13 @@ export async function initLocalSqlite() {
       throw error;
     }
   };
-  export const hasCurrentFile = fs.existsSync(LOCAL_DATA_FILE);
-  export let bytes = hasCurrentFile ? fs.readFileSync(LOCAL_DATA_FILE) : undefined;
-  export let recoveredFrom: string | null = null;
+  const hasCurrentFile = fs.existsSync(LOCAL_DATA_FILE);
+  let bytes = hasCurrentFile ? fs.readFileSync(LOCAL_DATA_FILE) : undefined;
+  let recoveredFrom: string | null = null;
   try {
     localSqlite = openDatabase(bytes);
   } catch (error) {
-    export const corruptPath = `${LOCAL_DATA_FILE}.corrupt-${Date.now()}`;
+    const corruptPath = `${LOCAL_DATA_FILE}.corrupt-${Date.now()}`;
     if (hasCurrentFile) {
       try {
         fs.renameSync(LOCAL_DATA_FILE, corruptPath);
@@ -137,9 +137,9 @@ export async function initLocalSqlite() {
       }
     }
     localSqlite = null;
-    export const backupDir = backupDirectory();
+    const backupDir = backupDirectory();
     if (fs.existsSync(backupDir)) {
-      export const candidates = fs.readdirSync(backupDir)
+      const candidates = fs.readdirSync(backupDir)
         .filter((name) => name.endsWith(".sqlite"))
         .map((name) => path.join(backupDir, name))
         .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
@@ -162,7 +162,7 @@ export async function initLocalSqlite() {
   }
   if (!bytes && fs.existsSync(LOCAL_LEGACY_DATA_FILE)) {
     try {
-      export const legacy = JSON.parse(fs.readFileSync(LOCAL_LEGACY_DATA_FILE, "utf8"));
+      const legacy = JSON.parse(fs.readFileSync(LOCAL_LEGACY_DATA_FILE, "utf8"));
       for (const [key, value] of Object.entries(legacy)) {
         localSqlite.run("INSERT OR REPLACE INTO app_state (key, value, updated_at) VALUES (?, ?, ?)", [key, JSON.stringify(value), new Date().toISOString()]);
       }
@@ -177,14 +177,14 @@ export async function initLocalSqlite() {
 
 export const SQLITE_BUSY_RETRY_DELAYS_MS = [25, 50, 100, 200, 400];
 export async function withSqliteBusyRetry<T>(operation: () => Promise<T>): Promise<T> {
-  export let lastError: unknown;
+  let lastError: unknown;
   for (let attempt = 0; attempt <= SQLITE_BUSY_RETRY_DELAYS_MS.length; attempt++) {
     try {
       return await operation();
     } catch (error) {
       lastError = error;
-      export const message = String((error as Error)?.message || error).toLowerCase();
-      export const isBusy = message.includes("busy") || message.includes("locked");
+      const message = String((error as Error)?.message || error).toLowerCase();
+      const isBusy = message.includes("busy") || message.includes("locked");
       if (!isBusy || attempt === SQLITE_BUSY_RETRY_DELAYS_MS.length) throw error;
       await new Promise((resolve) => setTimeout(resolve, SQLITE_BUSY_RETRY_DELAYS_MS[attempt]));
     }
@@ -194,9 +194,9 @@ export async function withSqliteBusyRetry<T>(operation: () => Promise<T>): Promi
 export async function flushLocalSqlite() {
   if (!localSqlite) return;
   await fs.promises.mkdir(path.dirname(LOCAL_DATA_FILE), { recursive: true });
-  export const bytes = localSqlite.export();
-  export const tempFile = `${LOCAL_DATA_FILE}.tmp`;
-  export const handle = await fs.promises.open(tempFile, "w");
+  const bytes = localSqlite.export();
+  const tempFile = `${LOCAL_DATA_FILE}.tmp`;
+  const handle = await fs.promises.open(tempFile, "w");
   try {
     await handle.writeFile(Buffer.from(bytes));
     await handle.sync();
@@ -207,15 +207,15 @@ export async function flushLocalSqlite() {
 }
 
 export function syncNormalizedLocalEntities(sqlite: any) {
-  export const now = new Date().toISOString();
+  const now = new Date().toISOString();
   for (const collection of NORMALIZED_LOCAL_COLLECTIONS) {
-    export const values = LOCAL_PERSISTED_COLLECTIONS[collection] || [];
-    export const usedEntityIds = new Set<string>();
+    const values = LOCAL_PERSISTED_COLLECTIONS[collection] || [];
+    const usedEntityIds = new Set<string>();
     sqlite.run("DELETE FROM local_entities WHERE collection = ?", [collection]);
     for (const value of values) {
-      export const baseEntityId = String(value?.id || value?.key || `${collection.toLowerCase()}-${Math.random().toString(36).slice(2)}`);
-      export let entityId = baseEntityId;
-      export let duplicateIndex = 1;
+      const baseEntityId = String(value?.id || value?.key || `${collection.toLowerCase()}-${Math.random().toString(36).slice(2)}`);
+      let entityId = baseEntityId;
+      let duplicateIndex = 1;
       while (usedEntityIds.has(entityId)) {
         entityId = `${baseEntityId}~${duplicateIndex++}`;
       }
@@ -229,14 +229,14 @@ export function syncNormalizedLocalEntities(sqlite: any) {
 }
 export function assertFinancialStateInvariants() {
   for (const invoice of INVOICES) {
-    export const total = Number(invoice.totalPrice) || 0;
-    export const paid = Number(invoice.paidAmount) || 0;
-    export const remaining = Number(invoice.remaining) || 0;
+    const total = Number(invoice.totalPrice) || 0;
+    const paid = Number(invoice.paidAmount) || 0;
+    const remaining = Number(invoice.remaining) || 0;
     if (invoice.status !== "credit_note" && Math.abs(remaining - Math.max(0, total - paid)) > 0.02) {
       throw new Error(`Financial invariant failed for invoice ${invoice.id}: remaining mismatch`);
     }
     for (const item of invoice.items || []) {
-      export const expected = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0) - (Number(item.discount) || 0) + (Number(item.tax) || 0);
+      const expected = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0) - (Number(item.discount) || 0) + (Number(item.tax) || 0);
       if (Math.abs((Number(item.total) || 0) - expected) > 0.02) {
         throw new Error(`Financial invariant failed for invoice item ${item.id || "unknown"}: total mismatch`);
       }
@@ -249,27 +249,27 @@ export function assertFinancialStateInvariants() {
   }
 }
 export function syncNormalizedFinancialEntities(sqlite: any) {
-  export const now = new Date().toISOString();
+  const now = new Date().toISOString();
   sqlite.run("DELETE FROM local_invoice_items");
   sqlite.run("DELETE FROM local_invoice_history");
   sqlite.run("DELETE FROM local_payments");
   sqlite.run("DELETE FROM local_invoices");
   sqlite.run("DELETE FROM local_expenses");
-  export const usedInvoiceIds = new Set<string>();
-  export const usedInvoiceItemIds = new Set<string>();
-  export const usedInvoiceHistoryIds = new Set<string>();
-  export const usedExpenseIds = new Set<string>();
+  const usedInvoiceIds = new Set<string>();
+  const usedInvoiceItemIds = new Set<string>();
+  const usedInvoiceHistoryIds = new Set<string>();
+  const usedExpenseIds = new Set<string>();
   for (const invoice of INVOICES) {
-    export const invoiceId = String(invoice.id);
+    const invoiceId = String(invoice.id);
     if (usedInvoiceIds.has(invoiceId)) continue;
     usedInvoiceIds.add(invoiceId);
     sqlite.run("INSERT INTO local_invoices (id, invoice_number, order_id, customer_id, issue_date, due_date, total_price, subtotal, tax_percent, discount, paid_amount, remaining, status, notes, payload, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
       invoiceId, String(invoice.invoiceNumber || invoiceId), invoice.orderId ? String(invoice.orderId) : null, String(invoice.customerId || ""), String(invoice.issueDate || now), String(invoice.dueDate || invoice.issueDate || now), Number(invoice.totalPrice) || 0, invoice.subtotal == null ? null : Number(invoice.subtotal), invoice.taxPercent == null ? null : Number(invoice.taxPercent), invoice.discount == null ? null : Number(invoice.discount), Number(invoice.paidAmount) || 0, Number(invoice.remaining) || 0, String(invoice.status || "unpaid"), invoice.notes || null, JSON.stringify(invoice), now,
     ]);
     for (const item of invoice.items || []) {
-      export const baseItemId = String(item.id || `${invoiceId}-item-${Math.random().toString(36).slice(2)}`);
-      export let itemId = baseItemId;
-      export let itemSuffix = 1;
+      const baseItemId = String(item.id || `${invoiceId}-item-${Math.random().toString(36).slice(2)}`);
+      let itemId = baseItemId;
+      let itemSuffix = 1;
       while (usedInvoiceItemIds.has(itemId)) itemId = `${baseItemId}~${itemSuffix++}`;
       usedInvoiceItemIds.add(itemId);
       sqlite.run("INSERT INTO local_invoice_items (id, invoice_id, product_name, quantity, unit_price, discount, tax, total, created_at, payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
@@ -277,24 +277,24 @@ export function syncNormalizedFinancialEntities(sqlite: any) {
       ]);
     }
     for (const history of invoice.history || []) {
-      export const baseHistoryId = String(history.id || `${invoiceId}-history-${Math.random().toString(36).slice(2)}`);
-      export let historyId = baseHistoryId;
-      export let historySuffix = 1;
+      const baseHistoryId = String(history.id || `${invoiceId}-history-${Math.random().toString(36).slice(2)}`);
+      let historyId = baseHistoryId;
+      let historySuffix = 1;
       while (usedInvoiceHistoryIds.has(historyId)) historyId = `${baseHistoryId}~${historySuffix++}`;
       usedInvoiceHistoryIds.add(historyId);
       sqlite.run("INSERT INTO local_invoice_history (id, invoice_id, action, created_at, payload) VALUES (?, ?, ?, ?, ?)", [historyId, invoiceId, String(history.action || "updated"), String(history.createdAt || now), JSON.stringify(history)]);
     }
   }
-  export const paymentRows = new Map<string, any>();
+  const paymentRows = new Map<string, any>();
   for (const invoice of INVOICES) {
     for (const payment of invoice.payments || []) {
-      export const id = String(payment.id || `${invoice.id}-${payment.createdAt || payment.date || Math.random()}`);
+      const id = String(payment.id || `${invoice.id}-${payment.createdAt || payment.date || Math.random()}`);
       paymentRows.set(id, { ...payment, id, invoiceId: invoice.id, orderId: invoice.orderId });
     }
   }
   for (const order of ORDERS) {
     for (const payment of order.payments || []) {
-      export const id = String(payment.id || `${order.id}-${payment.createdAt || payment.date || Math.random()}`);
+      const id = String(payment.id || `${order.id}-${payment.createdAt || payment.date || Math.random()}`);
       if (!paymentRows.has(id)) paymentRows.set(id, { ...payment, id, orderId: order.id });
     }
   }
@@ -304,7 +304,7 @@ export function syncNormalizedFinancialEntities(sqlite: any) {
     ]);
   }
   for (const expense of EXPENSES) {
-    export const expenseId = String(expense.id);
+    const expenseId = String(expense.id);
     if (usedExpenseIds.has(expenseId)) continue;
     usedExpenseIds.add(expenseId);
     sqlite.run("INSERT INTO local_expenses (id, category, amount, date, status, payload, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)", [expenseId, String(expense.category || "عام"), Number(expense.amount) || 0, String(expense.date || now), String(expense.status || "paid"), JSON.stringify(expense), now]);
@@ -313,21 +313,21 @@ export function syncNormalizedFinancialEntities(sqlite: any) {
 
 export function readFinancialTablesFromSqlite() {
   if (!USE_SQLITE || !localSqlite) return null;
-  export const invoiceRows = localSqlite.exec("SELECT payload FROM local_invoices ORDER BY updated_at, id")[0]?.values || [];
-  export const itemRows = localSqlite.exec("SELECT invoice_id, payload FROM local_invoice_items ORDER BY created_at, id")[0]?.values || [];
-  export const historyRows = localSqlite.exec("SELECT invoice_id, payload FROM local_invoice_history ORDER BY created_at, id")[0]?.values || [];
-  export const paymentRows = localSqlite.exec("SELECT payload FROM local_payments ORDER BY updated_at, id")[0]?.values || [];
-  export const expenseRows = localSqlite.exec("SELECT payload FROM local_expenses ORDER BY updated_at, id")[0]?.values || [];
-  export const invoices = invoiceRows.map(([payload]: any[]) => JSON.parse(String(payload)));
-  export const itemsByInvoice = new Map<string, any[]>();
+  const invoiceRows = localSqlite.exec("SELECT payload FROM local_invoices ORDER BY updated_at, id")[0]?.values || [];
+  const itemRows = localSqlite.exec("SELECT invoice_id, payload FROM local_invoice_items ORDER BY created_at, id")[0]?.values || [];
+  const historyRows = localSqlite.exec("SELECT invoice_id, payload FROM local_invoice_history ORDER BY created_at, id")[0]?.values || [];
+  const paymentRows = localSqlite.exec("SELECT payload FROM local_payments ORDER BY updated_at, id")[0]?.values || [];
+  const expenseRows = localSqlite.exec("SELECT payload FROM local_expenses ORDER BY updated_at, id")[0]?.values || [];
+  const invoices = invoiceRows.map(([payload]: any[]) => JSON.parse(String(payload)));
+  const itemsByInvoice = new Map<string, any[]>();
   for (const [invoiceId, payload] of itemRows) {
-    export const list = itemsByInvoice.get(String(invoiceId)) || [];
+    const list = itemsByInvoice.get(String(invoiceId)) || [];
     list.push(JSON.parse(String(payload)));
     itemsByInvoice.set(String(invoiceId), list);
   }
-  export const historyByInvoice = new Map<string, any[]>();
+  const historyByInvoice = new Map<string, any[]>();
   for (const [invoiceId, payload] of historyRows) {
-    export const list = historyByInvoice.get(String(invoiceId)) || [];
+    const list = historyByInvoice.get(String(invoiceId)) || [];
     list.push(JSON.parse(String(payload)));
     historyByInvoice.set(String(invoiceId), list);
   }
@@ -347,8 +347,8 @@ export function backupDirectory() {
 
 export function checksumFile(filePath: string) {
   return new Promise<string>((resolve, reject) => {
-    export const hash = createHash("sha256");
-    export const stream = fs.createReadStream(filePath);
+    const hash = createHash("sha256");
+    const stream = fs.createReadStream(filePath);
     stream.on("data", (chunk) => hash.update(chunk));
     stream.on("error", reject);
     stream.on("end", () => resolve(hash.digest("hex")));
@@ -359,10 +359,10 @@ export async function createSqliteBackup(kind = "manual") {
   if (!USE_SQLITE) return null;
   await persistStateNow();
   await fs.promises.mkdir(backupDirectory(), { recursive: true });
-  export const id = `b_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  export const filePath = path.join(backupDirectory(), `${id}.sqlite`);
+  const id = `b_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const filePath = path.join(backupDirectory(), `${id}.sqlite`);
   await fs.promises.copyFile(LOCAL_DATA_FILE, filePath);
-  export const stat = await fs.promises.stat(filePath);
+  const stat = await fs.promises.stat(filePath);
   return {
     id,
     name: `${kind === "safety" ? "نسخة أمان قبل الاستعادة" : "نسخة احتياطية يدوية"} - ${new Date().toLocaleDateString("ar-EG")}`,
@@ -404,14 +404,14 @@ export function generateJWT(user: UserRecord): string {
 }
 
 export function getRequestUser(req: any): UserRecord | null {
-  export const authHeader = req.headers.authorization;
-  export let token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
+  const authHeader = req.headers.authorization;
+  let token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
   if (!token && req.cookies) token = req.cookies.axislab_token;
   if (!token) return null;
   try {
-    export const payload = jwt.verify(token, JWT_SECRET, { algorithms: ["HS256"], issuer: JWT_ISSUER, audience: JWT_AUDIENCE }) as jwt.JwtPayload;
+    const payload = jwt.verify(token, JWT_SECRET, { algorithms: ["HS256"], issuer: JWT_ISSUER, audience: JWT_AUDIENCE }) as jwt.JwtPayload;
     if (!payload.sub) return null;
-    export const user = USERS.find(u => u.id === payload.sub);
+    const user = USERS.find(u => u.id === payload.sub);
     return user && user.isActive ? user : null;
   } catch {
     return null;
@@ -580,8 +580,8 @@ export function normalizeLegacyMaterialPrices() {
   // Material prices are canonical SYP values. Convert only known legacy values;
   // exact matching makes this migration idempotent across every restart.
   for (const material of MATERIALS) {
-    export const oldValue = LEGACY_MATERIAL_PRICES_SYP[material.id];
-    export const targetSyp = LEGACY_MATERIAL_PRICES_SYP_CANONICAL[material.id];
+    const oldValue = LEGACY_MATERIAL_PRICES_SYP[material.id];
+    const targetSyp = LEGACY_MATERIAL_PRICES_SYP_CANONICAL[material.id];
     if (oldValue !== undefined && targetSyp !== undefined && Number(material.pricePerUnit) === oldValue) {
       material.pricePerUnit = targetSyp;
     }
@@ -589,15 +589,15 @@ export function normalizeLegacyMaterialPrices() {
 
   // Supplier quotes and supply orders were seeded in USD in older builds.
   // They are material purchasing prices, so migrate them to the same SYP unit.
-  export const legacySupplierPricesUSD = new Set([10.5, 12, 18.2, 19, 20, 22.8, 24.5, 25, 26.5, 32, 33, 35, 41.5, 43, 45]);
+  const legacySupplierPricesUSD = new Set([10.5, 12, 18.2, 19, 20, 22.8, 24.5, 25, 26.5, 32, 33, 35, 41.5, 43, 45]);
   for (const quote of SUPPLIER_QUOTES as any[]) {
-    export const price = Number(quote.pricePerUnit);
+    const price = Number(quote.pricePerUnit);
     if (legacySupplierPricesUSD.has(price)) quote.pricePerUnit = Math.round(price * 135);
   }
   for (const order of SUPPLY_ORDERS as any[]) {
-    export const price = Number(order.unitPrice);
+    const price = Number(order.unitPrice);
     if (legacySupplierPricesUSD.has(price)) {
-      export const migratedPrice = Math.round(price * 135);
+      const migratedPrice = Math.round(price * 135);
       order.unitPrice = migratedPrice;
       order.totalPrice = migratedPrice * Number(order.quantity || 0);
     }
@@ -619,11 +619,11 @@ export const INVENTORY_TRANSACTIONS = [
 ];
 
 export function normalizeInventoryState() {
-  export let changed = false;
+  let changed = false;
   for (const inventory of INVENTORY) {
-    export const quantity = Math.max(0, Number(inventory.quantity) || 0);
-    export const reservedQuantity = Math.min(quantity, Math.max(0, Number(inventory.reservedQuantity) || 0));
-    export const availableQuantity = quantity - reservedQuantity;
+    const quantity = Math.max(0, Number(inventory.quantity) || 0);
+    const reservedQuantity = Math.min(quantity, Math.max(0, Number(inventory.reservedQuantity) || 0));
+    const availableQuantity = quantity - reservedQuantity;
     if (inventory.quantity !== quantity || inventory.reservedQuantity !== reservedQuantity || inventory.availableQuantity !== availableQuantity) {
       inventory.quantity = quantity;
       inventory.reservedQuantity = reservedQuantity;
@@ -911,9 +911,9 @@ export const NUMBERING_SETTINGS: any[] = [
 ];
 
 export function getNextNumber(entity: string): string {
-  export const setting = NUMBERING_SETTINGS.find(s => s.entity === entity);
+  const setting = NUMBERING_SETTINGS.find(s => s.entity === entity);
   if (!setting) {
-    export const defaultSetting = {
+    const defaultSetting = {
       id: nextEntityId("num"),
       entity,
       prefix: entity.toUpperCase().slice(0, 3),
@@ -923,12 +923,12 @@ export function getNextNumber(entity: string): string {
       nextNumber: 1
     };
     NUMBERING_SETTINGS.push(defaultSetting);
-    export const num = `${defaultSetting.prefix}${defaultSetting.separator}${String(defaultSetting.nextNumber).padStart(defaultSetting.digits, '0')}`;
+    const num = `${defaultSetting.prefix}${defaultSetting.separator}${String(defaultSetting.nextNumber).padStart(defaultSetting.digits, '0')}`;
     defaultSetting.nextNumber += 1;
     return num;
   }
-  export const separator = setting.separator || "-";
-  export const num = `${setting.prefix}${separator}${String(setting.nextNumber).padStart(setting.digits, '0')}${setting.suffix ? separator + setting.suffix : ""}`;
+  const separator = setting.separator || "-";
+  const num = `${setting.prefix}${separator}${String(setting.nextNumber).padStart(setting.digits, '0')}${setting.suffix ? separator + setting.suffix : ""}`;
   setting.nextNumber += 1;
   return num;
 }
@@ -979,7 +979,7 @@ export const ORDER_STATUSES: any[] = [
 ];
 
 export function normalizeOrderStatuses() {
-  export const defaults = [
+  const defaults = [
     { id: "new", name: "جديد", color: "#818cf8", order: 1, isDefault: true },
     { id: "design", name: "قيد التصميم", color: "#c084fc", order: 2, isDefault: true },
     { id: "design_approved", name: "تم اعتماد التصميم", color: "#a78bfa", order: 3, isDefault: true },
@@ -999,7 +999,7 @@ export function normalizeOrderStatuses() {
 }
 
 export function createNotification(title: string, message: string, type: string, priority: string = "normal", link: string = "") {
-  export const newNotif = {
+  const newNotif = {
     id: "notif_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
     title,
     message,
@@ -1014,15 +1014,15 @@ export function createNotification(title: string, message: string, type: string,
 }
 
 export function notifyOverdueOrders() {
-  export const now = Date.now();
+  const now = Date.now();
   for (const order of ORDERS) {
     if (!order.deliveryDateExpected || ["delivered", "cancelled"].includes(order.status)) continue;
-    export const dueAt = new Date(order.deliveryDateExpected).getTime();
+    const dueAt = new Date(order.deliveryDateExpected).getTime();
     if (!Number.isFinite(dueAt) || dueAt >= now) continue;
-    export const alreadyNotified = NOTIFICATIONS.some((n: any) => n.type === "order" && n.orderId === order.id && n.code === "overdue");
+    const alreadyNotified = NOTIFICATIONS.some((n: any) => n.type === "order" && n.orderId === order.id && n.code === "overdue");
     if (alreadyNotified) continue;
-    export const customer = CUSTOMERS.find((c: any) => c.id === order.customerId);
-    export const notification = createNotification(`طلب متأخر #${order.orderNumber}`, `تجاوز الطلب موعد التسليم المتوقع${customer?.name ? ` للعميل ${customer.name}` : ""}. الحالة الحالية: ${order.status}`, "order", "high", "/orders");
+    const customer = CUSTOMERS.find((c: any) => c.id === order.customerId);
+    const notification = createNotification(`طلب متأخر #${order.orderNumber}`, `تجاوز الطلب موعد التسليم المتوقع${customer?.name ? ` للعميل ${customer.name}` : ""}. الحالة الحالية: ${order.status}`, "order", "high", "/orders");
     (notification as any).orderId = order.id;
     (notification as any).code = "overdue";
   }
@@ -1145,7 +1145,7 @@ export const SETTINGS = {
 };
 
 export function publicSettings() {
-  export const { pass: _smtpPassword, ...safeSmtp } = SETTINGS.smtp;
+  const { pass: _smtpPassword, ...safeSmtp } = SETTINGS.smtp;
   return {
     ...SETTINGS,
     smtp: {
@@ -1157,20 +1157,20 @@ export function publicSettings() {
 }
 
 export function getPartnerSharePercentAt(dateValue?: string | Date) {
-  export const history = Array.isArray((SETTINGS as any).partnerShareHistory)
+  const history = Array.isArray((SETTINGS as any).partnerShareHistory)
     ? (SETTINGS as any).partnerShareHistory
         .filter((entry: any) => Number.isFinite(Number(entry.percent)) && entry.effectiveFrom)
         .sort((a: any, b: any) => new Date(a.effectiveFrom).getTime() - new Date(b.effectiveFrom).getTime())
     : [];
-  export const target = dateValue ? new Date(dateValue).getTime() : Date.now();
-  export const match = history.filter((entry: any) => new Date(entry.effectiveFrom).getTime() <= target).pop();
-  export const value = match ? Number(match.percent) : Number((SETTINGS as any).partnerSharePercent);
+  const target = dateValue ? new Date(dateValue).getTime() : Date.now();
+  const match = history.filter((entry: any) => new Date(entry.effectiveFrom).getTime() <= target).pop();
+  const value = match ? Number(match.percent) : Number((SETTINGS as any).partnerSharePercent);
   return Math.min(100, Math.max(0, Number.isFinite(value) ? value : 0));
 }
 
 export function mergeSmtpSettings(input: any) {
   if (!input || typeof input !== "object") return;
-  export const { pass, ...safeInput } = input;
+  const { pass, ...safeInput } = input;
   SETTINGS.smtp = { ...SETTINGS.smtp, ...safeInput };
   if (typeof pass === "string" && pass.trim()) SETTINGS.smtp.pass = pass;
 }
@@ -1183,13 +1183,13 @@ export function freezeOrderCurrencySnapshot(order: any, invoice?: any) {
   if (order.currencyFinalizedAt && order.exchangeRateAtFinalization) {
     return { order, invoice: invoice || INVOICES.find((candidate: any) => candidate.orderId === order.id) };
   }
-  export const historicalRate = Number(order.exchangeRateAtFinalization || order.exchangeRateAtCreation || invoice?.exchangeRateAtIssue);
-  export const rate = historicalRate > 0 ? historicalRate : (Number(SETTINGS.exchangeRate) > 0 ? Number(SETTINGS.exchangeRate) : 135);
-  export const finalizedAt = new Date().toISOString();
-  export const totalSYP = Math.round(Number(order.totalPrice) || 0);
-  export const paidSYP = Math.round(Number(order.paidAmount) || 0);
-  export const remainingSYP = Math.max(0, totalSYP - paidSYP);
-  export const finalInvoice = invoice || INVOICES.find((candidate: any) => candidate.orderId === order.id);
+  const historicalRate = Number(order.exchangeRateAtFinalization || order.exchangeRateAtCreation || invoice?.exchangeRateAtIssue);
+  const rate = historicalRate > 0 ? historicalRate : (Number(SETTINGS.exchangeRate) > 0 ? Number(SETTINGS.exchangeRate) : 135);
+  const finalizedAt = new Date().toISOString();
+  const totalSYP = Math.round(Number(order.totalPrice) || 0);
+  const paidSYP = Math.round(Number(order.paidAmount) || 0);
+  const remainingSYP = Math.max(0, totalSYP - paidSYP);
+  const finalInvoice = invoice || INVOICES.find((candidate: any) => candidate.orderId === order.id);
 
   order.currency = "SYP";
   order.exchangeRateAtFinalization = rate;
@@ -1212,9 +1212,9 @@ export function freezeOrderCurrencySnapshot(order: any, invoice?: any) {
     finalInvoice.paidAmountUSD = order.finalPaidUSD;
     finalInvoice.remainingUSD = order.finalRemainingUSD;
     finalInvoice.items = (finalInvoice.items || []).map((item: any) => {
-      export const issueRate = Number(finalInvoice.exchangeRateAtIssue) > 0 ? Number(finalInvoice.exchangeRateAtIssue) : rate;
-      export const unitPriceSYP = Math.round(Number(item.unitPriceSYP ?? (Number(item.unitPrice || 0) * issueRate)));
-      export const totalSYP = Math.round(Number(item.totalSYP ?? (Number(item.total || 0) * issueRate)));
+      const issueRate = Number(finalInvoice.exchangeRateAtIssue) > 0 ? Number(finalInvoice.exchangeRateAtIssue) : rate;
+      const unitPriceSYP = Math.round(Number(item.unitPriceSYP ?? (Number(item.unitPrice || 0) * issueRate)));
+      const totalSYP = Math.round(Number(item.totalSYP ?? (Number(item.total || 0) * issueRate)));
       return { ...item, unitPriceSYP, totalSYP, unitPrice: Number(sypToUsd(unitPriceSYP, rate).toFixed(2)), total: Number(sypToUsd(totalSYP, rate).toFixed(2)) };
     });
     // Existing invoice fields are USD and remain stable after finalization.
@@ -1236,7 +1236,7 @@ export async function sendProductionJobEmailNotification(
       return { success: false, reason: "SMTP disabled in settings" };
     }
 
-    export const recipients = (SETTINGS.smtp.recipientEmails || "")
+    const recipients = (SETTINGS.smtp.recipientEmails || "")
       .split(",")
       .map((e: string) => e.trim())
       .filter((e: string) => e.length > 0);
@@ -1246,7 +1246,7 @@ export async function sendProductionJobEmailNotification(
       return { success: false, reason: "No recipient emails configured" };
     }
 
-    export const statusTitleMap: Record<string, string> = {
+    const statusTitleMap: Record<string, string> = {
       created: "تم إنشاء مهمة إنتاج جديدة",
       started: "بدء تشغيل مهمة القص بالليزر",
       paused: "إيقاف مؤقت لمهمة الإنتاج",
@@ -1254,7 +1254,7 @@ export async function sendProductionJobEmailNotification(
       cancelled: "إلغاء مهمة الإنتاج"
     };
 
-    export const statusBadgeMap: Record<string, string> = {
+    const statusBadgeMap: Record<string, string> = {
       created: "جديدة",
       started: "قيد التشغيل",
       paused: "موقوفة مؤقتاً",
@@ -1262,14 +1262,14 @@ export async function sendProductionJobEmailNotification(
       cancelled: "ملغاة"
     };
 
-    export const mac = MACHINES.find((m: any) => m.id === job.machineId);
-    export const macName = mac ? mac.name : "غير محددة";
-    export const opUser = USERS.find((u: any) => u.id === job.operatorId);
-    export const opName = opUser ? opUser.fullName : "فني تشغيل الورشة";
+    const mac = MACHINES.find((m: any) => m.id === job.machineId);
+    const macName = mac ? mac.name : "غير محددة";
+    const opUser = USERS.find((u: any) => u.id === job.operatorId);
+    const opName = opUser ? opUser.fullName : "فني تشغيل الورشة";
 
-    export const subject = `[AXIS LAB] ${statusTitleMap[eventType] || "تحديث مهمة إنتاج"} - ${job.jobNo}`;
+    const subject = `[AXIS LAB] ${statusTitleMap[eventType] || "تحديث مهمة إنتاج"} - ${job.jobNo}`;
 
-    export const htmlBody = `
+    const htmlBody = `
       <div dir="rtl" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #09090b; color: #f4f4f5; padding: 24px; border-radius: 12px; border: 1px solid #27272a; max-width: 600px; margin: 0 auto;">
         <div style="text-align: center; border-bottom: 2px solid #c59257; padding-bottom: 16px; margin-bottom: 20px;">
           <h2 style="color: #c59257; margin: 0; font-size: 22px;">AXIS LAB — نظام إشعارات الإنتاج والمكائن</h2>
@@ -1333,7 +1333,7 @@ export async function sendProductionJobEmailNotification(
     });
 
     // Create Transporter
-    export const transporter = nodemailer.createTransport({
+    const transporter = nodemailer.createTransport({
       host: SETTINGS.smtp.host,
       port: SETTINGS.smtp.port,
       secure: SETTINGS.smtp.secure,
@@ -1346,7 +1346,7 @@ export async function sendProductionJobEmailNotification(
       }
     });
 
-    export const mailOptions = {
+    const mailOptions = {
       from: `"${SETTINGS.smtp.fromName}" <${SETTINGS.smtp.fromEmail}>`,
       to: recipients.join(", "),
       subject: subject,
@@ -1355,7 +1355,7 @@ export async function sendProductionJobEmailNotification(
     };
 
     try {
-      export const info = await transporter.sendMail(mailOptions);
+      const info = await transporter.sendMail(mailOptions);
       console.log(`[SMTP SUCCESS] Sent job email to ${recipients.join(", ")}. MessageId: ${info.messageId}`);
       
       ACTIVITY_LOGS.unshift({
@@ -1496,14 +1496,14 @@ export const LOCAL_PERSISTED_COLLECTIONS: Record<string, any> = {
 // tables. That makes the real Postgres tables the single source of truth everywhere.
 export function idNum(prefixedId: any, prefix: string): number | null {
   if (prefixedId === null || prefixedId === undefined) return null;
-  export const n = parseInt(String(prefixedId).replace(prefix, ""));
+  const n = parseInt(String(prefixedId).replace(prefix, ""));
   return isNaN(n) ? null : n;
 }
 
 export async function refreshWarehouseCache() {
   if (!USE_POSTGRES) return;
   try {
-    export const [custRows, prodRows, matRows, invRows, txRows, remRows, supRows, soRows, sqRows, machRows] = await Promise.all([
+    const [custRows, prodRows, matRows, invRows, txRows, remRows, supRows, soRows, sqRows, machRows] = await Promise.all([
       db.select().from(customersTable).orderBy(customersTable.id),
       db.select().from(productsTable).orderBy(productsTable.id),
       db.select().from(materialsTable).orderBy(materialsTable.id),
@@ -1536,7 +1536,7 @@ export async function refreshWarehouseCache() {
       description: p.description || "", stock: p.stock,
     })));
 
-    export const legacyUsdToSypByMaterialId: Record<number, { usd: number; syp: number }> = {
+    const legacyUsdToSypByMaterialId: Record<number, { usd: number; syp: number }> = {
       1: { usd: 10, syp: 1350 },
       2: { usd: 45, syp: 6075 },
       3: { usd: 20, syp: 2700 },
@@ -1544,17 +1544,17 @@ export async function refreshWarehouseCache() {
       5: { usd: 35, syp: 4725 },
     };
     for (const row of matRows) {
-      export const migration = legacyUsdToSypByMaterialId[row.id];
+      const migration = legacyUsdToSypByMaterialId[row.id];
       if (migration && Number(row.pricePerUnit) === migration.usd) {
         await db.update(materialsTable).set({ pricePerUnit: migration.syp }).where(eq(materialsTable.id, row.id));
         row.pricePerUnit = migration.syp;
       }
     }
-    export const legacySupplierPricesUSD = new Set([10.5, 12, 18.2, 19, 20, 22.8, 25, 26.5, 32, 35, 41.5, 43, 45]);
+    const legacySupplierPricesUSD = new Set([10.5, 12, 18.2, 19, 20, 22.8, 25, 26.5, 32, 35, 41.5, 43, 45]);
     for (const row of [...sqRows, ...soRows] as Array<any>) {
-      export const price = Number(row.pricePerUnit ?? row.unitPrice);
+      const price = Number(row.pricePerUnit ?? row.unitPrice);
       if (legacySupplierPricesUSD.has(price)) {
-        export const migratedPrice = Math.round(price * 135);
+        const migratedPrice = Math.round(price * 135);
         if ("minOrderQuantity" in row) {
           await db.update(supplierQuotesTable).set({ pricePerUnit: migratedPrice }).where(eq(supplierQuotesTable.id, row.id));
         } else {
@@ -1633,16 +1633,16 @@ export async function refreshWarehouseCache() {
 export async function loadPersistedState(): Promise<number> {
   try {
     if (USE_SQLITE) {
-      export const sqlite = await initLocalSqlite();
-      export const rows = sqlite.exec("SELECT key, value FROM app_state");
-      export const values = rows.length ? rows[0].values : [];
-      export let restored = 0;
-      export const snapshotKeys = new Set(values.map(([key]) => String(key)));
-      export const snapshotValues = new Map(values.map(([key, rawValue]) => [String(key), String(rawValue)]));
+      const sqlite = await initLocalSqlite();
+      const rows = sqlite.exec("SELECT key, value FROM app_state");
+      const values = rows.length ? rows[0].values : [];
+      let restored = 0;
+      const snapshotKeys = new Set(values.map(([key]) => String(key)));
+      const snapshotValues = new Map(values.map(([key, rawValue]) => [String(key), String(rawValue)]));
       for (const [key, rawValue] of values) {
-        export const target = LOCAL_PERSISTED_COLLECTIONS[String(key)];
+        const target = LOCAL_PERSISTED_COLLECTIONS[String(key)];
         if (!target || NORMALIZED_LOCAL_COLLECTIONS.includes(String(key) as typeof NORMALIZED_LOCAL_COLLECTIONS[number]) || NORMALIZED_FINANCIAL_COLLECTIONS.includes(String(key) as typeof NORMALIZED_FINANCIAL_COLLECTIONS[number])) continue;
-        export const value = JSON.parse(String(rawValue));
+        const value = JSON.parse(String(rawValue));
         if (Array.isArray(target) && Array.isArray(value)) {
           target.length = 0;
           target.push(...value);
@@ -1656,13 +1656,13 @@ export async function loadPersistedState(): Promise<number> {
           target.length = 0;
         }
       }
-      export let migrated = false;
+      let migrated = false;
       for (const collection of NORMALIZED_LOCAL_COLLECTIONS) {
-        export const target = LOCAL_PERSISTED_COLLECTIONS[collection];
-        export const entityRows = sqlite.exec("SELECT payload FROM local_entities WHERE collection = ? ORDER BY entity_id", [collection]);
-        export const entityValues = entityRows.length ? entityRows[0].values : [];
+        const target = LOCAL_PERSISTED_COLLECTIONS[collection];
+        const entityRows = sqlite.exec("SELECT payload FROM local_entities WHERE collection = ? ORDER BY entity_id", [collection]);
+        const entityValues = entityRows.length ? entityRows[0].values : [];
         if (snapshotKeys.has(collection)) {
-          export const legacyValue = JSON.parse(String(snapshotValues.get(collection) || "[]"));
+          const legacyValue = JSON.parse(String(snapshotValues.get(collection) || "[]"));
           if (Array.isArray(legacyValue)) {
             target.length = 0;
             target.push(...legacyValue);
@@ -1680,10 +1680,10 @@ export async function loadPersistedState(): Promise<number> {
           migrated = true;
         }
       }
-      export let financialMigrated = false;
-      export const invoiceRows = sqlite.exec("SELECT payload FROM local_invoices ORDER BY updated_at, id");
+      let financialMigrated = false;
+      const invoiceRows = sqlite.exec("SELECT payload FROM local_invoices ORDER BY updated_at, id");
       if (snapshotKeys.has("INVOICES")) {
-        export const legacyInvoices = JSON.parse(String(snapshotValues.get("INVOICES") || "[]"));
+        const legacyInvoices = JSON.parse(String(snapshotValues.get("INVOICES") || "[]"));
         if (Array.isArray(legacyInvoices)) {
           INVOICES.length = 0;
           INVOICES.push(...legacyInvoices);
@@ -1697,9 +1697,9 @@ export async function loadPersistedState(): Promise<number> {
       } else {
         INVOICES.length = 0;
       }
-      export const expenseRows = sqlite.exec("SELECT payload FROM local_expenses ORDER BY updated_at, id");
+      const expenseRows = sqlite.exec("SELECT payload FROM local_expenses ORDER BY updated_at, id");
       if (snapshotKeys.has("EXPENSES")) {
-        export const legacyExpenses = JSON.parse(String(snapshotValues.get("EXPENSES") || "[]"));
+        const legacyExpenses = JSON.parse(String(snapshotValues.get("EXPENSES") || "[]"));
         if (Array.isArray(legacyExpenses)) {
           EXPENSES.length = 0;
           EXPENSES.push(...legacyExpenses);
@@ -1721,12 +1721,12 @@ export async function loadPersistedState(): Promise<number> {
       return restored;
     }
     if (!USE_POSTGRES) return 0;
-    export const rows = await db.select().from(appState);
-    export let restored = 0;
+    const rows = await db.select().from(appState);
+    let restored = 0;
     for (const row of rows) {
-      export const target = PERSISTED_COLLECTIONS[row.key];
+      const target = PERSISTED_COLLECTIONS[row.key];
       if (!target) continue;
-      export const value = row.value as any;
+      const value = row.value as any;
       if (Array.isArray(target) && Array.isArray(value)) {
         target.length = 0;
         target.push(...value);
@@ -1756,12 +1756,12 @@ export async function persistStateNow() {
     return;
   }
   persistInFlight = true;
-  export const persistStartedAt = performance.now();
+  const persistStartedAt = performance.now();
   try {
     if (USE_SQLITE) {
       await withSqliteBusyRetry(async () => {
-        export const sqlite = await initLocalSqlite();
-        export const now = new Date().toISOString();
+        const sqlite = await initLocalSqlite();
+        const now = new Date().toISOString();
         sqlite.run("BEGIN TRANSACTION");
         try {
           for (const [key, value] of Object.entries(LOCAL_PERSISTED_COLLECTIONS)) {
@@ -1777,7 +1777,7 @@ export async function persistStateNow() {
           try { sqlite.run("ROLLBACK"); } catch {}
           throw error;
         }
-        export const flushStartedAt = performance.now();
+        const flushStartedAt = performance.now();
         await flushLocalSqlite();
         recordBenchmark(persistenceBenchmarks, "sqlite_export_and_atomic_flush", flushStartedAt);
       });
@@ -1801,7 +1801,7 @@ export async function persistStateNow() {
       persistAgainAfter = false;
       void persistStateNow();
     } else {
-      export const waiters = persistWaiters;
+      const waiters = persistWaiters;
       persistWaiters = [];
       waiters.forEach((resolve) => resolve());
     }
@@ -1846,7 +1846,7 @@ export async function resetBusinessData() {
   await persistStateNow();
   for (const collection of RESETTABLE_BUSINESS_COLLECTIONS) collection.length = 0;
   if (USE_SQLITE) {
-    export const sqlite = await initLocalSqlite();
+    const sqlite = await initLocalSqlite();
     await withSqliteBusyRetry(async () => {
       sqlite.run("BEGIN TRANSACTION");
       try {
