@@ -96,7 +96,8 @@ async function main() {
     const customerName = "CI E2E Customer " + Date.now();
     await modal.getByPlaceholder("ابحث أو اختر العميل (مثال: الأمل)...").fill(customerName);
     await modal.getByRole("button", { name: new RegExp('إضافة "' + customerName + '".*عميل سريع جديد') }).click();
-    await modal.getByText("مرتبط", { exact: true }).waitFor();
+    await modal.getByPlaceholder("ابحث أو اختر العميل (مثال: الأمل)...").waitFor({ timeout: 15000 });
+    await modal.getByText("مرتبط", { exact: true }).waitFor({ timeout: 20000 });
 
     await modal.getByRole("button", { name: /إضافة مادة يدوياً/ }).click();
     await modal.locator('button[title="حذف هذا العنصر"]').first().click();
