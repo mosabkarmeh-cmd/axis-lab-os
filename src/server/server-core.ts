@@ -28,6 +28,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { materialPriceUSD } from "../lib/materials.ts";
 import { sypToUsd } from "../lib/currency.ts";
+import { createNotification as createNotificationRuntime, notifyOverdueOrders as notifyOverdueOrdersRuntime } from "./notifications/notification-runtime.ts";
 
 import customersRouter from "./routes/customers.ts";
 import productsRouter from "./routes/products.ts";
@@ -836,33 +837,11 @@ export function normalizeOrderStatuses() {
 }
 
 export function createNotification(title: string, message: string, type: string, priority: string = "normal", link: string = "") {
-  const newNotif = {
-    id: "notif_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
-    title,
-    message,
-    type, // "inventory" | "order" | "production" | "financial" | "system"
-    priority, // "low" | "normal" | "high" | "critical"
-    isRead: false,
-    createdAt: new Date().toISOString(),
-    link
-  };
-  NOTIFICATIONS.unshift(newNotif);
-  return newNotif;
+  return createNotificationRuntime(NOTIFICATIONS, title, message, type, priority, link);
 }
 
 export function notifyOverdueOrders() {
-  const now = Date.now();
-  for (const order of ORDERS) {
-    if (!order.deliveryDateExpected || ["delivered", "cancelled"].includes(order.status)) continue;
-    const dueAt = new Date(order.deliveryDateExpected).getTime();
-    if (!Number.isFinite(dueAt) || dueAt >= now) continue;
-    const alreadyNotified = NOTIFICATIONS.some((n: any) => n.type === "order" && n.orderId === order.id && n.code === "overdue");
-    if (alreadyNotified) continue;
-    const customer = CUSTOMERS.find((c: any) => c.id === order.customerId);
-    const notification = createNotification(`طلب متأخر #${order.orderNumber}`, `تجاوز الطلب موعد التسليم المتوقع${customer?.name ? ` للعميل ${customer.name}` : ""}. الحالة الحالية: ${order.status}`, "order", "high", "/orders");
-    (notification as any).orderId = order.id;
-    (notification as any).code = "overdue";
-  }
+  return notifyOverdueOrdersRuntime(ORDERS, CUSTOMERS, NOTIFICATIONS);
 }
 
 export const WORKFLOW_NEXT_REMINDERS: Record<string, string> = {
