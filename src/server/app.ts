@@ -7,6 +7,14 @@ import rateLimit from "express-rate-limit";
 import * as core from "./server-core.ts";
 import { registerRoutes } from "./routes/index.ts";
 
+declare global {
+  namespace Express {
+    interface Request {
+      user?: ReturnType<typeof core.getRequestUser>;
+    }
+  }
+}
+
 const {
   DB_MODE,
   USE_POSTGRES,
@@ -66,7 +74,7 @@ export async function startServer() {
       res.status(428).json({ success: false, message: "يجب تغيير كلمة المرور المؤقتة قبل استخدام النظام" });
       return;
     }
-    (req as any).user = user;
+    req.user = user;
     next();
   });
 
@@ -115,7 +123,7 @@ export async function startServer() {
         ["POST", "PUT", "PATCH", "DELETE"].includes(req.method) &&
         res.statusCode >= 200 && res.statusCode < 400
       ) {
-        if ((USE_POSTGRES || USE_SQLITE) && !(res.locals as any).axisPersistScheduled) schedulePersist();
+        if ((USE_POSTGRES || USE_SQLITE) && !res.locals.axisPersistScheduled) schedulePersist();
       }
     });
     next();
