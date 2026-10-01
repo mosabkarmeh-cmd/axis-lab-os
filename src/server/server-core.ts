@@ -89,6 +89,7 @@ import {
   readFinancialTablesFromSqlite,
 } from "./storage/sqlite-runtime.ts";
 export { localSqlite, setLocalSqlite, initLocalSqlite, withSqliteBusyRetry, flushLocalSqlite, readFinancialTablesFromSqlite } from "./storage/sqlite-runtime.ts";
+export { SQLITE_BUSY_RETRY_DELAYS_MS } from "./storage/sqlite-runtime.ts";
 export function syncNormalizedLocalEntities(sqlite: any) {
   const now = new Date().toISOString();
   for (const collection of NORMALIZED_LOCAL_COLLECTIONS) {
