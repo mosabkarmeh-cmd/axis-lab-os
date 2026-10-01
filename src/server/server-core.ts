@@ -10,6 +10,7 @@
 import "dotenv/config";
 
 import express from "express";
+import { assertFinancialStateInvariants as assertFinancialInvariants } from "./accounting/financial-invariants.ts";
 import path from "path";
 import { GoogleGenAI, Type } from "@google/genai";
 import fs from "fs";
@@ -24,11 +25,10 @@ import rateLimit from "express-rate-limit";
 import os from "os";
 import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";
-import crypto from "crypto";
 import jwt from "jsonwebtoken";
-import initSqlJs from "sql.js";
 import { materialPriceUSD } from "../lib/materials.ts";
 import { sypToUsd } from "../lib/currency.ts";
+import { createNotification as createNotificationRuntime, notifyOverdueOrders as notifyOverdueOrdersRuntime } from "./notifications/notification-runtime.ts";
 
 import customersRouter from "./routes/customers.ts";
 import productsRouter from "./routes/products.ts";
@@ -57,159 +57,41 @@ export const LOCAL_DATA_FILE = process.env.AXIS_DATA_FILE || path.join(os.homedi
 export const RESOURCE_FONT_PATH = process.env.AXIS_FONT_PATH || path.join(APP_RUNTIME_ROOT, "Amiri-Regular.ttf");
 export const LOCAL_LEGACY_DATA_FILE = process.env.AXIS_LEGACY_DATA_FILE || path.join(os.homedir(), "AppData", "Roaming", "Electron", "axis-data.json");
 export const LOCAL_SCHEMA_VERSION = 6;
-export let activityLogSequence = 0;
-export function nextActivityLogId(prefix = "log") {
-  activityLogSequence = (activityLogSequence + 1) % 1000000;
-  return `${prefix}_${Date.now()}_${process.pid}_${activityLogSequence}_${crypto.randomUUID().slice(0, 8)}`;
-}
-export let entityIdSequence = 0;
-export function nextEntityId(prefix: string) {
-  entityIdSequence = (entityIdSequence + 1) % 1000000;
-  return `${prefix}-${Date.now()}${entityIdSequence}`;
-}
-export type BenchmarkBucket = { count: number; totalMs: number; maxMs: number; samples: number[] };
-export const orderCreateBenchmarks = new Map<string, BenchmarkBucket>();
-export const persistenceBenchmarks = new Map<string, BenchmarkBucket>();
-export const persistQueueStats = { scheduled: 0, coalesced: 0, completed: 0, failed: 0 };
-export function recordBenchmark(target: Map<string, BenchmarkBucket>, name: string, startedAt: number) {
-  const elapsed = Math.max(0, performance.now() - startedAt);
-  const bucket = target.get(name) || { count: 0, totalMs: 0, maxMs: 0, samples: [] };
-  bucket.count += 1;
-  bucket.totalMs += elapsed;
-  bucket.maxMs = Math.max(bucket.maxMs, elapsed);
-  bucket.samples.push(elapsed);
-  if (bucket.samples.length > 1000) bucket.samples.shift();
-  target.set(name, bucket);
-  return elapsed;
-}
-export function benchmarkSnapshot(target: Map<string, BenchmarkBucket>) {
-  return [...target.entries()].map(([name, bucket]) => {
-    const sorted = [...bucket.samples].sort((a, b) => a - b);
-    const p95 = sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] : 0;
-    return { name, count: bucket.count, avgMs: Number((bucket.totalMs / Math.max(1, bucket.count)).toFixed(2)), p95Ms: Number(p95.toFixed(2)), maxMs: Number(bucket.maxMs.toFixed(2)) };
-  });
-}
+import {
+  nextActivityLogId,
+  nextEntityId,
+  recordBenchmark,
+  benchmarkSnapshot,
+  orderCreateBenchmarks,
+  persistenceBenchmarks,
+  persistQueueStats,
+  type BenchmarkBucket,
+} from "./runtime/metrics.ts";
+export {
+  activityLogSequence,
+  entityIdSequence,
+  nextActivityLogId,
+  nextEntityId,
+  recordBenchmark,
+  benchmarkSnapshot,
+  orderCreateBenchmarks,
+  persistenceBenchmarks,
+  persistQueueStats,
+} from "./runtime/metrics.ts";
+export type { BenchmarkBucket } from "./runtime/metrics.ts";
+
 export const NORMALIZED_LOCAL_COLLECTIONS = ["CUSTOMERS", "PRODUCTS", "MATERIALS", "INVENTORY", "INVENTORY_TRANSACTIONS", "REMNANTS", "SUPPLIERS", "SUPPLY_ORDERS", "SUPPLIER_QUOTES", "MACHINES", "ORDERS", "ACTIVITY_LOGS", "NOTIFICATIONS", "PRODUCTION_JOBS"] as const;
 export const NORMALIZED_FINANCIAL_COLLECTIONS = ["INVOICES", "EXPENSES"] as const;
-export let localSqlite: any = null;
-export function setLocalSqlite(database: any) {
-  localSqlite = database;
-  return localSqlite;
-}
-
-export async function initLocalSqlite() {
-  if (localSqlite) return localSqlite;
-  const SQL = await initSqlJs({
-    locateFile: (file: string) => process.env.SQLITE_WASM_PATH || path.join(APP_RUNTIME_ROOT, "node_modules", "sql.js", "dist", file),
-  });
-  const openDatabase = (candidateBytes?: Uint8Array) => {
-    let database: any = null;
-    try {
-      database = candidateBytes ? new SQL.Database(candidateBytes) : new SQL.Database();
-      database.run("PRAGMA foreign_keys = ON");
-      database.run("CREATE TABLE IF NOT EXISTS app_state (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL, updated_at TEXT NOT NULL)");
-      database.run("CREATE TABLE IF NOT EXISTS local_entities (collection TEXT NOT NULL, entity_id TEXT NOT NULL, payload TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (collection, entity_id))");
-      database.run("CREATE INDEX IF NOT EXISTS idx_local_entities_collection_updated ON local_entities (collection, updated_at)");
-      database.run("CREATE INDEX IF NOT EXISTS idx_local_entities_entity ON local_entities (entity_id)");
-      database.run("CREATE TABLE IF NOT EXISTS local_metadata (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL, updated_at TEXT NOT NULL)");
-      database.run("CREATE TABLE IF NOT EXISTS local_invoices (id TEXT PRIMARY KEY NOT NULL, invoice_number TEXT NOT NULL, order_id TEXT, customer_id TEXT NOT NULL, issue_date TEXT NOT NULL, due_date TEXT NOT NULL, total_price REAL NOT NULL, subtotal REAL, tax_percent REAL, discount REAL, paid_amount REAL NOT NULL, remaining REAL NOT NULL, status TEXT NOT NULL, notes TEXT, payload TEXT NOT NULL, updated_at TEXT NOT NULL)");
-      database.run("CREATE TABLE IF NOT EXISTS local_invoice_items (id TEXT PRIMARY KEY NOT NULL, invoice_id TEXT NOT NULL, product_name TEXT NOT NULL, quantity REAL NOT NULL, unit_price REAL NOT NULL, discount REAL NOT NULL, tax REAL NOT NULL, total REAL NOT NULL, created_at TEXT NOT NULL, payload TEXT NOT NULL, FOREIGN KEY (invoice_id) REFERENCES local_invoices(id) ON DELETE CASCADE)");
-      database.run("CREATE TABLE IF NOT EXISTS local_invoice_history (id TEXT PRIMARY KEY NOT NULL, invoice_id TEXT NOT NULL, action TEXT NOT NULL, created_at TEXT NOT NULL, payload TEXT NOT NULL, FOREIGN KEY (invoice_id) REFERENCES local_invoices(id) ON DELETE CASCADE)");
-      database.run("CREATE TABLE IF NOT EXISTS local_payments (id TEXT PRIMARY KEY NOT NULL, order_id TEXT, invoice_id TEXT, amount REAL NOT NULL, method TEXT NOT NULL, reference TEXT, date TEXT NOT NULL, notes TEXT, payload TEXT NOT NULL, updated_at TEXT NOT NULL)");
-      database.run("CREATE TABLE IF NOT EXISTS local_expenses (id TEXT PRIMARY KEY NOT NULL, category TEXT NOT NULL, amount REAL NOT NULL, date TEXT NOT NULL, status TEXT NOT NULL, payload TEXT NOT NULL, updated_at TEXT NOT NULL)");
-      database.run("INSERT OR IGNORE INTO local_metadata (key, value, updated_at) VALUES ('schema_version', ?, ?)", [String(LOCAL_SCHEMA_VERSION), new Date().toISOString()]);
-      database.run("UPDATE local_metadata SET value = ?, updated_at = ? WHERE key = 'schema_version' AND CAST(value AS INTEGER) < ?", [String(LOCAL_SCHEMA_VERSION), new Date().toISOString(), LOCAL_SCHEMA_VERSION]);
-      return database;
-    } catch (error) {
-      try { database?.close(); } catch {}
-      throw error;
-    }
-  };
-  const hasCurrentFile = fs.existsSync(LOCAL_DATA_FILE);
-  let bytes = hasCurrentFile ? fs.readFileSync(LOCAL_DATA_FILE) : undefined;
-  let recoveredFrom: string | null = null;
-  try {
-    localSqlite = openDatabase(bytes);
-  } catch (error) {
-    const corruptPath = `${LOCAL_DATA_FILE}.corrupt-${Date.now()}`;
-    if (hasCurrentFile) {
-      try {
-        fs.renameSync(LOCAL_DATA_FILE, corruptPath);
-        console.error(`[SQLITE] Current database was corrupt and was preserved at ${corruptPath}:`, error);
-      } catch (renameError) {
-        console.error("[SQLITE] Could not preserve the corrupt database:", renameError);
-      }
-    }
-    localSqlite = null;
-    const backupDir = backupDirectory();
-    if (fs.existsSync(backupDir)) {
-      const candidates = fs.readdirSync(backupDir)
-        .filter((name) => name.endsWith(".sqlite"))
-        .map((name) => path.join(backupDir, name))
-        .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
-      for (const candidate of candidates) {
-        try {
-          bytes = fs.readFileSync(candidate);
-          localSqlite = openDatabase(bytes);
-          recoveredFrom = candidate;
-          console.error(`[SQLITE] Recovered database from backup ${candidate}`);
-          break;
-        } catch {
-          localSqlite = null;
-        }
-      }
-    }
-    if (!localSqlite) {
-      bytes = undefined;
-      localSqlite = openDatabase();
-    }
-  }
-  if (!bytes && fs.existsSync(LOCAL_LEGACY_DATA_FILE)) {
-    try {
-      const legacy = JSON.parse(fs.readFileSync(LOCAL_LEGACY_DATA_FILE, "utf8"));
-      for (const [key, value] of Object.entries(legacy)) {
-        localSqlite.run("INSERT OR REPLACE INTO app_state (key, value, updated_at) VALUES (?, ?, ?)", [key, JSON.stringify(value), new Date().toISOString()]);
-      }
-      console.log(`[SQLITE] Migrated legacy JSON data from ${LOCAL_LEGACY_DATA_FILE}`);
-    } catch (error) {
-      console.error("[SQLITE] Legacy JSON migration failed:", error);
-    }
-  }
-  if (recoveredFrom) await flushLocalSqlite();
-  return localSqlite;
-}
-
-export const SQLITE_BUSY_RETRY_DELAYS_MS = [25, 50, 100, 200, 400];
-export async function withSqliteBusyRetry<T>(operation: () => Promise<T>): Promise<T> {
-  let lastError: unknown;
-  for (let attempt = 0; attempt <= SQLITE_BUSY_RETRY_DELAYS_MS.length; attempt++) {
-    try {
-      return await operation();
-    } catch (error) {
-      lastError = error;
-      const message = String((error as Error)?.message || error).toLowerCase();
-      const isBusy = message.includes("busy") || message.includes("locked");
-      if (!isBusy || attempt === SQLITE_BUSY_RETRY_DELAYS_MS.length) throw error;
-      await new Promise((resolve) => setTimeout(resolve, SQLITE_BUSY_RETRY_DELAYS_MS[attempt]));
-    }
-  }
-  throw lastError;
-}
-export async function flushLocalSqlite() {
-  if (!localSqlite) return;
-  await fs.promises.mkdir(path.dirname(LOCAL_DATA_FILE), { recursive: true });
-  const bytes = localSqlite.export();
-  const tempFile = `${LOCAL_DATA_FILE}.tmp`;
-  const handle = await fs.promises.open(tempFile, "w");
-  try {
-    await handle.writeFile(Buffer.from(bytes));
-    await handle.sync();
-  } finally {
-    await handle.close();
-  }
-  await fs.promises.rename(tempFile, LOCAL_DATA_FILE);
-}
-
+import {
+  localSqlite,
+  setLocalSqlite,
+  initLocalSqlite,
+  withSqliteBusyRetry,
+  flushLocalSqlite,
+  readFinancialTablesFromSqlite,
+} from "./storage/sqlite-runtime.ts";
+export { localSqlite, setLocalSqlite, initLocalSqlite, withSqliteBusyRetry, flushLocalSqlite, readFinancialTablesFromSqlite } from "./storage/sqlite-runtime.ts";
+export { SQLITE_BUSY_RETRY_DELAYS_MS } from "./storage/sqlite-runtime.ts";
 export function syncNormalizedLocalEntities(sqlite: any) {
   const now = new Date().toISOString();
   for (const collection of NORMALIZED_LOCAL_COLLECTIONS) {
@@ -232,25 +114,7 @@ export function syncNormalizedLocalEntities(sqlite: any) {
   }
 }
 export function assertFinancialStateInvariants() {
-  for (const invoice of INVOICES) {
-    const total = Number(invoice.totalPrice) || 0;
-    const paid = Number(invoice.paidAmount) || 0;
-    const remaining = Number(invoice.remaining) || 0;
-    if (invoice.status !== "credit_note" && Math.abs(remaining - Math.max(0, total - paid)) > 0.02) {
-      throw new Error(`Financial invariant failed for invoice ${invoice.id}: remaining mismatch`);
-    }
-    for (const item of invoice.items || []) {
-      const expected = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0) - (Number(item.discount) || 0) + (Number(item.tax) || 0);
-      if (Math.abs((Number(item.total) || 0) - expected) > 0.02) {
-        throw new Error(`Financial invariant failed for invoice item ${item.id || "unknown"}: total mismatch`);
-      }
-    }
-  }
-  for (const expense of EXPENSES) {
-    if (!Number.isFinite(Number(expense.amount)) || Number(expense.amount) < 0) {
-      throw new Error(`Financial invariant failed for expense ${expense.id}: amount must be non-negative`);
-    }
-  }
+  return assertFinancialInvariants(INVOICES, EXPENSES);
 }
 export function syncNormalizedFinancialEntities(sqlite: any) {
   const now = new Date().toISOString();
@@ -315,36 +179,6 @@ export function syncNormalizedFinancialEntities(sqlite: any) {
   }
 }
 
-export function readFinancialTablesFromSqlite() {
-  if (!USE_SQLITE || !localSqlite) return null;
-  const invoiceRows = localSqlite.exec("SELECT payload FROM local_invoices ORDER BY updated_at, id")[0]?.values || [];
-  const itemRows = localSqlite.exec("SELECT invoice_id, payload FROM local_invoice_items ORDER BY created_at, id")[0]?.values || [];
-  const historyRows = localSqlite.exec("SELECT invoice_id, payload FROM local_invoice_history ORDER BY created_at, id")[0]?.values || [];
-  const paymentRows = localSqlite.exec("SELECT payload FROM local_payments ORDER BY updated_at, id")[0]?.values || [];
-  const expenseRows = localSqlite.exec("SELECT payload FROM local_expenses ORDER BY updated_at, id")[0]?.values || [];
-  const invoices = invoiceRows.map(([payload]: any[]) => JSON.parse(String(payload)));
-  const itemsByInvoice = new Map<string, any[]>();
-  for (const [invoiceId, payload] of itemRows) {
-    const list = itemsByInvoice.get(String(invoiceId)) || [];
-    list.push(JSON.parse(String(payload)));
-    itemsByInvoice.set(String(invoiceId), list);
-  }
-  const historyByInvoice = new Map<string, any[]>();
-  for (const [invoiceId, payload] of historyRows) {
-    const list = historyByInvoice.get(String(invoiceId)) || [];
-    list.push(JSON.parse(String(payload)));
-    historyByInvoice.set(String(invoiceId), list);
-  }
-  for (const invoice of invoices) {
-    invoice.items = itemsByInvoice.get(String(invoice.id)) || invoice.items || [];
-    invoice.history = historyByInvoice.get(String(invoice.id)) || invoice.history || [];
-  }
-  return {
-    invoices,
-    payments: paymentRows.map(([payload]: any[]) => JSON.parse(String(payload))),
-    expenses: expenseRows.map(([payload]: any[]) => JSON.parse(String(payload))),
-  };
-}
 export function backupDirectory() {
   return path.join(path.dirname(LOCAL_DATA_FILE), "backups");
 }
@@ -1003,33 +837,11 @@ export function normalizeOrderStatuses() {
 }
 
 export function createNotification(title: string, message: string, type: string, priority: string = "normal", link: string = "") {
-  const newNotif = {
-    id: "notif_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
-    title,
-    message,
-    type, // "inventory" | "order" | "production" | "financial" | "system"
-    priority, // "low" | "normal" | "high" | "critical"
-    isRead: false,
-    createdAt: new Date().toISOString(),
-    link
-  };
-  NOTIFICATIONS.unshift(newNotif);
-  return newNotif;
+  return createNotificationRuntime(NOTIFICATIONS, title, message, type, priority, link);
 }
 
 export function notifyOverdueOrders() {
-  const now = Date.now();
-  for (const order of ORDERS) {
-    if (!order.deliveryDateExpected || ["delivered", "cancelled"].includes(order.status)) continue;
-    const dueAt = new Date(order.deliveryDateExpected).getTime();
-    if (!Number.isFinite(dueAt) || dueAt >= now) continue;
-    const alreadyNotified = NOTIFICATIONS.some((n: any) => n.type === "order" && n.orderId === order.id && n.code === "overdue");
-    if (alreadyNotified) continue;
-    const customer = CUSTOMERS.find((c: any) => c.id === order.customerId);
-    const notification = createNotification(`طلب متأخر #${order.orderNumber}`, `تجاوز الطلب موعد التسليم المتوقع${customer?.name ? ` للعميل ${customer.name}` : ""}. الحالة الحالية: ${order.status}`, "order", "high", "/orders");
-    (notification as any).orderId = order.id;
-    (notification as any).code = "overdue";
-  }
+  return notifyOverdueOrdersRuntime(ORDERS, CUSTOMERS, NOTIFICATIONS);
 }
 
 export const WORKFLOW_NEXT_REMINDERS: Record<string, string> = {
@@ -1878,4 +1690,3 @@ export async function resetBusinessData() {
   await new Promise((resolve) => setTimeout(resolve, 75));
   await persistStateNow();
 }
-
