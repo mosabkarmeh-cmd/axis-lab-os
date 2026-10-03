@@ -29,7 +29,7 @@ if errorlevel 1 (
     if not errorlevel 1 (
         echo Trying to install it automatically with winget - a small installer
         echo window may pop up, just follow it ^(remember the password you set,
-        echo or keep the default one shown below^)...
+        echo then put that password in the .env file when prompted below^)...
         winget install --id PostgreSQL.PostgreSQL.16 -e --accept-package-agreements --accept-source-agreements
         echo.
         echo If the installer asked you to set a superuser password, open the
