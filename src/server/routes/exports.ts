@@ -1025,4 +1025,12 @@ export function registerExportRoutes(app: express.Express) {
         doc.text(reverseArabicLine(exp.category), 260, itemY, { align: "right", width: 120 });
         doc.text(new Date(exp.date).toLocaleDateString("ar-EG"), 390, itemY, { align: "right", width: 80 });
         doc.text(`$${exp.amount.toFixed(2)}`, 480, itemY, { align: "right", width: 65 });
+      });
+      
+      doc.end();
+    } catch (err: unknown) {
+      console.error("Export profit PDF failed:", err);
+      res.status(500).json({ error: "فشل توليد تقرير الأرباح", details: err instanceof Error ? err.message : String(err) });
+    }
+  });
 }
