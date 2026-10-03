@@ -15,11 +15,11 @@ export function registerFileRoutes(app: express.Express) {
   // Get Invoices
   // ==================== SETTINGS & BACKUP API ====================
   app.post("/api/files/upload", (req, res, next) => {
-    upload.single("file")(req, res, (err: any) => {
+    upload.single("file")(req, res, (err: unknown) => {
       if (err) {
         const message = err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE"
           ? "حجم الملف أكبر من الحد المسموح (25MB)"
-          : err instanceof Error ? err.message : String(err) || "فشل رفع الملف";
+          : err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err) || "فشل رفع الملف";
         return res.status(400).json({ success: false, message });
       }
       next();
@@ -41,7 +41,7 @@ export function registerFileRoutes(app: express.Express) {
         path: file.path,
         entityType: entityType || null,
         entityId: entityId || null,
-        uploadedById: uploadedBy || "u-1",
+        uploadedById: getRequestUser(req)?.id || "system",
         createdAt: new Date().toISOString()
       };
 
@@ -50,7 +50,7 @@ export function registerFileRoutes(app: express.Express) {
       // Log Activity
       ACTIVITY_LOGS.unshift({
         id: nextActivityLogId(),
-        userId: uploadedBy || "u-1",
+        userId: getRequestUser(req)?.id || "system",
         action: "UPLOAD_FILE",
         entityType: "File",
         entityId: newFile.id,
