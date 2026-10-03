@@ -305,7 +305,7 @@ export function registerImportRoutes(app: express.Express) {
         existing.quantity = quantity;
         existing.reservedQuantity = Math.min(existing.reservedQuantity || 0, quantity);
         existing.availableQuantity = quantity - existing.reservedQuantity;
-        existing.location = it.location || it.warehouse || existing.location || "المستودع الرئيسي";
+        existing.location = String(it.location ?? it.warehouse ?? existing.location ?? "المستودع الرئيسي");
         await db.update(inventoryTable).set({ quantity, reservedQuantity: existing.reservedQuantity, availableQuantity: existing.availableQuantity, location: existing.location }).where(eq(inventoryTable.materialId, idNum(material.id, "m-")));
         await db.insert(inventoryTransactionsTable).values({ materialId: idNum(material.id, "m-"), type: "adjustment", quantity: quantity - before, beforeQty: before, afterQty: quantity, referenceType: "opening_import", referenceId: "excel", reason: "تثبيت الرصيد الافتتاحي المستورد", createdById: idNum(getRequestUser(req)?.id, "u-") });
       } else {
