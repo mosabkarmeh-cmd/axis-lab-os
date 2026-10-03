@@ -102,19 +102,21 @@ export function registerOrderRoutes(app: express.Express) {
     }
     recordBenchmark(orderCreateBenchmarks, "request_validation", orderRequestStartedAt);
     const parseItemsStartedAt = performance.now();
-    const parsedItems = items.map((rawItem, idx: number) => ({
-        ...asOrderItem(rawItem),
-      id: `item-${Date.now()}-${idx}`,
-      productName: it.productName,
-      quantity: Number(it.quantity) || 1,
-      unitPrice: Number(it.unitPrice) || 0,
-      totalPrice: (Number(it.quantity) || 1) * (Number(it.unitPrice) || 0),
-      notes: it.notes || ""
-    }));
+    const parsedItems = items.map((rawItem, idx: number) => {
+      const it = asOrderItem(rawItem);
+      return {
+        id: `item-${Date.now()}-${idx}`,
+        productName: it.productName,
+        quantity: Number(it.quantity) || 1,
+        unitPrice: Number(it.unitPrice) || 0,
+        totalPrice: (Number(it.quantity) || 1) * (Number(it.unitPrice) || 0),
+        notes: it.notes || ""
+      };
+    });
     recordBenchmark(orderCreateBenchmarks, "parse_items", parseItemsStartedAt);
     const totalsStartedAt = performance.now();
 
-    const itemsSubtotal = parsedItems.reduce((acc: number, cur: any) => acc + cur.totalPrice, 0);
+    const itemsSubtotal = parsedItems.reduce((acc: number, cur: OrderItem) => acc + cur.totalPrice, 0);
     const taxRate = Number(taxPercent) || 0;
     const discountAmt = Number(discount) || 0;
     const computedTotal = itemsSubtotal + (itemsSubtotal * (taxRate / 100)) - discountAmt;
@@ -156,18 +158,20 @@ export function registerOrderRoutes(app: express.Express) {
 
     // Auto-create matching Invoice
     const invoiceId = nextEntityId("inv");
-    const invoiceItems = parsedItems.map((rawItem, idx: number) => ({
-        ...asOrderItem(rawItem),
-      id: `invitem-${Date.now()}-${idx}`,
-      invoiceId: invoiceId,
-      productName: it.productName,
-      quantity: it.quantity,
-      unitPrice: it.unitPrice,
-      discount: 0,
-      tax: 0,
-      total: it.totalPrice,
-      createdAt: new Date().toISOString()
-    }));
+    const invoiceItems = parsedItems.map((rawItem, idx: number) => {
+      const it = asOrderItem(rawItem);
+      return {
+        id: `invitem-${Date.now()}-${idx}`,
+        invoiceId,
+        productName: it.productName,
+        quantity: it.quantity,
+        unitPrice: Number(it.unitPrice) || 0,
+        discount: 0,
+        tax: 0,
+        total: Number(it.totalPrice) || 0,
+        createdAt: new Date().toISOString()
+      };
+    });
 
     const newInvoice = {
       id: invoiceId,
@@ -245,7 +249,7 @@ export function registerOrderRoutes(app: express.Express) {
       priority: order.priority || "normal",
       notes: order.notes || "",
       itemsCount: order.items ? order.items.length : 0,
-      itemsTotalQty: order.items ? order.items.reduce((acc: number, cur: any) => acc + (cur.quantity || 1), 0) : 0,
+      itemsTotalQty: order.items ? order.items.reduce((acc: number, cur: OrderItem) => acc + (cur.quantity || 1), 0) : 0,
     };
 
     if (customerId) order.customerId = customerId;
@@ -277,7 +281,7 @@ export function registerOrderRoutes(app: express.Express) {
       });
     }
 
-    const itemsSubtotal = order.items.reduce((acc: number, cur: any) => acc + cur.totalPrice, 0);
+    const itemsSubtotal = order.items.reduce((acc: number, cur: OrderItem) => acc + cur.totalPrice, 0);
     const taxRate = order.taxPercent !== undefined ? order.taxPercent : 0;
     const discountAmt = order.discount !== undefined ? order.discount : 0;
     order.totalPrice = Math.max(0, itemsSubtotal + (itemsSubtotal * (taxRate / 100)) - discountAmt);
@@ -335,7 +339,7 @@ export function registerOrderRoutes(app: express.Express) {
       changeDetails.push(`تغير العميل من "${oldCust}" إلى "${newCust}"`);
     }
 
-    const currentTotalQty = order.items ? order.items.reduce((acc: number, cur: any) => acc + (cur.quantity || 1), 0) : 0;
+    const currentTotalQty = order.items ? order.items.reduce((acc: number, cur: OrderItem) => acc + (cur.quantity || 1), 0) : 0;
     if (oldState.itemsCount !== (order.items?.length || 0) || oldState.itemsTotalQty !== currentTotalQty) {
       changeDetails.push(`تعديل بنود وعناصر الطلب (عدد البنود: ${order.items?.length || 0} / الكمية الإجمالية: ${currentTotalQty})`);
     }
@@ -577,7 +581,7 @@ export function registerOrderRoutes(app: express.Express) {
     let currentRemainingSYP: number;
     let orderPaidSoFarSYP = 0;
     if (order) {
-      orderPaidSoFarSYP = (order.payments || []).reduce((sum: number, payment: any) => sum + Number(payment.amountSYP ?? Math.round(Number(payment.amountUSD || 0) * rate)), 0);
+      orderPaidSoFarSYP = (order.payments || []).reduce((sum: number, payment: PaymentRecord) => sum + Number(payment.amountSYP ?? Math.round(Number(payment.amountUSD || 0) * rate)), 0);
       currentRemainingSYP = Math.max(0, Number(order.totalPrice || 0) - orderPaidSoFarSYP);
     } else {
       const invoiceTotalUSD = Number(inv.totalPriceUSD ?? inv.totalPrice) || 0;
@@ -659,7 +663,7 @@ export function registerOrderRoutes(app: express.Express) {
           if (!linkedOrder.payments.some((payment) => payment.id === orderPayment.id)) linkedOrder.payments.unshift(orderPayment);
           linkedOrder.paidAmount = Math.min(
             Number(linkedOrder.totalPrice || 0),
-            linkedOrder.payments.reduce((sum: number, payment: any) => sum + Number(payment.amountSYP ?? Math.round(Number(payment.amountUSD || 0) * orderExchangeRate)), 0)
+            linkedOrder.payments.reduce((sum: number, payment: PaymentRecord) => sum + Number(payment.amountSYP ?? Math.round(Number(payment.amountUSD || 0) * orderExchangeRate)), 0)
           );
           linkedOrder.remaining = Math.max(0, Number(linkedOrder.totalPrice || 0) - linkedOrder.paidAmount);
           linkedOrder.statusHistory.unshift({
@@ -734,7 +738,7 @@ export function registerOrderRoutes(app: express.Express) {
     const orderExchangeRate = Number(order.exchangeRateAtCreation) > 0 ? Number(order.exchangeRateAtCreation) : 135;
     order.paidAmount = Math.min(
       Number(order.totalPrice || 0),
-      order.payments.reduce((sum: number, payment: any) => sum + Number(payment.amountSYP ?? Math.round(Number(payment.amountUSD || 0) * orderExchangeRate)), 0)
+      order.payments.reduce((sum: number, payment: PaymentRecord) => sum + Number(payment.amountSYP ?? Math.round(Number(payment.amountUSD || 0) * orderExchangeRate)), 0)
     );
     order.remaining = Math.max(0, Number(order.totalPrice || 0) - order.paidAmount);
 
@@ -743,7 +747,7 @@ export function registerOrderRoutes(app: express.Express) {
     if (matchingInv2) {
       matchingInv2.paidAmount = Math.min(
         Number(matchingInv2.totalPrice || 0),
-        matchingInv2.payments?.reduce((sum: number, payment: any) => sum + Number(payment.amountUSD || 0), 0) || 0
+        matchingInv2.payments?.reduce((sum: number, payment: PaymentRecord) => sum + Number(payment.amountUSD || 0), 0) || 0
       );
       matchingInv2.remaining = Math.max(0, Number(matchingInv2.totalPrice || 0) - matchingInv2.paidAmount);
       matchingInv2.status = matchingInv2.remaining === 0 ? "paid" : matchingInv2.paidAmount > 0 ? "partially_paid" : "unpaid";
