@@ -4,6 +4,10 @@ import * as core from "../server-core.ts";
 
 const {
   USERS,
+  CUSTOMERS,
+  PRODUCTS,
+  DELETED_ITEMS,
+  createNotification,
   ACTIVITY_LOGS,
   nextEntityId,
   nextActivityLogId,
