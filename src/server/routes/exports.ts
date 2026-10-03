@@ -579,7 +579,7 @@ export function registerExportRoutes(app: express.Express) {
       doc.end();
     } catch (err: unknown) {
       console.error("Invoice PDF generation failed:", err);
-      res.status(500).json({ error: "فشل توليد ملف الـ PDF: " + err instanceof Error ? err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err) : String(err) });
+      res.status(500).json({ error: "فشل توليد ملف الـ PDF: " + (err instanceof Error ? err.message : String(err)) });
     }
   });
 
@@ -671,7 +671,7 @@ export function registerExportRoutes(app: express.Express) {
       doc.end();
     } catch (err: unknown) {
       console.error("Delivery Note PDF generation failed:", err);
-      res.status(500).json({ error: "فشل توليد السند: " + err instanceof Error ? err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err) : String(err) });
+      res.status(500).json({ error: "فشل توليد السند: " + (err instanceof Error ? err.message : String(err)) });
     }
   });
 
@@ -735,7 +735,7 @@ export function registerExportRoutes(app: express.Express) {
       doc.end();
     } catch (err: unknown) {
       console.error("Job ticket PDF generation failed:", err);
-      res.status(500).json({ error: "فشل توليد تذكرة التشغيل: " + err instanceof Error ? err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err) : String(err) });
+      res.status(500).json({ error: "فشل توليد تذكرة التشغيل: " + (err instanceof Error ? err.message : String(err)) });
     }
   });
 
@@ -908,7 +908,7 @@ export function registerExportRoutes(app: express.Express) {
       doc.end();
     } catch (err: unknown) {
       console.error("PDF generation failed:", err);
-      res.status(500).json({ error: "فشل توليد ملف الـ PDF: " + err instanceof Error ? err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err) : String(err) });
+      res.status(500).json({ error: "فشل توليد ملف الـ PDF: " + (err instanceof Error ? err.message : String(err)) });
     }
   });
 
