@@ -169,7 +169,7 @@ export function registerSupplyRoutes(app: express.Express) {
       res.json({ success: true, remnant: rem });
     } catch (err: unknown) {
       console.error("Error consuming remnant:", err);
-      res.status(500).json({ success: false, message: "فشل استهلاك البقايا: " + err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err) });
+      res.status(500).json({ success: false, message: "فشل استهلاك البقايا: " + (err instanceof Error ? err.message : String(err)) });
     }
   });
 
@@ -200,7 +200,7 @@ export function registerSupplyRoutes(app: express.Express) {
       res.json({ success: true, remnant: rem });
     } catch (err: unknown) {
       console.error("Error marking remnant as waste:", err);
-      res.status(500).json({ success: false, message: "فشل تحديث حالة البقايا: " + err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err) });
+      res.status(500).json({ success: false, message: "فشل تحديث حالة البقايا: " + (err instanceof Error ? err.message : String(err)) });
     }
   });
 
@@ -247,7 +247,7 @@ export function registerSupplyRoutes(app: express.Express) {
       res.status(201).json({ success: true, supplier: newSup });
     } catch (err: unknown) {
       console.error("Error adding supplier:", err);
-      res.status(500).json({ success: false, message: "فشل إضافة المورد: " + err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err) });
+      res.status(500).json({ success: false, message: "فشل إضافة المورد: " + (err instanceof Error ? err.message : String(err)) });
     }
   });
 
@@ -327,7 +327,7 @@ export function registerSupplyRoutes(app: express.Express) {
       res.status(201).json({ success: true, supplyOrder: newOrder });
     } catch (err: unknown) {
       console.error("Error creating supply order:", err);
-      res.status(500).json({ success: false, message: "فشل إنشاء طلب التوريد: " + err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err) });
+      res.status(500).json({ success: false, message: "فشل إنشاء طلب التوريد: " + (err instanceof Error ? err.message : String(err)) });
     }
   });
 
@@ -413,7 +413,7 @@ export function registerSupplyRoutes(app: express.Express) {
       res.json({ success: true, supplyOrder: order });
     } catch (err: unknown) {
       console.error("Error updating supply order status:", err);
-      res.status(500).json({ success: false, message: "فشل تحديث حالة طلب التوريد: " + err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err) });
+      res.status(500).json({ success: false, message: "فشل تحديث حالة طلب التوريد: " + (err instanceof Error ? err.message : String(err)) });
     }
   });
 
