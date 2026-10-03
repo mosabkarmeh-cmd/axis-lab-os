@@ -532,7 +532,7 @@ Do not include any markdown format tags like \`\`\`json or \`\`\` in your respon
           const matPricePerSheetUSD = matPricePerSheetSYP / exchangeRate;
           const sheetWidthCm = (mat as Record<string, unknown>)?.widthCm || mat?.width || 122;
           const sheetLengthCm = (mat as Record<string, unknown>)?.lengthCm || mat?.height || 244;
-          const sheetAreaCm2 = sheetWidthCm * sheetLengthCm;
+          const sheetAreaCm2 = Number(sheetWidthCm) * Number(sheetLengthCm);
           const pieceAreaCm2 = Math.max(1, widthCm * lengthCm);
 
           // Find machine if machineId provided
