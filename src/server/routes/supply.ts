@@ -279,7 +279,7 @@ export function registerSupplyRoutes(app: express.Express) {
     const expDelivery = expectedDeliveryDate || new Date(Date.now() + 3600000 * 24 * 5).toISOString().split('T')[0];
 
     try {
-      let newOrder: any;
+      let newOrder: typeof SUPPLY_ORDERS[number];
       if (USE_SQLITE) {
         // The packaged desktop build uses the in-process SQLite persistence queue.
         // Do not call the Postgres Drizzle adapter here; it produces a 500 in offline mode.
