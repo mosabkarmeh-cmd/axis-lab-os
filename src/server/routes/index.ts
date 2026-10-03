@@ -220,7 +220,6 @@ export async function registerRoutes(app: express.Express) {
     });
 
     res.json({
-      token,
       user: publicUser(user)
     });
   });
@@ -256,7 +255,7 @@ export async function registerRoutes(app: express.Express) {
     if (!user) { res.status(404).json({ error: "No active GUI test user for role" }); return; }
     const token = generateJWT(user);
     res.cookie("axislab_token", token, { maxAge: 10 * 60 * 1000, httpOnly: true, secure: false, path: "/", sameSite: "lax" });
-    res.json({ success: true, user: publicUser(user), token });
+    res.json({ success: true, user: publicUser(user) });
   });
 
   // API - Auth Register
