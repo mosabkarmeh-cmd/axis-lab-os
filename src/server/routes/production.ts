@@ -8,6 +8,8 @@ const router = express.Router();
 
 const getRequestUser = getVerifiedRequestUser;
 
+const errorMessage = (err: unknown) => err instanceof Error ? err.message : String(err);
+
 // 1. Get all production machines
 router.get("/machines", async (req, res) => {
   try {
@@ -21,7 +23,7 @@ router.get("/machines", async (req, res) => {
       currentJobId: m.currentJobId || null
     }));
     res.json(mapped);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error fetching machines:", err);
     res.status(500).json({ error: "Failed to fetch machines" });
   }
@@ -54,7 +56,7 @@ router.post("/machines", async (req, res) => {
       currentJobId: null
     };
     res.json(result);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error adding machine:", err);
     res.status(500).json({ error: "Failed to add machine" });
   }
@@ -74,7 +76,7 @@ router.put("/machines/:id", async (req, res) => {
     }
 
     const { name, type, status, maxDimensions } = req.body;
-    const values: any = {};
+    const values: Partial<typeof machines.$inferInsert> = {};
     if (name) values.name = name;
     if (type) values.type = type;
     if (status) values.status = status;
@@ -82,7 +84,7 @@ router.put("/machines/:id", async (req, res) => {
 
     await db.update(machines).set(values).where(eq(machines.id, rawId));
     res.json({ id: req.params.id, ...values });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error updating machine:", err);
     res.status(500).json({ error: "Failed to update machine" });
   }
@@ -103,7 +105,7 @@ router.delete("/machines/:id", async (req, res) => {
 
     await db.delete(machines).where(eq(machines.id, rawId));
     res.json({ success: true, id: req.params.id });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error deleting machine:", err);
     res.status(500).json({ error: "Failed to delete machine" });
   }

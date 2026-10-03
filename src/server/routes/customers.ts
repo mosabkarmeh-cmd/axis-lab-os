@@ -8,6 +8,8 @@ const router = express.Router();
 
 const getRequestUser = getVerifiedRequestUser;
 
+const errorMessage = (err: unknown) => err instanceof Error ? err.message : String(err);
+
 // 1. Get all customers
 router.get("/", async (req, res) => {
   try {
@@ -42,9 +44,9 @@ router.get("/", async (req, res) => {
       category: c.category || "شركة"
     }));
     res.json(mapped);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error fetching customers:", err);
-    res.status(500).json({ error: "Failed to fetch customers: " + err.message });
+    res.status(500).json({ error: "Failed to fetch customers: " + errorMessage(err) });
   }
 });
 
@@ -78,9 +80,9 @@ router.post("/", async (req, res) => {
       ...values
     };
     res.json(result);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error adding customer:", err);
-    res.status(500).json({ error: "Failed to add customer: " + err.message });
+    res.status(500).json({ error: "Failed to add customer: " + errorMessage(err) });
   }
 });
 
@@ -104,9 +106,9 @@ router.delete("/:id", async (req, res) => {
 
     await db.delete(customers).where(eq(customers.id, rawId));
     res.json({ success: true, id: req.params.id, name: existing[0].name });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error deleting customer:", err);
-    res.status(500).json({ error: "Failed to delete customer: " + err.message });
+    res.status(500).json({ error: "Failed to delete customer: " + errorMessage(err) });
   }
 });
 
@@ -150,9 +152,9 @@ router.put("/:id", async (req, res) => {
       ...values
     };
     res.json(result);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error updating customer:", err);
-    res.status(500).json({ error: "Failed to update customer: " + err.message });
+    res.status(500).json({ error: "Failed to update customer: " + errorMessage(err) });
   }
 });
 
@@ -190,9 +192,9 @@ router.patch("/:id", async (req, res) => {
       ...values
     };
     res.json(result);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error updating customer:", err);
-    res.status(500).json({ error: "Failed to update customer: " + err.message });
+    res.status(500).json({ error: "Failed to update customer: " + errorMessage(err) });
   }
 });
 

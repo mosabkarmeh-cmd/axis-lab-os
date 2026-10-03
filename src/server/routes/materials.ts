@@ -8,6 +8,8 @@ const router = express.Router();
 
 const getRequestUser = getVerifiedRequestUser;
 
+const errorMessage = (err: unknown) => err instanceof Error ? err.message : String(err);
+
 const LEGACY_USD_TO_SYP: Record<number, number> = {
   1: 1350,
   2: 6075,
@@ -38,7 +40,7 @@ async function ensureDemoLowPriceMaterials() {
     const existing = await db.select().from(materials);
     for (let index = 0; index < DEMO_LOW_PRICE_MATERIALS.length; index++) {
       const seed = DEMO_LOW_PRICE_MATERIALS[index];
-      if (existing.some((row: any) => row.name === seed.name)) continue;
+      if (existing.some(row => row.name === seed.name)) continue;
       const inserted = await db.insert(materials).values({ ...seed, notes: "مادة اختبارية منخفضة السعر", status: "active" }).returning();
       const materialId = inserted[0]?.id;
       if (materialId) {
@@ -49,7 +51,7 @@ async function ensureDemoLowPriceMaterials() {
   return demoMaterialSeedPromise;
 }
 
-async function normalizeMaterialCurrency(rows: any[]) {
+async function normalizeMaterialCurrency(rows: typeof materials.$inferSelect[]) {
   for (const row of rows) {
     if (LEGACY_USD_VALUES[row.id] !== undefined && Number(row.pricePerUnit) === LEGACY_USD_VALUES[row.id]) {
       const pricePerUnit = LEGACY_USD_TO_SYP[row.id];
@@ -81,9 +83,9 @@ router.get("/materials", async (req, res) => {
       status: m.status || "active"
     }));
     res.json(mapped);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error fetching materials:", err);
-    res.status(500).json({ error: "Failed to fetch materials: " + err.message });
+    res.status(500).json({ error: "Failed to fetch materials: " + errorMessage(err) });
   }
 });
 
@@ -134,9 +136,9 @@ router.post("/materials", async (req, res) => {
     });
 
     res.json(result);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error adding material:", err);
-    res.status(500).json({ error: "Failed to add material: " + err.message });
+    res.status(500).json({ error: "Failed to add material: " + errorMessage(err) });
   }
 });
 
@@ -173,9 +175,9 @@ router.put("/materials/:id", async (req, res) => {
 
     await db.update(materials).set(values).where(eq(materials.id, rawId));
     res.json({ id: req.params.id, ...values });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error updating material:", err);
-    res.status(500).json({ error: "Failed to update material: " + err.message });
+    res.status(500).json({ error: "Failed to update material: " + errorMessage(err) });
   }
 });
 
@@ -194,9 +196,9 @@ router.delete("/materials/:id", async (req, res) => {
 
     await db.update(materials).set({ status: "archived" }).where(eq(materials.id, rawId));
     res.json({ success: true, id: req.params.id });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error archiving material:", err);
-    res.status(500).json({ error: "Failed to archive material: " + err.message });
+    res.status(500).json({ error: "Failed to archive material: " + errorMessage(err) });
   }
 });
 
@@ -213,9 +215,9 @@ router.get("/inventory/stats", async (req, res) => {
       location: inv.location || ""
     }));
     res.json(mapped);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error fetching inventory stats:", err);
-    res.status(500).json({ error: "Failed to fetch inventory stats: " + err.message });
+    res.status(500).json({ error: "Failed to fetch inventory stats: " + errorMessage(err) });
   }
 });
 
@@ -235,9 +237,9 @@ router.get("/remnants", async (req, res) => {
       notes: r.notes || ""
     }));
     res.json(mapped);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error fetching remnants:", err);
-    res.status(500).json({ error: "Failed to fetch remnants: " + err.message });
+    res.status(500).json({ error: "Failed to fetch remnants: " + errorMessage(err) });
   }
 });
 
@@ -272,9 +274,9 @@ router.post("/remnants", async (req, res) => {
       ...values
     };
     res.json(result);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error adding remnant:", err);
-    res.status(500).json({ error: "Failed to add remnant: " + err.message });
+    res.status(500).json({ error: "Failed to add remnant: " + errorMessage(err) });
   }
 });
 
@@ -291,7 +293,7 @@ router.get("/suppliers", async (req, res) => {
       notes: s.notes || ""
     }));
     res.json(mapped);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error fetching suppliers:", err);
     res.status(500).json({ error: "Failed to fetch suppliers" });
   }

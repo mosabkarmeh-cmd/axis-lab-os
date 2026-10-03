@@ -8,6 +8,8 @@ const router = express.Router();
 
 const getRequestUser = getVerifiedRequestUser;
 
+const errorMessage = (err: unknown) => err instanceof Error ? err.message : String(err);
+
 // 1. Get all products
 router.get("/", async (req, res) => {
   try {
@@ -22,9 +24,9 @@ router.get("/", async (req, res) => {
       stock: p.stock
     }));
     res.json(mapped);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error fetching products:", err);
-    res.status(500).json({ error: "Failed to fetch products: " + err.message });
+    res.status(500).json({ error: "Failed to fetch products: " + errorMessage(err) });
   }
 });
 
@@ -56,9 +58,9 @@ router.post("/", async (req, res) => {
       ...values
     };
     res.json(result);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error adding product:", err);
-    res.status(500).json({ error: "Failed to add product: " + err.message });
+    res.status(500).json({ error: "Failed to add product: " + errorMessage(err) });
   }
 });
 
@@ -87,9 +89,9 @@ router.put("/:id", async (req, res) => {
 
     await db.update(products).set(values).where(eq(products.id, rawId));
     res.json({ id: req.params.id, ...values });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error updating product:", err);
-    res.status(500).json({ error: "Failed to update product: " + err.message });
+    res.status(500).json({ error: "Failed to update product: " + errorMessage(err) });
   }
 });
 
@@ -113,9 +115,9 @@ router.delete("/:id", async (req, res) => {
 
     await db.delete(products).where(eq(products.id, rawId));
     res.json({ success: true, id: req.params.id, name: existing[0].name });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error deleting product:", err);
-    res.status(500).json({ error: "Failed to delete product: " + err.message });
+    res.status(500).json({ error: "Failed to delete product: " + errorMessage(err) });
   }
 });
 
