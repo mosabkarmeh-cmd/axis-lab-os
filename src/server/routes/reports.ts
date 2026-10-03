@@ -13,12 +13,6 @@ const {
 } = core;
 
 export function registerReportRoutes(app: express.Express) {
-    }
-  });
-
-  // ==================== ACCOUNTING & FINANCE API ====================
-
-  // Get Invoices
   app.get("/api/reports/analytics", (req, res) => {
     // See note on /api/accounting/stats: in-memory is the fresh, race-free
     // source; SQLite durability is handled by loadPersistedState() at boot.
@@ -281,7 +275,4 @@ export function registerReportRoutes(app: express.Express) {
     });
   });
 
-  // Dedicated small endpoint for the exchange rate (single source of truth for
-  // the whole app - frontend + every backend currency conversion reads/writes this).
-  app.get("/api/exchange-rate", (req, res) => {
 }
