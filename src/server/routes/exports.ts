@@ -35,12 +35,7 @@ const {
 } = core;
 
 export function registerExportRoutes(app: express.Express) {
-  });
 
-  // ==================== ACCOUNTING & FINANCE API ====================
-
-  // Get Invoices
-  // ==================== SETTINGS & BACKUP API ====================
   app.get("/api/export/sales/excel", async (req, res) => {
     try {
       const { dateFrom, dateTo, customerId } = req.query;
@@ -319,7 +314,7 @@ export function registerExportRoutes(app: express.Express) {
       res.setHeader("Content-Disposition", `attachment; filename=AXIS_LAB_Customers_Outreach_${Date.now()}.csv`);
       res.send(csvContent);
     } catch (e: unknown) {
-      res.status(500).json({ error: "Failed to export customers CSV", details: e instanceof Error ? e instanceof Error ? e.message : String(e) : String(e) });
+      res.status(500).json({ error: "Failed to export customers CSV", details: e instanceof Error ? e.message : String(e) });
     }
   });
 
