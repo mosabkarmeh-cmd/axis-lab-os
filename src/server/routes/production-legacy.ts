@@ -82,8 +82,8 @@ export function registerProductionLegacyRoutes(app: express.Express) {
     if (req.body.status !== undefined) machine.status = req.body.status;
     if (req.body.workingHours !== undefined) machine.workingHours = Number(req.body.workingHours);
     if (req.body.calibrationSettings !== undefined) {
-      (machine as any).calibrationSettings = {
-        ...((machine as any).calibrationSettings || {}),
+      machine.calibrationSettings = {
+        ...(machine.calibrationSettings || {}),
         ...req.body.calibrationSettings
       };
     }
@@ -109,9 +109,9 @@ export function registerProductionLegacyRoutes(app: express.Express) {
         ...job,
         materialName: mat ? mat.name : "خامة غير معروفة",
         materialPricePerUnit: matPrice,
-        materialCostUSD: (job as any).materialCostUSD || materialCostUSD,
-        technicianCostUSD: (job as any).technicianCostUSD || technicianCostUSD,
-        totalDirectCostUSD: Number((((job as any).materialCostUSD || materialCostUSD) + ((job as any).technicianCostUSD || technicianCostUSD)).toFixed(2)),
+        materialCostUSD: job.materialCostUSD || materialCostUSD,
+        technicianCostUSD: job.technicianCostUSD || technicianCostUSD,
+        totalDirectCostUSD: Number(((job.materialCostUSD || materialCostUSD) + (job.technicianCostUSD || technicianCostUSD)).toFixed(2)),
         operatorName: op ? op.fullName : "لم يحدد",
         machineName: mac ? mac.name : "لم تحدد آلة"
       };
@@ -250,10 +250,10 @@ export function registerProductionLegacyRoutes(app: express.Express) {
     const machineSimulatedJobsCount = new Map<string, number>();
     availableMachines.forEach(m => machineSimulatedJobsCount.set(m.id, 0));
 
-    const assignmentResults: any[] = [];
+    const assignmentResults: Array<{ jobId: string; operatorId?: string; status?: string }> = [];
 
     for (const job of targetJobs) {
-      const jobObj = job as any;
+      const jobObj = job as typeof job & Record<string, unknown>;
       const matName = (jobObj.materialName || job.itemName || "").toLowerCase();
       let preferredType = "laser_co2";
       if (matName.includes("فايبر") || matName.includes("حديد") || matName.includes("معدن") || matName.includes("استيل") || matName.includes("fiber")) {
@@ -382,7 +382,7 @@ export function registerProductionLegacyRoutes(app: express.Express) {
     }
 
     job.machineId = finalMachineId;
-    job.operatorId = finalOperatorId || "u-1";
+    job.operatorId = finalOperatorId || getActorId(req);
     job.status = "running";
 
     // Auto-update associated order status to 'cutting' when the laser actually starts.
@@ -403,7 +403,7 @@ export function registerProductionLegacyRoutes(app: express.Express) {
           status: 'cutting',
           note: `تحديث تلقائي: تم بدء القص بالليزر (${job.jobNo}) على الماكينة (${mac ? mac.name : ''})`,
           createdAt: new Date().toISOString(),
-          createdById: finalOperatorId || "u-1"
+          createdById: finalOperatorId || getActorId(req)
         });
         createNotification(`بدأ قص الطلب #${ord.orderNumber}`, `بدأت مهمة القص ${job.jobNo} تلقائياً على الماكينة ${mac?.name || "المحددة"}.`, "production", "normal", "/production");
       }
@@ -527,7 +527,7 @@ export function registerProductionLegacyRoutes(app: express.Express) {
         notes: `انتهى القص ${job.jobNo}، بانتظار بدء التجميع`,
         changedAt: new Date().toISOString(),
         createdAt: new Date().toISOString(),
-        changedById: job.operatorId || "u-1"
+        changedById: job.operatorId || getActorId(req)
       });
       createNotification(`انتهى قص الطلب #${completedOrder.orderNumber}`, `انتهت مهمة القص ${job.jobNo}. تذكير: ابدأ مرحلة التجميع.`, "production", "high", "/production");
     }
@@ -589,7 +589,7 @@ export function registerProductionLegacyRoutes(app: express.Express) {
           referenceType: "production_job",
           referenceId: job.id,
           reason: `استهلاك لوح لإنتاج مهمة: ${job.itemName} لطلب ${job.orderNumber}`,
-          createdById: job.operatorId || "u-1",
+          createdById: job.operatorId || getActorId(req),
           createdAt: new Date().toISOString()
         });
       }
@@ -632,7 +632,7 @@ export function registerProductionLegacyRoutes(app: express.Express) {
 
     ACTIVITY_LOGS.unshift({
       id: nextActivityLogId(),
-      userId: job.operatorId || "u-1",
+      userId: job.operatorId || getActorId(req),
       action: "COMPLETE_PRODUCTION_JOB",
       entityType: "ProductionJob",
       entityId: job.id,
