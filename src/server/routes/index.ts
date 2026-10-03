@@ -65,7 +65,7 @@ export async function registerRoutes(app: express.Express) {
   });
 
   app.get("/api/diagnostics/benchmarks", (req, res) => {
-    const user = (req as any).user as UserRecord | undefined;
+    const user = req.user;
     if (!user || user.role !== "admin") {
       res.status(403).json({ success: false, message: "غير مصرح لك بعرض قياسات الأداء الداخلية" });
       return;
