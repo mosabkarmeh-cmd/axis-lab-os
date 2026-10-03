@@ -226,7 +226,7 @@ Do not include any markdown format tags like \`\`\`json or \`\`\` in your respon
             const productCounts: Record<string, number> = {};
             customerOrders.forEach(o => {
               if (o.items && Array.isArray(o.items)) {
-                o.items.forEach((item) => { const typedItem = asAiItem(item); => {
+                o.items.forEach((item) => { const typedItem = asAiItem(item);
                   const pName = typedItem.productName || typedItem.name || "";
                   if (pName) {
                     productCounts[pName] = (productCounts[pName] || 0) + (typedItem.quantity || 1);
@@ -268,7 +268,7 @@ Do not include any markdown format tags like \`\`\`json or \`\`\` in your respon
             const itemCounts: Record<string, number> = {};
             customerOrders.forEach(o => {
               if (o.items && Array.isArray(o.items)) {
-                o.items.forEach((it) => { const typedItem = asAiItem(it); => {
+                o.items.forEach((it) => { const typedItem = asAiItem(it);
                   const name = typedItem.name || typedItem.productName || "";
                   if (name) itemCounts[name] = (itemCounts[name] || 0) + (typedItem.quantity || 1);
                 });
@@ -328,7 +328,7 @@ Do not include any markdown format tags like \`\`\`json or \`\`\` in your respon
         case "pricing-advisor": {
           const items = payload?.items || [];
           let totalSubtotal = 0;
-          items.forEach((it) => { const typedItem = asAiItem(it); => {
+          items.forEach((it) => { const typedItem = asAiItem(it);
             const q = Number(typedItem.qty || typedItem.quantity) || 1;
             const p = Number(typedItem.price) || 0;
             totalSubtotal += q * p;
@@ -452,7 +452,7 @@ Do not include any markdown format tags like \`\`\`json or \`\`\` in your respon
           const productSales: Record<string, number> = {};
           ORDERS.forEach(o => {
             if (o.items && Array.isArray(o.items)) {
-              o.items.forEach((item) => { const typedItem = asAiItem(item); => {
+              o.items.forEach((item) => { const typedItem = asAiItem(item);
                 const name = typedItem.productName || typedItem.name || "عام";
                 productSales[name] = (productSales[name] || 0) + (typedItem.quantity || 1);
               });
