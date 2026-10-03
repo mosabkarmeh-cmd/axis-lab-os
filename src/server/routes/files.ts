@@ -1,0 +1,153 @@
+import express from "express";
+import * as core from "../server-core.ts";
+
+const {
+  FILES,
+  nextEntityId,
+  getRequestUser,
+  ACTIVITY_LOGS,
+  nextActivityLogId,
+  DELETED_ITEMS,
+} = core;
+
+export function registerFileRoutes(app: express.Express) {
+
+  // Get Invoices
+  // ==================== SETTINGS & BACKUP API ====================
+  app.post("/api/files/upload", (req, res, next) => {
+    upload.single("file")(req, res, (err: any) => {
+      if (err) {
+        const message = err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE"
+          ? "حجم الملف أكبر من الحد المسموح (25MB)"
+          : err instanceof Error ? err.message : String(err) || "فشل رفع الملف";
+        return res.status(400).json({ success: false, message });
+      }
+      next();
+    });
+  }, (req, res) => {
+    try {
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({ success: false, message: "لم يتم رفع أي ملف" });
+      }
+
+      const { entityType, entityId, uploadedBy } = req.body;
+      const newFile = {
+        id: "f-" + Date.now(),
+        name: file.filename,
+        originalName: file.originalname,
+        mimeType: file.mimetype,
+        size: file.size,
+        path: file.path,
+        entityType: entityType || null,
+        entityId: entityId || null,
+        uploadedById: uploadedBy || "u-1",
+        createdAt: new Date().toISOString()
+      };
+
+      FILES.push(newFile);
+
+      // Log Activity
+      ACTIVITY_LOGS.unshift({
+        id: nextActivityLogId(),
+        userId: uploadedBy || "u-1",
+        action: "UPLOAD_FILE",
+        entityType: "File",
+        entityId: newFile.id,
+        createdAt: new Date().toISOString()
+      });
+
+      res.status(201).json({ success: true, file: newFile });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, message: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // Get files of an entity
+  app.get("/api/files/entity/:entityType/:entityId", (req, res) => {
+    const { entityType, entityId } = req.params;
+    const filtered = FILES.filter(f => f.entityType === entityType && f.entityId === entityId);
+    res.json({ success: true, files: filtered });
+  });
+
+  // Download a file
+  app.get("/api/files/:id/download", (req, res) => {
+    const file = FILES.find(f => f.id === req.params.id);
+    if (!file) {
+      return res.status(404).json({ success: false, message: "الملف غير موجود" });
+    }
+
+    if (file.path && fs.existsSync(file.path)) {
+      res.download(file.path, file.originalName);
+    } else {
+      res.status(404).json({ success: false, message: "ملف النظام الفعلي غير موجود على القرص" });
+    }
+  });
+
+  // Delete a file
+  app.delete("/api/files/:id", (req, res) => {
+    const idx = FILES.findIndex(f => f.id === req.params.id);
+    if (idx === -1) {
+      return res.status(404).json({ success: false, message: "الملف غير موجود" });
+    }
+
+    const file = FILES[idx];
+    FILES.splice(idx, 1);
+
+    if (file.path && fs.existsSync(file.path)) {
+      try {
+        fs.unlinkSync(file.path);
+      } catch (err) {
+        console.error("Error deleting file on disk", err);
+      }
+    }
+
+    // Log Activity
+    ACTIVITY_LOGS.unshift({
+      id: nextActivityLogId(),
+      userId: getRequestUser(req)?.id || "system",
+      action: "DELETE_FILE",
+      entityType: "File",
+      entityId: file.id,
+      createdAt: new Date().toISOString()
+    });
+
+    res.json({ success: true, file });
+  });
+
+  // ==================== REPORT EXPORTS API ====================
+  const FONT_PATH = RESOURCE_FONT_PATH;
+
+  async function ensureFontExists(): Promise<string | null> {
+    if (fs.existsSync(FONT_PATH)) return FONT_PATH;
+    return new Promise((resolve) => {
+      const file = fs.createWriteStream(FONT_PATH);
+      https.get("https://raw.githubusercontent.com/google/fonts/main/ofl/amiri/Amiri-Regular.ttf", (response) => {
+        response.pipe(file);
+        file.on('finish', () => {
+          file.close();
+          resolve(FONT_PATH);
+        });
+      }).on('error', (err) => {
+        fs.unlink(FONT_PATH, () => {});
+        console.error("Failed to download Amiri font, falling back", err);
+        resolve(null);
+      });
+    });
+  }
+
+  function reverseArabicLine(text: string): string {
+    if (!text) return "";
+    if (!/[\u0600-\u06FF]/.test(text)) return text;
+    const words = text.split(" ");
+    const reversedWords = words.map(w => {
+      if (/[\u0600-\u06FF]/.test(w)) {
+        return w.split("").reverse().join("");
+      }
+      return w;
+    });
+    return reversedWords.reverse().join(" ");
+  }
+
+  // Export Sales Report to Excel
+}
