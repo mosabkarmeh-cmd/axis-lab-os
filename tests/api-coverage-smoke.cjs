@@ -61,7 +61,7 @@ const readRoutes = [
   "/api/notifications", "/api/activity-logs", "/api/recycle-bin", "/api/search?q=laser",
 ];
 
-request.token = "";
+request.cookie = "";
 
 (async () => {
   try {
