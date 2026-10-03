@@ -1,12 +1,9 @@
 import express from "express";
 import { Type, GoogleGenAI } from "@google/genai";
 import * as core from "../server-core.ts";
-const { apiKey } = core;
+const { apiKey, ai } = core;
 
 export function registerCompilerRoutes(app: express.Express) {
-    res.redirect(`/api/print/quotation/${req.params.id}`);
-  });
-
   // API - G-Code & CNC Laser Blueprint Compiler (Using Gemini Model)
   app.post("/api/compiler/gcode", async (req, res) => {
     const { promptText, material, speed, power } = req.body;
@@ -123,5 +120,4 @@ Return your response strictly in the following JSON schema:
     }
   });
 
-  // API - AI Laser Order Advisor and Parameter Estimator
 }
