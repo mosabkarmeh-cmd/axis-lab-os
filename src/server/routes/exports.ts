@@ -826,7 +826,8 @@ export function registerExportRoutes(app: express.Express) {
       }
 
       // Left side: Detailed pricing summary
-      const subtotal = items.reduce((acc: number, cur: any) => {
+      const subtotal = items.reduce((acc: number, rawItem) => {
+        const cur = asExportItem(rawItem);
         const qty = Number(cur.quantity) || Number(cur.qty) || 1;
         const uPrice = Number(cur.unitPrice) || Number(cur.price) || 0;
         return acc + (Number(cur.totalPrice) || (qty * uPrice));
