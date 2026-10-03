@@ -57,7 +57,7 @@ export function registerImportRoutes(app: express.Express) {
         const name = worksheet.name;
         const matrix: unknown[][] = [];
         worksheet.eachRow({ includeEmpty: true }, (row) => {
-          const rawValues = row.values as any[];
+          const rawValues = row.values as unknown[];
           const values = rawValues.slice(1).map((value: unknown) => {
             if (value && typeof value === "object") {
               if ("text" in value) return value.text;
@@ -96,7 +96,7 @@ export function registerImportRoutes(app: express.Express) {
     const errors: string[] = [];
 
     for (let idx = 0; idx < items.length; idx++) {
-      const it: any = items[idx];
+      const it = items[idx] && typeof items[idx] === "object" ? items[idx] as Record<string, unknown> : {};
       if (!it.name) {
         errors.push(`السطر ${idx + 1}: حقل الاسم مطلوب`);
         continue;
@@ -144,7 +144,7 @@ export function registerImportRoutes(app: express.Express) {
     const errors: string[] = [];
 
     for (let idx = 0; idx < items.length; idx++) {
-      const it: any = items[idx];
+      const it = items[idx] && typeof items[idx] === "object" ? items[idx] as Record<string, unknown> : {};
       if (!it.name || !it.price) {
         errors.push(`السطر ${idx + 1}: الاسم والسعر مطلوبان`);
         continue;
@@ -191,7 +191,7 @@ export function registerImportRoutes(app: express.Express) {
     const errors: string[] = [];
 
     for (let idx = 0; idx < items.length; idx++) {
-      const it: any = items[idx];
+      const it = items[idx] && typeof items[idx] === "object" ? items[idx] as Record<string, unknown> : {};
       const name = String(it.name || "").trim();
       const code = String(it.code || "").trim();
       const pricePerUnit = Number(it.pricePerUnit);
@@ -267,7 +267,7 @@ export function registerImportRoutes(app: express.Express) {
     const imported: unknown[] = [];
     const errors: string[] = [];
     for (let idx = 0; idx < items.length; idx++) {
-      const it: any = items[idx];
+      const it = items[idx] && typeof items[idx] === "object" ? items[idx] as Record<string, unknown> : {};
       const code = String(it.code || "").trim();
       const name = String(it.name || "").trim();
       if (!name || !code) { errors.push(`السطر ${idx + 1}: كود المورد والاسم مطلوبان`); continue; }
@@ -292,14 +292,14 @@ export function registerImportRoutes(app: express.Express) {
     const imported: unknown[] = [];
     const errors: string[] = [];
     for (let idx = 0; idx < items.length; idx++) {
-      const it: any = items[idx];
+      const it = items[idx] && typeof items[idx] === "object" ? items[idx] as Record<string, unknown> : {};
       const code = String(it.code || "").trim().toLowerCase();
       const name = String(it.name || "").trim().toLowerCase();
-      const material: any = MATERIALS.find((candidate) => (code && String(candidate.notes || "").match(/كود المادة:\s*([^|]+)/)?.[1]?.trim().toLowerCase() === code) || (name && String(candidate.name || "").trim().toLowerCase() === name));
+      const material = MATERIALS.find((candidate) => (code && String(candidate.notes || "").match(/كود المادة:\s*([^|]+)/)?.[1]?.trim().toLowerCase() === code) || (name && String(candidate.name || "").trim().toLowerCase() === name));
       const quantity = Number(it.openingQuantity);
       if (!material) { errors.push(`السطر ${idx + 1}: المادة غير موجودة`); continue; }
       if (!Number.isInteger(quantity) || quantity < 0) { errors.push(`السطر ${idx + 1}: الكمية يجب أن تكون عددًا صحيحًا غير سالب`); continue; }
-      const existing = INVENTORY.find((row: unknown[]) => row.materialId === material.id);
+      const existing = INVENTORY.find((row) => row.materialId === material.id);
       if (existing) {
         const before = Number(existing.quantity) || 0;
         existing.quantity = quantity;
