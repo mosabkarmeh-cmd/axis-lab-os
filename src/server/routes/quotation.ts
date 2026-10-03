@@ -143,7 +143,7 @@ export function registerQuotationRoutes(app: express.Express) {
       doc.end();
     } catch (err: unknown) {
       console.error("Quotation PDF generation failed:", err);
-      res.status(500).json({ error: "فشل توليد عرض السعر: " + err instanceof Error ? err.message : String(err) });
+      res.status(500).json({ error: "فشل توليد عرض السعر: " + (err instanceof Error ? err.message : String(err)) });
     }
   });
 
