@@ -1,8 +1,20 @@
 import express from "express";
+import { db } from "../../db/index.ts";
+import { machines as machinesTable, inventory as inventoryTable, inventoryTransactions as inventoryTransactionsTable, remnants as remnantsTable } from "../../db/schema.ts";
+import { eq } from "drizzle-orm";
 import * as core from "../server-core.ts";
 
 const {
   PRODUCTION_JOBS,
+  MATERIALS,
+  USERS,
+  ORDERS,
+  INVENTORY,
+  INVENTORY_TRANSACTIONS,
+  REMNANTS,
+  createNotification,
+  sendProductionJobEmailNotification,
+  idNum,
   MACHINES,
   ACTIVITY_LOGS,
   nextEntityId,
