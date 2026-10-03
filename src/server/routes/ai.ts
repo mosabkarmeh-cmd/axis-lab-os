@@ -2,6 +2,18 @@ import express from "express";
 import { GoogleGenAI, Type } from "@google/genai";
 import * as core from "../server-core.ts";
 
+type AiItem = {
+  name?: string;
+  productName?: string;
+  quantity?: number | string;
+  qty?: number | string;
+  price?: number | string;
+};
+
+function asAiItem(value: unknown): AiItem {
+  return value && typeof value === "object" ? value as AiItem : {};
+}
+
 const {
   apiKey,
   ORDERS,
@@ -33,7 +45,7 @@ export function registerAIRoutes(app: express.Express) {
 
     const fallbackAdvisor = () => {
       const itemsParameters = items.map(item => {
-        const text = (item.name || item.productName || "").toLowerCase();
+        const text = (typedItem.name || typedItem.productName || "").toLowerCase();
         let speed = "15-25 mm/s";
         let power = "80%";
         let lens = "2.0\" focal lens";
@@ -57,7 +69,7 @@ export function registerAIRoutes(app: express.Express) {
         }
 
         return {
-          itemName: item.name || item.productName || "عنصر غير مسمى",
+          itemName: typedItem.name || typedItem.productName || "عنصر غير مسمى",
           speed,
           power,
           lens,
@@ -82,9 +94,9 @@ export function registerAIRoutes(app: express.Express) {
 
       const itemsStr = items.map((it, idx) => `
 Item #${idx + 1}:
-- Name/Material: "${it.name}"
-- Quantity: ${it.qty}
-- Input Price: $${it.price}
+- Name/Material: "${typedItem.name}"
+- Quantity: ${typedItem.qty}
+- Input Price: $${typedItem.price}
 - Custom Notes: "${it.notes || "None"}"
 `).join("\n");
 
@@ -214,10 +226,10 @@ Do not include any markdown format tags like \`\`\`json or \`\`\` in your respon
             const productCounts: Record<string, number> = {};
             customerOrders.forEach(o => {
               if (o.items && Array.isArray(o.items)) {
-                o.items.forEach((item: any) => {
-                  const pName = item.productName || item.name || "";
+                o.items.forEach((item) => { const typedItem = asAiItem(item); => {
+                  const pName = typedItem.productName || typedItem.name || "";
                   if (pName) {
-                    productCounts[pName] = (productCounts[pName] || 0) + (item.quantity || 1);
+                    productCounts[pName] = (productCounts[pName] || 0) + (typedItem.quantity || 1);
                   }
                 });
               }
@@ -256,9 +268,9 @@ Do not include any markdown format tags like \`\`\`json or \`\`\` in your respon
             const itemCounts: Record<string, number> = {};
             customerOrders.forEach(o => {
               if (o.items && Array.isArray(o.items)) {
-                o.items.forEach((it: any) => {
-                  const name = it.name || it.productName || "";
-                  if (name) itemCounts[name] = (itemCounts[name] || 0) + (it.quantity || 1);
+                o.items.forEach((it) => { const typedItem = asAiItem(it); => {
+                  const name = typedItem.name || typedItem.productName || "";
+                  if (name) itemCounts[name] = (itemCounts[name] || 0) + (typedItem.quantity || 1);
                 });
               }
             });
@@ -316,9 +328,9 @@ Do not include any markdown format tags like \`\`\`json or \`\`\` in your respon
         case "pricing-advisor": {
           const items = payload?.items || [];
           let totalSubtotal = 0;
-          items.forEach((it: any) => {
-            const q = Number(it.qty || it.quantity) || 1;
-            const p = Number(it.price) || 0;
+          items.forEach((it) => { const typedItem = asAiItem(it); => {
+            const q = Number(typedItem.qty || typedItem.quantity) || 1;
+            const p = Number(typedItem.price) || 0;
             totalSubtotal += q * p;
           });
 
@@ -440,9 +452,9 @@ Do not include any markdown format tags like \`\`\`json or \`\`\` in your respon
           const productSales: Record<string, number> = {};
           ORDERS.forEach(o => {
             if (o.items && Array.isArray(o.items)) {
-              o.items.forEach((item: any) => {
-                const name = item.productName || item.name || "عام";
-                productSales[name] = (productSales[name] || 0) + (item.quantity || 1);
+              o.items.forEach((item) => { const typedItem = asAiItem(item); => {
+                const name = typedItem.productName || typedItem.name || "عام";
+                productSales[name] = (productSales[name] || 0) + (typedItem.quantity || 1);
               });
             }
           });
@@ -511,8 +523,8 @@ Do not include any markdown format tags like \`\`\`json or \`\`\` in your respon
           // Material prices are stored in SYP. Convert to USD only for this legacy USD-based costing model.
           const matPricePerSheetSYP = Number(mat?.pricePerUnit || 0) || 1350;
           const matPricePerSheetUSD = matPricePerSheetSYP / exchangeRate;
-          const sheetWidthCm = (mat as any)?.widthCm || mat?.width || 122;
-          const sheetLengthCm = (mat as any)?.lengthCm || mat?.height || 244;
+          const sheetWidthCm = (mat as Record<string, unknown>).widthCm || mat?.width || 122;
+          const sheetLengthCm = (mat as Record<string, unknown>).lengthCm || mat?.height || 244;
           const sheetAreaCm2 = sheetWidthCm * sheetLengthCm;
           const pieceAreaCm2 = Math.max(1, widthCm * lengthCm);
 
@@ -1041,7 +1053,7 @@ Do not include any markdown format tags like \`\`\`json or \`\`\` in your respon
   };
 
   // Local Chat Response Generator for offline or high-demand fallback
-  const getLocalChatResponse = (message: string, stats: any, userExchangeRate?: number) => {
+  const getLocalChatResponse = (message: string, stats: unknown, userExchangeRate?: number) => {
     const rate = userExchangeRate || 15000;
     const msgNorm = normalizeArabicAndDialect(message);
 
