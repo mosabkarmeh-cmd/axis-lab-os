@@ -82,14 +82,16 @@ export function registerSettingsBackupRoutes(app: express.Express) {
         res.status(400).json({ success: false, message: "نسبة الشريك يجب أن تكون بين 0 و100%" });
         return;
       }
-      const previousPartnerPercent = Number((SETTINGS as Record<string, unknown>).partnerSharePercent ?? 0);
+      const settingsRecord = SETTINGS as typeof SETTINGS & Record<string, unknown>;
+      const previousPartnerPercent = Number(settingsRecord.partnerSharePercent ?? 0);
       if (nextPartnerPercent !== previousPartnerPercent) {
-        (SETTINGS as Record<string, unknown>).partnerShareHistory = Array.isArray((SETTINGS as Record<string, unknown>).partnerShareHistory)
-          ? (SETTINGS as Record<string, unknown>).partnerShareHistory
+        const history = Array.isArray(settingsRecord.partnerShareHistory)
+          ? settingsRecord.partnerShareHistory as Array<{ effectiveFrom: string; percent: number }>
           : [];
-        (SETTINGS as Record<string, unknown>).partnerShareHistory.push({ effectiveFrom: new Date().toISOString(), percent: nextPartnerPercent });
+        history.push({ effectiveFrom: new Date().toISOString(), percent: nextPartnerPercent });
+        settingsRecord.partnerShareHistory = history;
       }
-      (SETTINGS as Record<string, unknown>).partnerSharePercent = nextPartnerPercent;
+      settingsRecord.partnerSharePercent = nextPartnerPercent;
     }
     if (exchangeRate !== undefined) {
       const nextExchangeRate = Number(exchangeRate);
