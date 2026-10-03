@@ -1,4 +1,8 @@
 import express from "express";
+import path from "path";
+import fs from "fs";
+import https from "https";
+import multer from "multer";
 import * as core from "../server-core.ts";
 
 const {
@@ -8,18 +12,50 @@ const {
   ACTIVITY_LOGS,
   nextActivityLogId,
   DELETED_ITEMS,
+  RESOURCE_FONT_PATH,
 } = core;
 
 export function registerFileRoutes(app: express.Express) {
+// ==================== FILES & DOCUMENTS API ====================
+  const UPLOAD_DIR = path.join(process.cwd(), "uploads");
+  if (!fs.existsSync(UPLOAD_DIR)) {
+    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+  }
 
-  // Get Invoices
-  // ==================== SETTINGS & BACKUP API ====================
+  const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, UPLOAD_DIR);
+    },
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname);
+      const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+      cb(null, uniqueName);
+    }
+  });
+  const ALLOWED_UPLOAD_EXTENSIONS = new Set([
+    ".dxf", ".dwg", ".svg", ".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp",
+    ".xlsx", ".xls", ".csv", ".doc", ".docx"
+  ]);
+  const upload = multer({
+    storage,
+    limits: { fileSize: 25 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (!ALLOWED_UPLOAD_EXTENSIONS.has(ext)) {
+        cb(new Error("نوع الملف غير مسموح به"));
+        return;
+      }
+      cb(null, true);
+    }
+  });
+
+  // File Upload
   app.post("/api/files/upload", (req, res, next) => {
-    upload.single("file")(req, res, (err: unknown) => {
+    upload.single("file")(req, res, (err: any) => {
       if (err) {
         const message = err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE"
           ? "حجم الملف أكبر من الحد المسموح (25MB)"
-          : err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err) || "فشل رفع الملف";
+          : err.message || "فشل رفع الملف";
         return res.status(400).json({ success: false, message });
       }
       next();
@@ -41,7 +77,7 @@ export function registerFileRoutes(app: express.Express) {
         path: file.path,
         entityType: entityType || null,
         entityId: entityId || null,
-        uploadedById: getRequestUser(req)?.id || "system",
+        uploadedById: uploadedBy || "u-1",
         createdAt: new Date().toISOString()
       };
 
@@ -50,7 +86,7 @@ export function registerFileRoutes(app: express.Express) {
       // Log Activity
       ACTIVITY_LOGS.unshift({
         id: nextActivityLogId(),
-        userId: getRequestUser(req)?.id || "system",
+        userId: uploadedBy || "u-1",
         action: "UPLOAD_FILE",
         entityType: "File",
         entityId: newFile.id,
@@ -58,8 +94,8 @@ export function registerFileRoutes(app: express.Express) {
       });
 
       res.status(201).json({ success: true, file: newFile });
-    } catch (error: unknown) {
-      res.status(500).json({ success: false, message: error instanceof Error ? error.message : String(error) });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
     }
   });
 
@@ -105,7 +141,7 @@ export function registerFileRoutes(app: express.Express) {
     // Log Activity
     ACTIVITY_LOGS.unshift({
       id: nextActivityLogId(),
-      userId: getRequestUser(req)?.id || "system",
+      userId: "u-1",
       action: "DELETE_FILE",
       entityType: "File",
       entityId: file.id,
@@ -114,40 +150,4 @@ export function registerFileRoutes(app: express.Express) {
 
     res.json({ success: true, file });
   });
-
-  // ==================== REPORT EXPORTS API ====================
-  const FONT_PATH = RESOURCE_FONT_PATH;
-
-  async function ensureFontExists(): Promise<string | null> {
-    if (fs.existsSync(FONT_PATH)) return FONT_PATH;
-    return new Promise((resolve) => {
-      const file = fs.createWriteStream(FONT_PATH);
-      https.get("https://raw.githubusercontent.com/google/fonts/main/ofl/amiri/Amiri-Regular.ttf", (response) => {
-        response.pipe(file);
-        file.on('finish', () => {
-          file.close();
-          resolve(FONT_PATH);
-        });
-      }).on('error', (err) => {
-        fs.unlink(FONT_PATH, () => {});
-        console.error("Failed to download Amiri font, falling back", err);
-        resolve(null);
-      });
-    });
-  }
-
-  function reverseArabicLine(text: string): string {
-    if (!text) return "";
-    if (!/[\u0600-\u06FF]/.test(text)) return text;
-    const words = text.split(" ");
-    const reversedWords = words.map(w => {
-      if (/[\u0600-\u06FF]/.test(w)) {
-        return w.split("").reverse().join("");
-      }
-      return w;
-    });
-    return reversedWords.reverse().join(" ");
-  }
-
-  // Export Sales Report to Excel
 }
