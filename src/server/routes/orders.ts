@@ -4,44 +4,74 @@ import * as core from "../server-core.ts";
 const {
   ORDERS,
   CUSTOMERS,
-  PRODUCTS,
   USERS,
   INVOICES,
   ACTIVITY_LOGS,
-  NOTIFICATIONS,
-  DELETED_ITEMS,
   nextEntityId,
   nextActivityLogId,
-  schedulePersist,
   persistMutationWithFastDurability,
   getRequestUser,
-  publicUser,
+  recordBenchmark,
+  orderCreateBenchmarks,
+  getNextNumber,
+  SETTINGS,
+  sypToUsd,
+  notifyOverdueOrders,
+  persistStateNow,
+  ORDER_STATUSES,
+  freezeOrderCurrencySnapshot,
+  createNotification,
+  WORKFLOW_NEXT_REMINDERS,
 } = core;
+
+type OrderRecord = Record<string, unknown>;
+type PaymentRecord = Record<string, unknown>;
+
+const EMPLOYEE_HIDDEN_FIELDS = new Set([
+  "matCost", "finalPrice", "profit", "profitPercent", "costPrice", "unitCost",
+  "unitPrice", "unitPriceSYP", "totalPrice", "totalPriceSYP", "total", "totalSYP",
+  "subtotal", "discount", "tax", "taxPercent", "paidAmount", "remaining",
+  "remainingSYP", "amount", "amountSYP", "amountUSD",
+]);
+
+function getActorId(req: express.Request): string {
+  return getRequestUser(req)?.id || "system";
+}
+
+function sanitizeForEmployee(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sanitizeForEmployee);
+  if (!value || typeof value !== "object") return value;
+
+  const source = value as Record<string, unknown>;
+  const result: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(source)) {
+    if (EMPLOYEE_HIDDEN_FIELDS.has(key)) {
+      if ([
+        "unitPrice", "unitPriceSYP", "totalPrice", "totalPriceSYP", "total", "totalSYP",
+        "subtotal", "paidAmount", "remaining", "remainingSYP", "amount", "amountSYP", "amountUSD"
+      ].includes(key)) result[key] = 0;
+      continue;
+    }
+    result[key] = sanitizeForEmployee(entry);
+  }
+  return result;
+}
+
+function orderForResponse(req: express.Request, order: unknown): unknown {
+  return getRequestUser(req)?.role === "employee" ? sanitizeForEmployee(order) : order;
+}
+
+function ordersForResponse(req: express.Request, orders: unknown[]): unknown[] {
+  return getRequestUser(req)?.role === "employee"
+    ? orders.map(order => sanitizeForEmployee(order))
+    : orders;
+}
 
 export function registerOrderRoutes(app: express.Express) {
   // API - Get Orders
   app.get("/api/orders", (req, res) => {
     notifyOverdueOrders();
-    const user = getRequestUser(req);
-    const isEmployee = user && user.role === "employee";
-    
-    if (isEmployee) {
-      // Security: mask all financial values for orders and order items
-      const securedOrders = ORDERS.map((ord: any) => ({
-        ...ord,
-        totalPrice: 0,
-        paidAmount: 0,
-        remaining: 0,
-        items: ord.items ? ord.items.map((it: any) => ({
-          ...it,
-          unitPrice: 0,
-          totalPrice: 0
-        })) : []
-      }));
-      res.json(securedOrders);
-    } else {
-      res.json(ORDERS);
-    }
+    res.json(ordersForResponse(req, ORDERS));
   });
 
   // API - Create Order
@@ -90,7 +120,7 @@ export function registerOrderRoutes(app: express.Express) {
       paidAmount: Number(paidAmount) || 0,
       remaining: Math.max(0, finalTotal - (Number(paidAmount) || 0)),
       notes: notes || "",
-      createdById: createdById || "u-1",
+      createdById: getActorId(req),
       createdAt: new Date().toISOString(),
       deliveryDateExpected: deliveryDateExpected || new Date(Date.now() + 3600000 * 48).toISOString(), // default 48h
       items: parsedItems,
@@ -99,7 +129,7 @@ export function registerOrderRoutes(app: express.Express) {
         newStatus: "new",
         notes: "تم استقبال الطلب",
         changedAt: new Date().toISOString(),
-        changedById: createdById || "u-1"
+        changedById: getActorId(req)
       }]
     };
 
@@ -136,13 +166,13 @@ export function registerOrderRoutes(app: express.Express) {
       remaining: sypToUsd(newOrder.remaining, newOrder.exchangeRateAtCreation),
       status: newOrder.remaining === 0 ? "paid" : newOrder.paidAmount > 0 ? "partially_paid" : "unpaid",
       currency: "USD",
-      items: invoiceItems.map((item: any) => ({ ...item, unitPriceSYP: Math.round(item.unitPrice), totalSYP: Math.round(item.total), unitPrice: sypToUsd(item.unitPrice, newOrder.exchangeRateAtCreation), total: sypToUsd(item.total, newOrder.exchangeRateAtCreation) })),
+      items: invoiceItems.map((item) => ({ ...item, unitPriceSYP: Math.round(item.unitPrice), totalSYP: Math.round(item.total), unitPrice: sypToUsd(item.unitPrice, newOrder.exchangeRateAtCreation), total: sypToUsd(item.total, newOrder.exchangeRateAtCreation) })),
       history: [
         {
           id: `invhist-${Date.now()}`,
           invoiceId: invoiceId,
           action: "created",
-          userId: createdById || "u-1",
+          userId: getActorId(req),
           createdAt: new Date().toISOString()
         }
       ]
@@ -155,7 +185,7 @@ export function registerOrderRoutes(app: express.Express) {
     const newOrderMsg = `إنشاء طلب جديد #${newOrder.orderNumber} بقيمة إجمالية $${newOrder.totalPrice.toFixed(2)} (المدفوع: $${newOrder.paidAmount.toFixed(2)} / المتبقي: $${newOrder.remaining.toFixed(2)})`;
     ACTIVITY_LOGS.unshift({
       id: nextActivityLogId(),
-      userId: createdById || "u-1",
+      userId: getActorId(req),
       action: "CREATE_ORDER",
       entityType: "Order",
       entityId: newOrder.id,
@@ -169,7 +199,7 @@ export function registerOrderRoutes(app: express.Express) {
     res.locals.axisPersistScheduled = true;
     recordBenchmark(orderCreateBenchmarks, "queue_persistence", queueStartedAt);
     recordBenchmark(orderCreateBenchmarks, "request_total_to_response", orderRequestStartedAt);
-    res.json(newOrder);
+    res.json(orderForResponse(req, newOrder));
   });
   // API - Update Order (Edit details)
   app.put("/api/orders/:id", (req, res) => {
@@ -305,7 +335,7 @@ export function registerOrderRoutes(app: express.Express) {
     // 4. Log Activity
     ACTIVITY_LOGS.unshift({
       id: nextActivityLogId(),
-      userId: req.body.changedById || "u-1",
+      userId: getActorId(req),
       action: "UPDATE_ORDER",
       entityType: "Order",
       entityId: order.id,
@@ -313,7 +343,7 @@ export function registerOrderRoutes(app: express.Express) {
       createdAt: new Date().toISOString()
     });
 
-    res.json(order);
+    res.json(orderForResponse(req, order));
   });
 
   // API - Update Order Item Progress (تحديث نسبة إنجاز أجزاء ومواد الطلب والتكرارات)
@@ -327,7 +357,7 @@ export function registerOrderRoutes(app: express.Express) {
 
     if (!order.items) order.items = [];
 
-    const getMaterialKey = (it: any): string => {
+    const getMaterialKey = (it): string => {
       if (it.material && typeof it.material === 'string' && it.material.trim()) return it.material.trim();
       if (it.materialCategory && typeof it.materialCategory === 'string' && it.materialCategory.trim()) return it.materialCategory.trim();
       const name = (it.productName || it.name || "").trim();
@@ -366,20 +396,20 @@ export function registerOrderRoutes(app: express.Express) {
       });
       autoNote = `إضافة بند جديد لجدول القص: [${addItem.productName}] بكمية ${q} قطعة.`;
     } else if (removeItemId) {
-      const idx = order.items.findIndex((it: any) => it.id === removeItemId);
+      const idx = order.items.findIndex((it) => it.id === removeItemId);
       if (idx !== -1) {
         const removed = order.items.splice(idx, 1)[0];
         autoNote = `حذف البند [${removed.productName}] من جدول إنجاز القص.`;
       }
     } else if (resetAll) {
-      order.items.forEach((it: any) => {
+      order.items.forEach((it) => {
         it.completedQuantity = 0;
         it.isCompleted = false;
       });
       autoNote = "🔄 تصفير إنجاز كافة القطع والمواد (إعادة التعيين إلى 0%).";
     } else if (setAllCompleted) {
       // Complete all items in order
-      order.items.forEach((it: any) => {
+      order.items.forEach((it) => {
         const q = Number(it.quantity) || 1;
         it.completedQuantity = q;
         it.isCompleted = true;
@@ -388,7 +418,7 @@ export function registerOrderRoutes(app: express.Express) {
     } else if (materialName) {
       // Update all items matching materialName
       let targetCount = 0;
-      order.items.forEach((it: any) => {
+      order.items.forEach((it) => {
         const key = getMaterialKey(it);
         if (key === materialName || (it.productName && it.productName.includes(materialName))) {
           const q = Number(it.quantity) || 1;
@@ -401,7 +431,7 @@ export function registerOrderRoutes(app: express.Express) {
       autoNote = `تحديث نسبة إنجاز كافة القطع والمواد التابعة لخامة [${materialName}] (${targetCount} بند).`;
     } else if (itemId) {
       // Update single item
-      const item = order.items.find((it: any) => it.id === itemId);
+      const item = order.items.find((it) => it.id === itemId);
       if (!item) {
         res.status(404).json({ error: "جزء/عنصر الطلب غير موجود" });
         return;
@@ -416,7 +446,7 @@ export function registerOrderRoutes(app: express.Express) {
     // Calculate total order progress across all parts and materials
     let totalReq = 0;
     let totalDone = 0;
-    order.items.forEach((it: any) => {
+    order.items.forEach((it) => {
       const q = Number(it.quantity) || 1;
       const c = it.completedQuantity !== undefined ? Number(it.completedQuantity) : (it.isCompleted ? q : 0);
       totalReq += q;
@@ -445,14 +475,14 @@ export function registerOrderRoutes(app: express.Express) {
 
     ACTIVITY_LOGS.unshift({
       id: nextActivityLogId(),
-      userId: changedById || "u-1",
+      userId: getActorId(req),
       action: "UPDATE_ITEM_PROGRESS",
       entityType: "Order",
       entityId: order.id,
       createdAt: new Date().toISOString()
     });
 
-    res.json(order);
+    res.json(orderForResponse(req, order));
   });
 
   // Financial mutations use one in-memory snapshot plus the SQLite transaction
@@ -484,15 +514,15 @@ export function registerOrderRoutes(app: express.Express) {
   // validation, payment-record shape, and cross-entity sync live in exactly
   // one place instead of two independently-maintained copies.
   function applyPayment(params: {
-    order: any | null;
-    inv: any | null;
-    amount: any;
+    order: OrderRecord | null;
+    inv: OrderRecord | null;
+    amount: unknown;
     currency: string;
     notes: string | undefined;
     paymentMethod: string | undefined;
     changedById: string | undefined;
     paymentId: string | undefined;
-  }): { ok: boolean; status: number; body: any; order: any | null; invoice: any | null } {
+  }): { ok: boolean; status: number; body: any; order: OrderRecord | null; invoice: any | null } {
     const { order, inv, currency, notes, paymentMethod, changedById, paymentId } = params;
 
     if (order?.currencyFinalizedAt) {
@@ -509,7 +539,7 @@ export function registerOrderRoutes(app: express.Express) {
     const rate = order
       ? (Number(order.exchangeRateAtCreation) > 0 ? Number(order.exchangeRateAtCreation) : 135)
       : (() => {
-          const r = Number(inv.exchangeRateAtFinalization || inv.exchangeRateAtIssue || (inv.orderId ? ORDERS.find((o: any) => o.id === inv.orderId)?.exchangeRateAtCreation : 0) || SETTINGS.exchangeRate || 135);
+          const r = Number(inv.exchangeRateAtFinalization || inv.exchangeRateAtIssue || (inv.orderId ? ORDERS.find((o) => o.id === inv.orderId)?.exchangeRateAtCreation : 0) || SETTINGS.exchangeRate || 135);
           return Number.isFinite(r) && r > 0 ? r : 135;
         })();
 
@@ -542,8 +572,8 @@ export function registerOrderRoutes(app: express.Express) {
       return { ok: false, status: 400, body: order ? { error: msg, remainingSYP: currentRemainingSYP, remainingUSD: currentRemainingSYP / rate } : { message: msg }, order: null, invoice: null };
     }
 
-    const existingPayments = (order?.payments || inv?.payments || []) as any[];
-    if (paymentId && existingPayments.some((payment: any) => payment.id === String(paymentId))) {
+    const existingPayments = (order?.payments || inv?.payments || []) as PaymentRecord[];
+    if (paymentId && existingPayments.some((payment) => payment.id === String(paymentId))) {
       return { ok: false, status: 409, body: { error: "هذه الدفعة مسجلة مسبقاً", message: "هذه الدفعة مسجلة مسبقاً" }, order: null, invoice: null };
     }
 
@@ -558,7 +588,7 @@ export function registerOrderRoutes(app: express.Express) {
       currency: "SYP",
       paymentMethod: paymentMethod || "cash",
       notes: notes || (order ? "دفعة مقبوضة للطلب" : "دفعة فاتورة"),
-      recordedBy: changedById || "u-1",
+      recordedBy: getActorId(req),
       createdAt: new Date().toISOString()
     };
 
@@ -592,7 +622,7 @@ export function registerOrderRoutes(app: express.Express) {
       inv.remaining = inv.remainingUSD;
       inv.status = inv.remaining === 0 ? "paid" : inv.paidAmount > 0 ? "partially_paid" : "unpaid";
       if (!inv.payments) inv.payments = [];
-      if (!inv.payments.some((payment: any) => payment.id === paymentRecord.id)) {
+      if (!inv.payments.some((payment) => payment.id === paymentRecord.id)) {
         inv.payments.unshift({ ...paymentRecord });
       }
       if (order) {
@@ -600,12 +630,12 @@ export function registerOrderRoutes(app: express.Express) {
       } else if (inv.orderId) {
         // Invoice-initiated payment on an invoice linked to an order: keep the
         // order's own ledger in sync exactly as the invoice route always did.
-        const linkedOrder = ORDERS.find((o: any) => o.id === inv.orderId);
+        const linkedOrder = ORDERS.find((o) => o.id === inv.orderId);
         if (linkedOrder) {
           const orderExchangeRate = Number(linkedOrder.exchangeRateAtCreation) > 0 ? Number(linkedOrder.exchangeRateAtCreation) : 135;
           const orderPayment = { ...paymentRecord, orderId: linkedOrder.id, amountSYP: payAmtSYP, exchangeRate: orderExchangeRate, currency: "SYP" };
           if (!linkedOrder.payments) linkedOrder.payments = [];
-          if (!linkedOrder.payments.some((payment: any) => payment.id === orderPayment.id)) linkedOrder.payments.unshift(orderPayment);
+          if (!linkedOrder.payments.some((payment) => payment.id === orderPayment.id)) linkedOrder.payments.unshift(orderPayment);
           linkedOrder.paidAmount = Math.min(
             Number(linkedOrder.totalPrice || 0),
             linkedOrder.payments.reduce((sum: number, payment: any) => sum + Number(payment.amountSYP ?? Math.round(Number(payment.amountUSD || 0) * orderExchangeRate)), 0)
@@ -623,7 +653,7 @@ export function registerOrderRoutes(app: express.Express) {
 
     ACTIVITY_LOGS.unshift({
       id: nextActivityLogId(),
-      userId: changedById || "u-1",
+      userId: getActorId(req),
       action: order ? "RECORD_PAYMENT" : "RECORD_INVOICE_PAYMENT",
       entityType: order ? "Order" : "Invoice",
       entityId: order?.id || inv?.id,
@@ -671,7 +701,7 @@ export function registerOrderRoutes(app: express.Express) {
     }
 
     if (!order.payments) order.payments = [];
-    const pIndex = order.payments.findIndex((p: any) => p.id === paymentId);
+    const pIndex = order.payments.findIndex((p) => p.id === paymentId);
     if (pIndex === -1) {
       res.status(404).json({ error: "سند القبض غير موجود" });
       return;
@@ -709,7 +739,7 @@ export function registerOrderRoutes(app: express.Express) {
 
     ACTIVITY_LOGS.unshift({
       id: nextActivityLogId(),
-      userId: changedById || "u-1",
+      userId: getActorId(req),
       action: "DELETE_PAYMENT",
       entityType: "Order",
       entityId: order.id,
@@ -717,7 +747,7 @@ export function registerOrderRoutes(app: express.Express) {
       createdAt: new Date().toISOString()
     });
 
-    res.json(order);
+    res.json(orderForResponse(req, order));
   });
 
   // API - Update Order Status
@@ -768,7 +798,7 @@ export function registerOrderRoutes(app: express.Express) {
     }
     ACTIVITY_LOGS.unshift({
       id: nextActivityLogId(),
-      userId: changedById || "u-1",
+      userId: getActorId(req),
       action: "ASSIGN_ORDER_WORKERS",
       entityType: "Order",
       entityId: order.id,
@@ -776,12 +806,12 @@ export function registerOrderRoutes(app: express.Express) {
       createdAt: new Date().toISOString()
     });
     await persistStateNow();
-    res.json(order);
+    res.json(orderForResponse(req, order));
   });
 
   // Manager-only performance rating per production stage (design/cutting/assembly).
   app.patch("/api/orders/:id/rate", async (req, res) => {
-    const user = (req as any).user as UserRecord | undefined;
+    const user = getRequestUser(req);
     if (!user || user.role !== "admin") {
       res.status(403).json({ error: "تقييم الطلبات متاح للمدير فقط" });
       return;
@@ -792,7 +822,7 @@ export function registerOrderRoutes(app: express.Express) {
       return;
     }
     const { designRating, cuttingRating, assemblyRating, ratingNotes } = req.body;
-    const validateRating = (value: any) => value === undefined || value === null || (Number.isInteger(value) && value >= 1 && value <= 5);
+    const validateRating = (value: unknown) => value === undefined || value === null || (Number.isInteger(value) && value >= 1 && value <= 5);
     if (!validateRating(designRating) || !validateRating(cuttingRating) || !validateRating(assemblyRating)) {
       res.status(400).json({ error: "التقييم يجب أن يكون رقماً صحيحاً بين 1 و5" });
       return;
@@ -814,12 +844,12 @@ export function registerOrderRoutes(app: express.Express) {
       createdAt: new Date().toISOString()
     });
     await persistStateNow();
-    res.json(order);
+    res.json(orderForResponse(req, order));
   });
 
   // Aggregate per-employee performance stats from order ratings (manager-only).
   app.get("/api/employees/stats", async (req, res) => {
-    const user = (req as any).user as UserRecord | undefined;
+    const user = getRequestUser(req);
     if (!user || user.role !== "admin") {
       res.status(403).json({ error: "إحصائيات الموظفين متاحة للمدير فقط" });
       return;
@@ -878,7 +908,7 @@ export function registerOrderRoutes(app: express.Express) {
       return;
     }
 
-    if (!ORDER_STATUSES.some((entry: any) => entry.id === status)) {
+    if (!ORDER_STATUSES.some((entry) => entry.id === status)) {
       res.status(400).json({ error: "حالة الطلب غير صالحة" });
       return;
     }
@@ -931,7 +961,7 @@ export function registerOrderRoutes(app: express.Express) {
       newStatus: status,
       notes: notes || `تحديث حالة الطلب إلى ${newStatusLabel}`,
       changedAt: new Date().toISOString(),
-      changedById: changedById || "u-1"
+      changedById: getActorId(req)
     });
 
     createNotification(
@@ -955,7 +985,7 @@ export function registerOrderRoutes(app: express.Express) {
     // Log Activity
     ACTIVITY_LOGS.unshift({
       id: nextActivityLogId(),
-      userId: changedById || "u-1",
+      userId: getActorId(req),
       action: "UPDATE_ORDER_STATUS",
       entityType: "Order",
       entityId: order.id,
@@ -964,7 +994,7 @@ export function registerOrderRoutes(app: express.Express) {
     });
 
     await persistStateNow();
-    res.json(order);
+    res.json(orderForResponse(req, order));
   });
 
   // API - Run Auto Archive Orders
@@ -982,9 +1012,9 @@ export function registerOrderRoutes(app: express.Express) {
     const daysThreshold = Number(req.body.days) || SETTINGS.autoArchive?.thresholdDays || 30;
     const cutoffTime = Date.now() - (daysThreshold * 24 * 60 * 60 * 1000);
     let count = 0;
-    const archivedOrders: any[] = [];
+    const archivedOrders: OrderRecord[] = [];
 
-    ORDERS.forEach((ord: any) => {
+    ORDERS.forEach((ord) => {
       if (!ord.isArchived) {
         const orderCreatedTime = new Date(ord.createdAt || Date.now()).getTime();
         const isFinished = ord.status === "delivered" || ord.status === "completed" || ord.status === "ready";
@@ -1031,7 +1061,7 @@ export function registerOrderRoutes(app: express.Express) {
       const warningWindowStart = Date.now() - (daysThreshold * 24 * 60 * 60 * 1000);
       const warningWindowEnd = Date.now() - ((daysThreshold - notifyDaysBefore) * 24 * 60 * 60 * 1000);
 
-      const upcomingOrders = ORDERS.filter((ord: any) => {
+      const upcomingOrders = ORDERS.filter((ord) => {
         if (ord.isArchived) return false;
         const orderCreatedTime = new Date(ord.createdAt || Date.now()).getTime();
         const isFinished = ord.status === "delivered" || ord.status === "completed" || ord.status === "ready";
@@ -1040,11 +1070,11 @@ export function registerOrderRoutes(app: express.Express) {
 
       if (upcomingOrders.length > 0) {
         upcomingCount = upcomingOrders.length;
-        upcomingOrders.forEach((ord: any) => { ord.archiveWarningNotified = true; });
+        upcomingOrders.forEach((ord) => { ord.archiveWarningNotified = true; });
 
         createNotification(
           "تنبيه: أرشفة طلبات وشيكة 🔔",
-          `توجد ${upcomingCount} طلبات مكتملة اقتربت من موعد الأرشفة التلقائية خلال ${notifyDaysBefore} أيام (الطلبات: ${upcomingOrders.map((o: any) => o.orderNumber).slice(0, 3).join(', ')}${upcomingCount > 3 ? '...' : ''}).`,
+          `توجد ${upcomingCount} طلبات مكتملة اقتربت من موعد الأرشفة التلقائية خلال ${notifyDaysBefore} أيام (الطلبات: ${upcomingOrders.map((o) => o.orderNumber).slice(0, 3).join(', ')}${upcomingCount > 3 ? '...' : ''}).`,
           "warning"
         );
       }
@@ -1054,7 +1084,7 @@ export function registerOrderRoutes(app: express.Express) {
       success: true,
       count,
       upcomingCount,
-      archivedOrders,
+      archivedOrders: ordersForResponse(req, archivedOrders),
       message: count > 0 
         ? `تمت أرشفة ${count} طلبات مكتملة تجاوزت ${daysThreshold} يوماً بنجاح.` 
         : `لا توجد طلبات مكتملة تجاوزت ${daysThreshold} يوماً بحاجة للأرشفة حالياً.`
@@ -1064,7 +1094,7 @@ export function registerOrderRoutes(app: express.Express) {
   // API - Get Archived Orders
   app.get("/api/orders/archived", (req, res) => {
     const archived = ORDERS.filter(o => o.isArchived === true);
-    res.json(archived);
+    res.json(ordersForResponse(req, archived));
   });
 
   // API - Archive Single Order (Manual Archive)
@@ -1087,14 +1117,14 @@ export function registerOrderRoutes(app: express.Express) {
 
     ACTIVITY_LOGS.unshift({
       id: nextActivityLogId(),
-      userId: "u-1",
+      userId: getActorId(req),
       action: "ARCHIVE_ORDER",
       entityType: "Order",
       entityId: order.id,
       createdAt: new Date().toISOString()
     });
 
-    res.json(order);
+    res.json(orderForResponse(req, order));
   });
 
   // API - Restore Order from Archive
@@ -1117,14 +1147,14 @@ export function registerOrderRoutes(app: express.Express) {
 
     ACTIVITY_LOGS.unshift({
       id: nextActivityLogId(),
-      userId: "u-1",
+      userId: getActorId(req),
       action: "RESTORE_ORDER_FROM_ARCHIVE",
       entityType: "Order",
       entityId: order.id,
       createdAt: new Date().toISOString()
     });
 
-    res.json(order);
+    res.json(orderForResponse(req, order));
   });
 
 
