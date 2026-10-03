@@ -431,7 +431,7 @@ const USERS: UserRecord[] = [
   { id: "u-3", email: "accountant@axislab.com", fullName: "المحاسب المالي", role: "accountant", isActive: Boolean(process.env.DEMO_ACCOUNTANT_PASSWORD_HASH), passwordHash: process.env.DEMO_ACCOUNTANT_PASSWORD_HASH || "" }
 ];
 
-const FILES: any[] = [
+const FILES = [
   {
     id: "f-1",
     name: "ax-2026-001-design.dxf",
