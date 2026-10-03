@@ -1,4 +1,7 @@
 import "dotenv/config";
 import { startServer } from "./src/server/app.ts";
 
-startServer();
+startServer().catch((error) => {
+  console.error("[SERVER STARTUP] Failed to start AXIS LAB OS:", error);
+  process.exitCode = 1;
+});
