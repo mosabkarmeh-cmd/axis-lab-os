@@ -1,9 +1,11 @@
 import express from "express";
 import os from "node:os";
+import nodemailer from "nodemailer";
 import * as core from "../server-core.ts";
 
 const {
   SETTINGS,
+  USE_SQLITE,
   BACKUPS,
   ACTIVITY_LOGS,
   nextActivityLogId,
@@ -80,14 +82,14 @@ export function registerSettingsBackupRoutes(app: express.Express) {
         res.status(400).json({ success: false, message: "نسبة الشريك يجب أن تكون بين 0 و100%" });
         return;
       }
-      const previousPartnerPercent = Number((SETTINGS as any).partnerSharePercent ?? 0);
+      const previousPartnerPercent = Number((SETTINGS as Record<string, unknown>).partnerSharePercent ?? 0);
       if (nextPartnerPercent !== previousPartnerPercent) {
-        (SETTINGS as any).partnerShareHistory = Array.isArray((SETTINGS as any).partnerShareHistory)
-          ? (SETTINGS as any).partnerShareHistory
+        (SETTINGS as Record<string, unknown>).partnerShareHistory = Array.isArray((SETTINGS as Record<string, unknown>).partnerShareHistory)
+          ? (SETTINGS as Record<string, unknown>).partnerShareHistory
           : [];
-        (SETTINGS as any).partnerShareHistory.push({ effectiveFrom: new Date().toISOString(), percent: nextPartnerPercent });
+        (SETTINGS as Record<string, unknown>).partnerShareHistory.push({ effectiveFrom: new Date().toISOString(), percent: nextPartnerPercent });
       }
-      (SETTINGS as any).partnerSharePercent = nextPartnerPercent;
+      (SETTINGS as Record<string, unknown>).partnerSharePercent = nextPartnerPercent;
     }
     if (exchangeRate !== undefined) {
       const nextExchangeRate = Number(exchangeRate);
@@ -155,15 +157,15 @@ export function registerSettingsBackupRoutes(app: express.Express) {
       try {
         const info = await transporter.sendMail(mailOptions);
         res.json({ success: true, message: `تم إرسال بريد الاختبار بنجاح إلى ${targetEmail}`, messageId: info.messageId });
-      } catch (sendErr: any) {
-        res.json({ success: true, warning: `تم اختبار التكوين وإرسال الطلب للخادم: ${sendErr.message}`, targetEmail });
+      } catch (sendErr: unknown) {
+        res.json({ success: true, warning: `تم اختبار التكوين وإرسال الطلب للخادم: ${sendErr instanceof Error ? sendErr.message : String(sendErr)}`, targetEmail });
       }
     } catch (err: unknown) {
       res.status(500).json({ success: false, message: `فشل إرسال بريد الاختبار: ${err instanceof Error ? err.message : String(err)}` });
     }
   });
 
-  const publicBackup = (backup: any) => {
+  const publicBackup = (backup: Record<string, unknown>) => {
     const { filePath, ...safeBackup } = backup;
     return safeBackup;
   };
