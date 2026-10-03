@@ -1,11 +1,8 @@
 import express from "express";
-import { db } from "../../db/index.ts";
-import { materials as materialsTable, supplierQuotes as supplierQuotesTable } from "../../db/schema.ts";
-import { eq } from "drizzle-orm";
 import { Type } from "@google/genai";
 import { db } from "../../db/index.ts";
+import { materials as materialsTable, supplierQuotes as supplierQuotesTable, inventory as inventoryTable, inventoryTransactions as inventoryTransactionsTable } from "../../db/schema.ts";
 import { eq } from "drizzle-orm";
-import { inventory as inventoryTable, inventoryTransactions as inventoryTransactionsTable } from "../../db/schema.ts";
 import * as core from "../server-core.ts";
 
 const {
@@ -17,6 +14,7 @@ const {
   REMNANTS,
   SUPPLIER_QUOTES,
   SUPPLIERS,
+  USERS,
   DELETED_ITEMS,
   ACTIVITY_LOGS,
   nextEntityId,
@@ -92,7 +90,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
       res.json({ success: true, classification: resultJson });
     } catch (error: unknown) {
       console.error("AI Material classification error:", error);
-      res.status(500).json({ success: false, message: "فشل تصنيف المادة بالذكاء الاصطناعي", error: error.message });
+      res.status(500).json({ success: false, message: "فشل تصنيف المادة بالذكاء الاصطناعي", error: error instanceof Error ? error.message : String(error) });
     }
   });
 
