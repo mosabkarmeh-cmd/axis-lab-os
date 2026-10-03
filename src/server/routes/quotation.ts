@@ -97,8 +97,8 @@ export function registerQuotationRoutes(app: express.Express) {
       let currentY = tableY + 25;
       doc.fillColor("#27272a").fontSize(10);
 
-      const items = order.items || [];
-      items.forEach((item: unknown, idx: number) => {
+      const items = Array.isArray(order.items) ? order.items.map(asQuotationItem) : [];
+      items.forEach((item, idx: number) => {
         if (idx % 2 === 1) {
           doc.rect(50, currentY, 495, 22).fill("#fcf9f5");
         }
@@ -119,7 +119,7 @@ export function registerQuotationRoutes(app: express.Express) {
       doc.strokeColor("#e4e4e7").lineWidth(1).moveTo(50, currentY).lineTo(545, currentY).stroke();
 
       // Total pricing block
-      const subtotal = items.reduce((sum: number, item: unknown) => sum + ((Number(item.quantity) || Number(item.qty) || 1) * (Number(item.unitPrice) || Number(item.price) || 0)), 0);
+      const subtotal = items.reduce((sum: number, item) => sum + ((Number(item.quantity) || Number(item.qty) || 1) * (Number(item.unitPrice) || Number(item.price) || 0)), 0);
       const tax = subtotal * 0.0; // 0%
       const total = subtotal + tax;
 
