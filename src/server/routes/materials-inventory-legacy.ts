@@ -24,6 +24,10 @@ const {
   persistStateNow,
 } = core;
 
+function getActorId(req: express.Request): string {
+  return getRequestUser(req)?.id || "system";
+}
+
 export function registerLegacyMaterialsInventoryRoutes(app: express.Express) {
   app.post("/api/materials/ai-classify", async (req, res) => {
     try {
@@ -83,7 +87,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
 
       const resultJson = JSON.parse(resultText.trim());
       res.json({ success: true, classification: resultJson });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("AI Material classification error:", error);
       res.status(500).json({ success: false, message: "فشل تصنيف المادة بالذكاء الاصطناعي", error: error.message });
     }
@@ -168,7 +172,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
     let hasWarnings = false;
     let hasErrors = false;
 
-    items.forEach((it: any) => {
+    items.forEach((it) => {
       const itemName = String(it.name || it.productName || "").trim();
       const requiredQty = Number(it.qty || it.quantity) || 1;
 
@@ -374,7 +378,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
 
       ACTIVITY_LOGS.unshift({
         id: nextActivityLogId(),
-        userId: "u-1",
+        userId: getActorId(req),
         action: "SET_PRIMARY_SUPPLIER",
         entityType: "Material",
         entityId: material.id,
@@ -430,7 +434,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
 
     ACTIVITY_LOGS.unshift({
       id: nextActivityLogId(),
-      userId: "u-1",
+      userId: getActorId(req),
       action: "CREATE_MATERIAL",
       entityType: "Material",
       entityId: newMat.id,
@@ -470,7 +474,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
 
     ACTIVITY_LOGS.unshift({
       id: nextActivityLogId(),
-      userId: "u-1",
+      userId: getActorId(req),
       action: "UPDATE_MATERIAL",
       entityType: "Material",
       entityId: material.id,
@@ -492,7 +496,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
     }
     ACTIVITY_LOGS.unshift({
       id: nextActivityLogId(),
-      userId: "u-1",
+      userId: getActorId(req),
       action: "UPDATE_MATERIAL_QUALITY_STATUS",
       entityType: "Material",
       entityId: material.id,
@@ -524,7 +528,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
 
     ACTIVITY_LOGS.unshift({
       id: nextActivityLogId(),
-      userId: "u-1",
+      userId: getActorId(req),
       action: "ARCHIVE_MATERIAL",
       entityType: "Material",
       entityId: material.id,
@@ -550,7 +554,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
 
     ACTIVITY_LOGS.unshift({
       id: nextActivityLogId(),
-      userId: "u-1",
+      userId: getActorId(req),
       action: "RESTORE_MATERIAL",
       entityType: "Material",
       entityId: material.id,
@@ -681,14 +685,14 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
         referenceType: referenceType || null,
         referenceId: referenceId || null,
         reason: reason || "تحديث يدوي للمخزون",
-        createdById: userId || "u-1",
+        createdById: getActorId(req),
         createdAt: new Date().toISOString()
       };
       INVENTORY_TRANSACTIONS.push(newTx);
 
       ACTIVITY_LOGS.unshift({
         id: nextActivityLogId(),
-        userId: userId || "u-1",
+        userId: getActorId(req),
         action: `INVENTORY_${type ? type.toUpperCase() : 'ADJUSTMENT'}`,
         entityType: "Inventory",
         entityId: inv.id,
@@ -699,7 +703,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
       res.json({ success: true, inventory: inv });
     } catch (err: unknown) {
       console.error("Error updating inventory:", err);
-      res.status(500).json({ success: false, message: "فشل تحديث المخزون: " + err instanceof Error ? err.message : String(err) });
+      res.status(500).json({ success: false, message: `فشل تحديث المخزون: ${err instanceof Error ? err.message : String(err)}` });
     }
   });
 
