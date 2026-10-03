@@ -86,7 +86,12 @@ where psql >nul 2>nul
 if not errorlevel 1 (
     echo.
     echo Making sure the "axislab" database exists...
-    set PGPASSWORD=axislab_dev_pass
+    for /f "usebackq tokens=1,* delims==" %%A in (".env") do if /I "%%A"=="SQL_ADMIN_PASSWORD" set "PGPASSWORD=%%~B"
+    if not defined PGPASSWORD (
+        echo [X] SQL_ADMIN_PASSWORD is missing from .env.
+        pause
+        exit /b 1
+    )
     psql -U postgres -h localhost -tc "SELECT 1 FROM pg_database WHERE datname = 'axislab'" | findstr /C:"1" >nul
     if errorlevel 1 (
         createdb -U postgres -h localhost axislab
