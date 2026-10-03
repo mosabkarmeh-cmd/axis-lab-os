@@ -171,7 +171,6 @@ export function registerAuthRoutes(app: express.Express) {
     });
 
     res.json({
-      token,
       user: publicUser(newUser)
     });
   });
