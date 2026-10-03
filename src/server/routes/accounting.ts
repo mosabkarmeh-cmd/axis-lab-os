@@ -189,17 +189,20 @@ export function registerAccountingRoutes(app: express.Express) {
     if (discount !== undefined) inv.discount = Number(discount) || 0;
 
     if (items && Array.isArray(items)) {
-      inv.items = items.map((raw, idx: number) => { const it = asInvoiceItem(raw); return ({
-        id: it.id || `invitem-${Date.now()}-${idx}`,
-        invoiceId: inv.id,
-        productName: it.productName || "بند مخصص",
-        quantity: Number(it.quantity) || 1,
-        unitPrice: Number(it.unitPrice) || 0,
-        discount: Number(it.discount) || 0,
-        tax: Number(it.tax) || 0,
-        total: (Number(it.quantity) || 1) * (Number(it.unitPrice) || 0) - (Number(it.discount) || 0) + (Number(it.tax) || 0),
-        createdAt: it.createdAt || new Date().toISOString()
-      }));
+      inv.items = items.map((raw, idx: number) => {
+        const it = asInvoiceItem(raw);
+        return {
+          id: it.id || `invitem-${Date.now()}-${idx}`,
+          invoiceId: inv.id,
+          productName: it.productName || "بند مخصص",
+          quantity: Number(it.quantity) || 1,
+          unitPrice: Number(it.unitPrice) || 0,
+          discount: Number(it.discount) || 0,
+          tax: Number(it.tax) || 0,
+          total: (Number(it.quantity) || 1) * (Number(it.unitPrice) || 0) - (Number(it.discount) || 0) + (Number(it.tax) || 0),
+          createdAt: it.createdAt || new Date().toISOString()
+        };
+      });
     }
 
     const computedSubtotal = inv.items ? inv.items.reduce((sum: number, it) => sum + (it.quantity * it.unitPrice), 0) : inv.totalPrice;
