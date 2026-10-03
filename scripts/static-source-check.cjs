@@ -4,6 +4,7 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 const fail = (message) => { console.error("[STATIC-SOURCE-AUDIT] FAIL:", message); process.exitCode = 1; };
 const files = [];
+const scanRoots = ["src", "desktop"];
 const walk = (dir) => {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (entry.name === "node_modules" || entry.name === ".git" || entry.name === "dist") continue;
@@ -12,7 +13,7 @@ const walk = (dir) => {
     else if (/\.(ts|tsx|cjs|mjs|js)$/.test(entry.name)) files.push(full);
   }
 };
-walk(root);
+for (const rel of scanRoots) walk(path.join(root, rel));
 
 for (const file of files) {
   const source = fs.readFileSync(file, "utf8");
