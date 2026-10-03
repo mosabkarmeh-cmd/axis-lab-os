@@ -1678,7 +1678,7 @@ Role Guidelines:
 
       res.json({ success: true, results: results.slice(0, 10) });
     } catch (err: unknown) {
-      res.status(500).json({ success: false, message: err instanceof Error ? err instanceof Error ? err.message : String(err) : "فشل البحث الدلالي" });
+      res.status(500).json({ success: false, message: err instanceof Error ? err.message : String(err) || "فشل البحث الدلالي" });
     }
   });
 
