@@ -36,6 +36,7 @@ import { registerSupplyRoutes } from "./supply.ts";
 import { registerAccountingRoutes } from "./accounting.ts";
 import { registerReportRoutes } from "./reports.ts";
 import { registerSettingsBackupRoutes } from "./settings-backup.ts";
+import { registerFileRoutes } from "./files.ts";
 
 const { apiKey, ai, DB_MODE, USE_POSTGRES, USE_SQLITE, APP_RUNTIME_ROOT, LOCAL_DATA_FILE, RESOURCE_FONT_PATH, LOCAL_LEGACY_DATA_FILE, LOCAL_SCHEMA_VERSION, activityLogSequence, nextActivityLogId, entityIdSequence, nextEntityId, orderCreateBenchmarks, persistenceBenchmarks, persistQueueStats, recordBenchmark, benchmarkSnapshot, NORMALIZED_LOCAL_COLLECTIONS, NORMALIZED_FINANCIAL_COLLECTIONS, initLocalSqlite, setLocalSqlite, SQLITE_BUSY_RETRY_DELAYS_MS, withSqliteBusyRetry, flushLocalSqlite, syncNormalizedLocalEntities, assertFinancialStateInvariants, syncNormalizedFinancialEntities, readFinancialTablesFromSqlite, backupDirectory, checksumFile, createSqliteBackup, JWT_SECRET, JWT_ISSUER, JWT_AUDIENCE, publicUser, generateJWT, getRequestUser, USERS, FILES, CUSTOMERS, PRODUCTS, ORDERS, ACTIVITY_LOGS, MATERIALS, LEGACY_MATERIAL_PRICES_SYP_CANONICAL, LEGACY_MATERIAL_PRICES_SYP, normalizeLegacyMaterialPrices, INVENTORY, INVENTORY_TRANSACTIONS, normalizeInventoryState, REMNANTS, SUPPLIER_QUOTES, SUPPLIERS, SUPPLY_ORDERS, DEMO_LOW_PRICE_MATERIALS, DEMO_LOW_PRICE_INVENTORY, ensureDemoLowPriceMaterials, MACHINES, EXPENSES, NUMBERING_SETTINGS, getNextNumber, INVOICE_HISTORY, NOTIFICATIONS, DELETED_ITEMS, ORDER_STATUSES, normalizeOrderStatuses, createNotification, notifyOverdueOrders, WORKFLOW_NEXT_REMINDERS, INVOICES, SETTINGS, publicSettings, getPartnerSharePercentAt, mergeSmtpSettings, freezeOrderCurrencySnapshot, sendProductionJobEmailNotification, BACKUPS, PRODUCTION_JOBS, PERSISTED_COLLECTIONS, LOCAL_PERSISTED_COLLECTIONS, idNum, refreshWarehouseCache, loadPersistedState, persistTimer, persistInFlight, persistAgainAfter, persistWaiters, persistStateNow, persistMutationWithFastDurability, schedulePersist, RESETTABLE_BUSINESS_COLLECTIONS, resetBusinessData } = core;
 
@@ -203,6 +204,8 @@ export async function registerRoutes(app: express.Express) {
   registerReportRoutes(app);
 
   registerSettingsBackupRoutes(app);
+
+  registerFileRoutes(app);
 
   registerOrderRoutes(app);
 
@@ -3290,142 +3293,6 @@ Role Guidelines:
 
   // Get Invoices
   // ==================== SETTINGS & BACKUP API ====================
-  app.post("/api/files/upload", (req, res, next) => {
-    upload.single("file")(req, res, (err: any) => {
-      if (err) {
-        const message = err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE"
-          ? "حجم الملف أكبر من الحد المسموح (25MB)"
-          : err.message || "فشل رفع الملف";
-        return res.status(400).json({ success: false, message });
-      }
-      next();
-    });
-  }, (req, res) => {
-    try {
-      const file = req.file;
-      if (!file) {
-        return res.status(400).json({ success: false, message: "لم يتم رفع أي ملف" });
-      }
-
-      const { entityType, entityId, uploadedBy } = req.body;
-      const newFile = {
-        id: "f-" + Date.now(),
-        name: file.filename,
-        originalName: file.originalname,
-        mimeType: file.mimetype,
-        size: file.size,
-        path: file.path,
-        entityType: entityType || null,
-        entityId: entityId || null,
-        uploadedById: uploadedBy || "u-1",
-        createdAt: new Date().toISOString()
-      };
-
-      FILES.push(newFile);
-
-      // Log Activity
-      ACTIVITY_LOGS.unshift({
-        id: nextActivityLogId(),
-        userId: uploadedBy || "u-1",
-        action: "UPLOAD_FILE",
-        entityType: "File",
-        entityId: newFile.id,
-        createdAt: new Date().toISOString()
-      });
-
-      res.status(201).json({ success: true, file: newFile });
-    } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
-    }
-  });
-
-  // Get files of an entity
-  app.get("/api/files/entity/:entityType/:entityId", (req, res) => {
-    const { entityType, entityId } = req.params;
-    const filtered = FILES.filter(f => f.entityType === entityType && f.entityId === entityId);
-    res.json({ success: true, files: filtered });
-  });
-
-  // Download a file
-  app.get("/api/files/:id/download", (req, res) => {
-    const file = FILES.find(f => f.id === req.params.id);
-    if (!file) {
-      return res.status(404).json({ success: false, message: "الملف غير موجود" });
-    }
-
-    if (file.path && fs.existsSync(file.path)) {
-      res.download(file.path, file.originalName);
-    } else {
-      res.status(404).json({ success: false, message: "ملف النظام الفعلي غير موجود على القرص" });
-    }
-  });
-
-  // Delete a file
-  app.delete("/api/files/:id", (req, res) => {
-    const idx = FILES.findIndex(f => f.id === req.params.id);
-    if (idx === -1) {
-      return res.status(404).json({ success: false, message: "الملف غير موجود" });
-    }
-
-    const file = FILES[idx];
-    FILES.splice(idx, 1);
-
-    if (file.path && fs.existsSync(file.path)) {
-      try {
-        fs.unlinkSync(file.path);
-      } catch (err) {
-        console.error("Error deleting file on disk", err);
-      }
-    }
-
-    // Log Activity
-    ACTIVITY_LOGS.unshift({
-      id: nextActivityLogId(),
-      userId: "u-1",
-      action: "DELETE_FILE",
-      entityType: "File",
-      entityId: file.id,
-      createdAt: new Date().toISOString()
-    });
-
-    res.json({ success: true, file });
-  });
-
-  // ==================== REPORT EXPORTS API ====================
-  const FONT_PATH = RESOURCE_FONT_PATH;
-
-  async function ensureFontExists(): Promise<string | null> {
-    if (fs.existsSync(FONT_PATH)) return FONT_PATH;
-    return new Promise((resolve) => {
-      const file = fs.createWriteStream(FONT_PATH);
-      https.get("https://raw.githubusercontent.com/google/fonts/main/ofl/amiri/Amiri-Regular.ttf", (response) => {
-        response.pipe(file);
-        file.on('finish', () => {
-          file.close();
-          resolve(FONT_PATH);
-        });
-      }).on('error', (err) => {
-        fs.unlink(FONT_PATH, () => {});
-        console.error("Failed to download Amiri font, falling back", err);
-        resolve(null);
-      });
-    });
-  }
-
-  function reverseArabicLine(text: string): string {
-    if (!text) return "";
-    if (!/[\u0600-\u06FF]/.test(text)) return text;
-    const words = text.split(" ");
-    const reversedWords = words.map(w => {
-      if (/[\u0600-\u06FF]/.test(w)) {
-        return w.split("").reverse().join("");
-      }
-      return w;
-    });
-    return reversedWords.reverse().join(" ");
-  }
-
-  // Export Sales Report to Excel
   app.get("/api/export/sales/excel", async (req, res) => {
     try {
       const { dateFrom, dateTo, customerId } = req.query;
