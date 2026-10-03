@@ -14,6 +14,8 @@ const {
   INVENTORY,
   nextEntityId,
   getRequestUser,
+  createNotification,
+  idNum,
 } = core;
 
 function getActorId(req: express.Request): string {
@@ -21,7 +23,6 @@ function getActorId(req: express.Request): string {
 }
 
 export function registerImportRoutes(app: express.Express) {
-  });
 
   // 4. BULK IMPORT APIs
   const requireImportAdmin = (req: express.Request, res: express.Response) => {
@@ -79,7 +80,7 @@ export function registerImportRoutes(app: express.Express) {
       res.json({ success: true, fileName: req.file.originalname, sheets: sheets.filter((sheet) => sheet.kind !== "ignore") });
     } catch (error: unknown) {
       console.error("Excel preview failed:", error);
-      res.status(400).json({ success: false, message: "تعذر قراءة ملف Excel: " + error instanceof Error ? error.message : String(error) });
+      res.status(400).json({ success: false, message: "تعذر قراءة ملف Excel: " + (error instanceof Error ? error.message : String(error)) });
     }
   });
 
