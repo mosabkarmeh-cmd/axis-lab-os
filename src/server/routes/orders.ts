@@ -25,6 +25,18 @@ const {
 } = core;
 
 type OrderRecord = (typeof ORDERS)[number];
+type InvoiceRecord = (typeof INVOICES)[number];
+type OrderItem = {
+  productName?: string;
+  quantity?: number | string;
+  unitPrice?: number | string;
+  totalPrice?: number | string;
+  notes?: string;
+  [key: string]: unknown;
+};
+function asOrderItem(value: unknown): OrderItem {
+  return value && typeof value === "object" ? value as OrderItem : {};
+}
 type PaymentRecord = {
   id?: string;
   amountSYP?: number;
@@ -90,7 +102,8 @@ export function registerOrderRoutes(app: express.Express) {
     }
     recordBenchmark(orderCreateBenchmarks, "request_validation", orderRequestStartedAt);
     const parseItemsStartedAt = performance.now();
-    const parsedItems = items.map((it: any, idx: number) => ({
+    const parsedItems = items.map((rawItem, idx: number) => ({
+        ...asOrderItem(rawItem),
       id: `item-${Date.now()}-${idx}`,
       productName: it.productName,
       quantity: Number(it.quantity) || 1,
@@ -143,7 +156,8 @@ export function registerOrderRoutes(app: express.Express) {
 
     // Auto-create matching Invoice
     const invoiceId = nextEntityId("inv");
-    const invoiceItems = parsedItems.map((it: any, idx: number) => ({
+    const invoiceItems = parsedItems.map((rawItem, idx: number) => ({
+        ...asOrderItem(rawItem),
       id: `invitem-${Date.now()}-${idx}`,
       invoiceId: invoiceId,
       productName: it.productName,
@@ -246,7 +260,8 @@ export function registerOrderRoutes(app: express.Express) {
     if (discount !== undefined) order.discount = Number(discount) || 0;
 
     if (items && items.length > 0) {
-      order.items = items.map((it: any, idx: number) => {
+      order.items = items.map((rawItem, idx: number) => {
+        const it = asOrderItem(rawItem);
         const qty = Number(it.quantity) || 1;
         const comp = it.completedQuantity !== undefined ? Number(it.completedQuantity) : (it.isCompleted ? qty : 0);
         return {
@@ -521,14 +536,14 @@ export function registerOrderRoutes(app: express.Express) {
   // one place instead of two independently-maintained copies.
   function applyPayment(params: {
     order: OrderRecord | null;
-    inv: OrderRecord | null;
+    inv: InvoiceRecord | null;
     amount: unknown;
     currency: string;
     notes: string | undefined;
     paymentMethod: string | undefined;
     changedById: string | undefined;
     paymentId: string | undefined;
-  }): { ok: boolean; status: number; body: any; order: OrderRecord | null; invoice: any | null } {
+  }): { ok: boolean; status: number; body: Record<string, unknown>; order: OrderRecord | null; invoice: InvoiceRecord | null } {
     const { order, inv, currency, notes, paymentMethod, changedById, paymentId } = params;
 
     if (order?.currencyFinalizedAt) {
