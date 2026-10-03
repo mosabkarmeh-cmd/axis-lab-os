@@ -284,7 +284,7 @@ export function registerAccountingRoutes(app: express.Express) {
       tax: -it.tax,
       total: -it.total,
       createdAt: new Date().toISOString()
-    })) : [
+    })) }) : [
       {
         id: `invitem-${Date.now()}-0`,
         invoiceId: creditNoteId,
