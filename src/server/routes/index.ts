@@ -301,7 +301,7 @@ export async function registerRoutes(app: express.Express) {
 
     ACTIVITY_LOGS.unshift({
       id: nextActivityLogId(),
-      userId: "u-1",
+      userId: getRequestUser(req)?.id || "system",
       action: "RESTORE_" + delItem.entityType.toUpperCase(),
       entityType: delItem.entityType,
       entityId: delItem.entityId,
