@@ -91,7 +91,11 @@ function benchmarkSnapshot(target: Map<string, BenchmarkBucket>) {
 }
 const NORMALIZED_LOCAL_COLLECTIONS = ["CUSTOMERS", "PRODUCTS", "MATERIALS", "INVENTORY", "INVENTORY_TRANSACTIONS", "REMNANTS", "SUPPLIERS", "SUPPLY_ORDERS", "SUPPLIER_QUOTES", "MACHINES", "ORDERS", "ACTIVITY_LOGS", "NOTIFICATIONS", "PRODUCTION_JOBS"] as const;
 const NORMALIZED_FINANCIAL_COLLECTIONS = ["INVOICES", "EXPENSES"] as const;
-let localSqlite: any = null;
+export let localSqlite: Database | null = null;
+export function setLocalSqlite(database: Database) {
+  localSqlite = database;
+  return localSqlite;
+}
 
 async function initLocalSqlite() {
   if (localSqlite) return localSqlite;
@@ -99,7 +103,7 @@ async function initLocalSqlite() {
     locateFile: (file: string) => process.env.SQLITE_WASM_PATH || path.join(APP_RUNTIME_ROOT, "node_modules", "sql.js", "dist", file),
   });
   const openDatabase = (candidateBytes?: Uint8Array) => {
-    let database: any = null;
+    let database: Database | null = null;
     try {
       database = candidateBytes ? new SQL.Database(candidateBytes) : new SQL.Database();
       database.run("PRAGMA foreign_keys = ON");
