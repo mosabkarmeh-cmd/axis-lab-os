@@ -1,17 +1,14 @@
 import express from "express";
-import PDFDocument from "pdfkit";
 import * as core from "../server-core.ts";
-const { ORDERS, CUSTOMERS, PRODUCTS, MATERIALS, INVOICES, getRequestUser } = core;
+import PDFDocument from "pdfkit";
+
+const { NOTIFICATIONS, DELETED_ITEMS, ORDER_STATUSES, createNotification, getRequestUser, CUSTOMERS, PRODUCTS, MATERIALS, EXPENSES, ACTIVITY_LOGS, nextActivityLogId, idNum } = core;
+
+function getActorId(req: express.Request): string {
+  return getRequestUser(req)?.id || "system";
+}
 
 export function registerQuotationRoutes(app: express.Express) {
-    if (normalizedName.includes("تعليمات") || normalizedName.includes("قوائم") || normalizedName.includes("instructions") || normalizedName.includes("lists")) return "ignore";
-    if (normalizedName.includes("مورد") || normalizedHeaders.includes("كودالمورد") || normalizedHeaders.includes("suppliercode")) return "suppliers";
-    if (normalizedName.includes("مخزون") || normalizedHeaders.includes("الكميةالافتتاحية") || normalizedHeaders.includes("openingquantity")) return "inventory";
-    return "materials";
-  };
-  // 5. GLOBAL SEARCH API
-
-  // 6. QUOTATION PDF API
   app.get("/api/print/quotation/:id", async (req, res) => {
     try {
       const orderId = req.params.id;
@@ -121,9 +118,9 @@ export function registerQuotationRoutes(app: express.Express) {
       doc.fillColor("#a1a1aa").fontSize(8);
       doc.text(reverseArabicLine("عرض سعر ذكي صادر آلياً من نظام ورش القص ليزر CO2 والتحكم الإداري - AXIS LAB"), 50, footerY + 10, { align: "center", width: 495 });
       doc.end();
-    } catch (err: unknown) {
+    } catch (err: any) {
       console.error("Quotation PDF generation failed:", err);
-      res.status(500).json({ error: "فشل توليد عرض السعر: " + err instanceof Error ? err.message : String(err) });
+      res.status(500).json({ error: "فشل توليد عرض السعر: " + err.message });
     }
   });
 
@@ -132,7 +129,5 @@ export function registerQuotationRoutes(app: express.Express) {
   });
 
 
-  // API - AI Laser Order Advisor and Parameter Estimator
 
-  // API - FAST LOCAL AI - Ultra-low latency Intelligent Engine (<10ms)
 }
