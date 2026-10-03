@@ -1,6 +1,10 @@
 import express from "express";
 import * as core from "../server-core.ts";
 
+type InvoiceItem = { quantity?: number; unitPrice?: number; total?: number; description?: string; [key: string]: unknown };
+type InvoiceLike = { id: string; orderId?: string; items?: InvoiceItem[]; totalPrice?: number; subtotal?: number; [key: string]: unknown };
+const asInvoiceItem = (value: unknown): InvoiceItem => value && typeof value === "object" ? value as InvoiceItem : {};
+
 const {
   INVOICES,
   ORDERS,
@@ -53,7 +57,7 @@ export function registerAccountingRoutes(app: express.Express) {
     }
 
     const invoiceId = nextEntityId("inv");
-    const invItems = (items && items.length > 0) ? items.map((it: any, idx: number) => ({
+    const invItems = (items && items.length > 0) ? items.map((raw, idx: number) => { const it = asInvoiceItem(raw); => ({
       id: `invitem-${Date.now()}-${idx}`,
       invoiceId: invoiceId,
       productName: it.productName || "بند مخصص",
@@ -186,7 +190,7 @@ export function registerAccountingRoutes(app: express.Express) {
     if (discount !== undefined) inv.discount = Number(discount) || 0;
 
     if (items && Array.isArray(items)) {
-      inv.items = items.map((it: any, idx: number) => ({
+      inv.items = items.map((raw, idx: number) => { const it = asInvoiceItem(raw); => ({
         id: it.id || `invitem-${Date.now()}-${idx}`,
         invoiceId: inv.id,
         productName: it.productName || "بند مخصص",
@@ -199,10 +203,10 @@ export function registerAccountingRoutes(app: express.Express) {
       }));
     }
 
-    const computedSubtotal = inv.items ? inv.items.reduce((sum: number, it: any) => sum + (it.quantity * it.unitPrice), 0) : inv.totalPrice;
+    const computedSubtotal = inv.items ? inv.items.reduce((sum: number, it) => sum + (it.quantity * it.unitPrice), 0) : inv.totalPrice;
     inv.subtotal = computedSubtotal;
 
-    const computedTotal = inv.items ? inv.items.reduce((sum: number, it: any) => sum + it.total, 0) : inv.totalPrice;
+    const computedTotal = inv.items ? inv.items.reduce((sum: number, it) => sum + it.total, 0) : inv.totalPrice;
     const finalTotal = totalPrice !== undefined ? Number(totalPrice) : computedTotal;
     inv.totalPrice = finalTotal;
     inv.remaining = Math.max(0, finalTotal - inv.paidAmount);
@@ -250,7 +254,7 @@ export function registerAccountingRoutes(app: express.Express) {
     inv.history.push({
       id: `invhist-${Date.now()}`,
       invoiceId: inv.id,
-      action: (status === "cancelled" ? "cancelled" : status === "paid" ? "paid" : "updated") as any,
+      action: (status === "cancelled" ? "cancelled" : status === "paid" ? "paid" : "updated") ,
       oldData,
       newData: { status },
       userId: getActorId(req),
@@ -270,7 +274,7 @@ export function registerAccountingRoutes(app: express.Express) {
     }
 
     const creditNoteId = nextEntityId("inv");
-    const creditItems = inv.items ? inv.items.map((it: any, idx: number) => ({
+    const creditItems = inv.items ? inv.items.map((raw, idx: number) => { const it = asInvoiceItem(raw); => ({
       id: `invitem-${Date.now()}-${idx}`,
       invoiceId: creditNoteId,
       productName: `مرتجع: ${it.productName}`,
@@ -499,10 +503,10 @@ export function registerAccountingRoutes(app: express.Express) {
     const sourceInvoices = INVOICES;
     const sourceExpenses = EXPENSES;
     const reportRate = Number(SETTINGS.exchangeRate) > 0 ? Number(SETTINGS.exchangeRate) : 135;
-    const invoiceSYP = (inv: any, usdField: string, sypField: string) => {
+    const invoiceSYP = (inv: InvoiceLike, usdField: string, sypField: string) => {
       const fixedSYP = Number(inv[sypField]);
       if (Number.isFinite(fixedSYP)) return Math.round(fixedSYP);
-      const linkedOrder = ORDERS.find((order: any) => order.id === inv.orderId);
+      const linkedOrder = ORDERS.find((order) => order.id === inv.orderId);
       const historicalRate = Number(inv.exchangeRateAtFinalization || inv.exchangeRateAtIssue || linkedOrder?.exchangeRateAtCreation);
       const rate = historicalRate > 0 ? historicalRate : 135;
       return Math.round((Number(inv[usdField]) || 0) * rate);
