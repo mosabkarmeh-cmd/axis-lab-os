@@ -210,7 +210,7 @@ export function registerProductionLegacyRoutes(app: express.Express) {
     orderedIds.forEach((id, idx) => {
       const job = jobMap.get(id);
       if (job) {
-        (job as any).priority = idx + 1;
+        job.priority = idx + 1;
         reordered.push(job);
         jobMap.delete(id);
       }
