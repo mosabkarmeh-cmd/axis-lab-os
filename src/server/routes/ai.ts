@@ -1020,7 +1020,7 @@ Do not include any markdown format tags like \`\`\`json or \`\`\` in your respon
       }
     } catch (error: unknown) {
       console.error("Fast local AI Error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
     }
   });
 
@@ -1569,7 +1569,7 @@ Role Guidelines:
         }
       });
     } catch (err: unknown) {
-      res.status(500).json({ success: false, message: err.message || "فشل قراءة الذاكرة المتعلمة" });
+      res.status(500).json({ success: false, message: err instanceof Error ? err.message : String(err) || "فشل قراءة الذاكرة المتعلمة" });
     }
   });
 
@@ -1678,7 +1678,7 @@ Role Guidelines:
 
       res.json({ success: true, results: results.slice(0, 10) });
     } catch (err: unknown) {
-      res.status(500).json({ success: false, message: err instanceof Error ? err.message : "فشل البحث الدلالي" });
+      res.status(500).json({ success: false, message: err instanceof Error ? err instanceof Error ? err.message : String(err) : "فشل البحث الدلالي" });
     }
   });
 
