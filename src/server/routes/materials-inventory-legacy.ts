@@ -1,4 +1,7 @@
 import express from "express";
+import { db } from "../../db/index.ts";
+import { materials as materialsTable, supplierQuotes as supplierQuotesTable } from "../../db/schema.ts";
+import { eq } from "drizzle-orm";
 import { Type } from "@google/genai";
 import { db } from "../../db/index.ts";
 import { eq } from "drizzle-orm";
@@ -334,7 +337,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
       res.status(201).json({ success: true, quote: newQuote, quotes: SUPPLIER_QUOTES.filter(q => q.materialId === req.params.id) });
     } catch (err: unknown) {
       console.error("Error adding supplier quote:", err);
-      res.status(500).json({ success: false, message: "فشل إضافة عرض السعر: " + err instanceof Error ? err.message : String(err) });
+      res.status(500).json({ success: false, message: "فشل إضافة عرض السعر: " + (err instanceof Error ? err.message : String(err)) });
     }
   });
 
@@ -351,7 +354,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
       res.json({ success: true, quotes: SUPPLIER_QUOTES.filter(q => q.materialId === req.params.id) });
     } catch (err: unknown) {
       console.error("Error deleting supplier quote:", err);
-      res.status(500).json({ success: false, message: "فشل حذف عرض السعر: " + err instanceof Error ? err.message : String(err) });
+      res.status(500).json({ success: false, message: "فشل حذف عرض السعر: " + (err instanceof Error ? err.message : String(err)) });
     }
   });
 
@@ -389,7 +392,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
       res.json({ success: true, material });
     } catch (err: unknown) {
       console.error("Error setting primary supplier:", err);
-      res.status(500).json({ success: false, message: "فشل تعيين المورد الرئيسي: " + err instanceof Error ? err.message : String(err) });
+      res.status(500).json({ success: false, message: "فشل تعيين المورد الرئيسي: " + (err instanceof Error ? err.message : String(err)) });
     }
   });
 
@@ -768,7 +771,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
       res.json({ success: true, inventory: inv });
     } catch (err: unknown) {
       console.error("Error reserving inventory:", err);
-      res.status(500).json({ success: false, message: "فشل حجز المخزون: " + err instanceof Error ? err.message : String(err) });
+      res.status(500).json({ success: false, message: "فشل حجز المخزون: " + (err instanceof Error ? err.message : String(err)) });
     }
   });
 
@@ -831,7 +834,7 @@ Be intelligent! If the name contains wood words like "خشب", "زان", "MDF", 
       res.json({ success: true, inventory: inv });
     } catch (err: unknown) {
       console.error("Error unreserving inventory:", err);
-      res.status(500).json({ success: false, message: "فشل إلغاء حجز المخزون: " + err instanceof Error ? err.message : String(err) });
+      res.status(500).json({ success: false, message: "فشل إلغاء حجز المخزون: " + (err instanceof Error ? err.message : String(err)) });
     }
   });
 
