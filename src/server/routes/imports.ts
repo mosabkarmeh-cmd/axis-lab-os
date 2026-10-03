@@ -80,7 +80,7 @@ export function registerImportRoutes(app: express.Express) {
       res.json({ success: true, fileName: req.file.originalname, sheets: sheets.filter((sheet) => sheet.kind !== "ignore") });
     } catch (error: unknown) {
       console.error("Excel preview failed:", error);
-      res.status(400).json({ success: false, message: "تعذر قراءة ملف Excel: " + (error instanceof Error ? error instanceof Error ? error.message : String(error) : String(error)) });
+      res.status(400).json({ success: false, message: "تعذر قراءة ملف Excel: " + (error instanceof Error ? error.message : String(error)) });
     }
   });
 
@@ -92,7 +92,7 @@ export function registerImportRoutes(app: express.Express) {
       return;
     }
 
-    const imported: unknown[] = [];
+    const imported: Array<Record<string, unknown>> = [];
     const errors: string[] = [];
 
     for (let idx = 0; idx < items.length; idx++) {
@@ -103,9 +103,9 @@ export function registerImportRoutes(app: express.Express) {
       }
       try {
         const inserted = await db.insert(customersTable).values({
-          name: it.name, phone: it.phone || null, whatsapp: it.whatsapp || it.phone || null,
-          email: it.email || null, company: it.company || "أفراد", address: it.address || null,
-          notes: it.notes || null, category: it.category || "شركة",
+          name: String(it.name), phone: it.phone ? String(it.phone) : null, whatsapp: it.whatsapp ? String(it.whatsapp) : (it.phone ? String(it.phone) : null),
+          email: it.email ? String(it.email) : null, company: it.company ? String(it.company) : "أفراد", address: it.address ? String(it.address) : null,
+          notes: it.notes ? String(it.notes) : null, category: it.category ? String(it.category) : "شركة",
         }).returning();
         const row = inserted[0];
         const newCust = {
@@ -117,7 +117,7 @@ export function registerImportRoutes(app: express.Express) {
         imported.push(newCust);
       } catch (err: unknown) {
         console.error("Error importing customer row:", err);
-        errors.push(`السطر ${idx + 1}: فشل الحفظ - ${err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err)}`);
+        errors.push(`السطر ${idx + 1}: فشل الحفظ - ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 
@@ -151,9 +151,9 @@ export function registerImportRoutes(app: express.Express) {
       }
       try {
         const inserted = await db.insert(productsTable).values({
-          name: it.name, code: it.code || `PRD-${Date.now().toString().slice(-4)}-${idx}`,
-          category: it.category || "عام", price: Number(it.price) || 0,
-          description: it.description || null, stock: Number(it.stock) || 0,
+          name: String(it.name), code: it.code ? String(it.code) : `PRD-${Date.now().toString().slice(-4)}-${idx}`,
+          category: it.category ? String(it.category) : "عام", price: Number(it.price) || 0,
+          description: it.description ? String(it.description) : null, stock: Number(it.stock) || 0,
         }).returning();
         const row = inserted[0];
         const newProd = {
@@ -164,7 +164,7 @@ export function registerImportRoutes(app: express.Express) {
         imported.push(newProd);
       } catch (err: unknown) {
         console.error("Error importing product row:", err);
-        errors.push(`السطر ${idx + 1}: فشل الحفظ - ${err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err)}`);
+        errors.push(`السطر ${idx + 1}: فشل الحفظ - ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 
@@ -208,26 +208,26 @@ export function registerImportRoutes(app: express.Express) {
         const supId = idNum(it.supplierId, "s-");
         const insertedMat = await db.insert(materialsTable).values({
           name,
-          category: it.category || "عام",
-          subCategory: it.subCategory || "general",
+          category: it.category ? String(it.category) : "عام",
+          subCategory: it.subCategory ? String(it.subCategory) : "general",
           thickness: Number(it.thickness) || 0,
-          color: it.color || "natural",
+          color: it.color ? String(it.color) : "natural",
           width: Number(it.width) || 1220,
           height: Number(it.height) || 2440,
-          unit: it.unit || "sheet",
+          unit: it.unit ? String(it.unit) : "sheet",
           pricePerUnit,
           minimumStock: Number(it.minimumStock) || 5,
           supplierId: supId,
-          notes: [code ? `كود المادة: ${code}` : "", it.notes || ""].filter(Boolean).join(" | ") || null,
+          notes: [code ? `كود المادة: ${code}` : "", it.notes ? String(it.notes) : ""].filter(Boolean).join(" | ") || null,
           status: "active",
-          qualityStatus: it.qualityStatus || "inspected",
+          qualityStatus: it.qualityStatus ? String(it.qualityStatus) : "inspected",
         }).returning();
         const matRow = insertedMat[0];
 
         const stock = Number(it.stock) || 0;
         await db.insert(inventoryTable).values({
           materialId: matRow.id, quantity: stock, reservedQuantity: 0,
-          availableQuantity: stock, location: it.location || "المستودع الرئيسي",
+          availableQuantity: stock, location: it.location ? String(it.location) : "المستودع الرئيسي",
         });
 
         const newMat = {
@@ -245,7 +245,7 @@ export function registerImportRoutes(app: express.Express) {
         imported.push(newMat);
       } catch (err: unknown) {
         console.error("Error importing material row:", err);
-        errors.push(`السطر ${idx + 1}: فشل الحفظ - ${err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err)}`);
+        errors.push(`السطر ${idx + 1}: فشل الحفظ - ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 
@@ -274,12 +274,12 @@ export function registerImportRoutes(app: express.Express) {
       const duplicate = SUPPLIERS.some((supplier) => String(supplier.name || "").trim().toLowerCase() === name.toLowerCase() || String(supplier.notes || "").includes(`كود المورد: ${code}`));
       if (duplicate) { errors.push(`السطر ${idx + 1}: المورد أو كوده موجود مسبقًا`); continue; }
       try {
-        const inserted = await db.insert(suppliersTable).values({ name, phone: it.phone || null, email: it.email || null, address: it.address || null, notes: [`كود المورد: ${code}`, it.notes || ""].filter(Boolean).join(" | ") }).returning();
+        const inserted = await db.insert(suppliersTable).values({ name, phone: it.phone ? String(it.phone) : null, email: it.email ? String(it.email) : null, address: it.address ? String(it.address) : null, notes: [`كود المورد: ${code}`, it.notes ? String(it.notes) : ""].filter(Boolean).join(" | ") }).returning();
         const row = inserted[0];
-        const supplier = { id: "s-" + row.id, code, name: row.name, phone: row.phone || "", email: row.email || "", address: row.address || "", notes: it.notes || "" };
+        const supplier = { id: "s-" + row.id, code, name: row.name, phone: row.phone || "", email: row.email || "", address: row.address || "", notes: it.notes ? String(it.notes) : "" };
         SUPPLIERS.push(supplier);
         imported.push(supplier);
-      } catch (error: unknown) { errors.push(`السطر ${idx + 1}: فشل الحفظ - ${error instanceof Error ? error instanceof Error ? error.message : String(error) : String(error)}`); }
+      } catch (error: unknown) { errors.push(`السطر ${idx + 1}: فشل الحفظ - ${error instanceof Error ? error.message : String(error)}`); }
     }
     if (imported.length > 0) createNotification("استيراد موردين جماعي", `تم استيراد ${imported.length} موردين بنجاح.`, "system");
     res.json({ success: true, count: imported.length, imported, errors });
