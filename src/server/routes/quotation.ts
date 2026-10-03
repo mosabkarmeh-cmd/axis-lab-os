@@ -1,11 +1,34 @@
 import express from "express";
-import * as core from "../server-core.ts";
+import fs from "fs";
 import PDFDocument from "pdfkit";
+import * as core from "../server-core.ts";
 
-const { NOTIFICATIONS, DELETED_ITEMS, ORDER_STATUSES, createNotification, getRequestUser, CUSTOMERS, PRODUCTS, MATERIALS, EXPENSES, ACTIVITY_LOGS, nextActivityLogId, idNum } = core;
+const { ORDERS, CUSTOMERS, RESOURCE_FONT_PATH } = core;
 
-function getActorId(req: express.Request): string {
-  return getRequestUser(req)?.id || "system";
+function reverseArabicLine(value: string): string {
+  return value.split("\n").map(line => line.split(" ").reverse().join(" ")).join("\n");
+}
+
+async function ensureFontExists(): Promise<string | null> {
+  try {
+    await fs.promises.access(RESOURCE_FONT_PATH, fs.constants.R_OK);
+    return RESOURCE_FONT_PATH;
+  } catch {
+    return null;
+  }
+}
+
+type QuotationItem = {
+  quantity?: number | string;
+  qty?: number | string;
+  unitPrice?: number | string;
+  price?: number | string;
+  productName?: string;
+};
+
+function asQuotationItem(value: unknown): QuotationItem {
+  if (!value || typeof value !== "object") return {};
+  return value as QuotationItem;
 }
 
 export function registerQuotationRoutes(app: express.Express) {
@@ -75,7 +98,7 @@ export function registerQuotationRoutes(app: express.Express) {
       doc.fillColor("#27272a").fontSize(10);
 
       const items = order.items || [];
-      items.forEach((item: any, idx: number) => {
+      items.forEach((item: unknown, idx: number) => {
         if (idx % 2 === 1) {
           doc.rect(50, currentY, 495, 22).fill("#fcf9f5");
         }
@@ -96,7 +119,7 @@ export function registerQuotationRoutes(app: express.Express) {
       doc.strokeColor("#e4e4e7").lineWidth(1).moveTo(50, currentY).lineTo(545, currentY).stroke();
 
       // Total pricing block
-      const subtotal = items.reduce((sum: number, item: any) => sum + ((Number(item.quantity) || Number(item.qty) || 1) * (Number(item.unitPrice) || Number(item.price) || 0)), 0);
+      const subtotal = items.reduce((sum: number, item: unknown) => sum + ((Number(item.quantity) || Number(item.qty) || 1) * (Number(item.unitPrice) || Number(item.price) || 0)), 0);
       const tax = subtotal * 0.0; // 0%
       const total = subtotal + tax;
 
@@ -118,7 +141,7 @@ export function registerQuotationRoutes(app: express.Express) {
       doc.fillColor("#a1a1aa").fontSize(8);
       doc.text(reverseArabicLine("عرض سعر ذكي صادر آلياً من نظام ورش القص ليزر CO2 والتحكم الإداري - AXIS LAB"), 50, footerY + 10, { align: "center", width: 495 });
       doc.end();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Quotation PDF generation failed:", err);
       res.status(500).json({ error: "فشل توليد عرض السعر: " + err.message });
     }
