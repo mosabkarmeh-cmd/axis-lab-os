@@ -2,6 +2,15 @@ import express from "express";
 import { Type } from "@google/genai";
 import * as core from "../server-core.ts";
 
+type SemanticResult = {
+  type: string;
+  title: string;
+  subtitle: string;
+  entityId: string;
+  relevance: number;
+  reason: string;
+};
+
 type AiItem = {
   name?: string;
   productName?: string;
@@ -1574,7 +1583,7 @@ Role Guidelines:
       }
 
       const q = query.toLowerCase().trim();
-      const results: Array<Record<string, unknown>> = [];
+      const results: SemanticResult[] = [];
 
       // Search Customers
       CUSTOMERS.forEach(c => {
@@ -1669,7 +1678,7 @@ Role Guidelines:
 
       res.json({ success: true, results: results.slice(0, 10) });
     } catch (err: unknown) {
-      res.status(500).json({ success: false, message: err.message || "فشل البحث الدلالي" });
+      res.status(500).json({ success: false, message: err instanceof Error ? err.message : "فشل البحث الدلالي" });
     }
   });
 
