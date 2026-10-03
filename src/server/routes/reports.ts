@@ -136,6 +136,7 @@ export function registerReportRoutes(app: express.Express) {
     // Recent Financial Transactions Combined
     const recentInvoices = sourceInvoices.map(inv => {
       const record = inv as Record<string, unknown>;
+      return {
       id: inv.id,
       type: "invoice",
       reference: inv.invoiceNumber,
