@@ -1,4 +1,7 @@
 import express from "express";
+import { db } from "../../db/index.ts";
+import { materials as materialsTable } from "../../db/schema.ts";
+import { eq } from "drizzle-orm";
 import * as core from "../server-core.ts";
 
 const {
