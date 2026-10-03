@@ -115,7 +115,7 @@ export function registerExportRoutes(app: express.Express) {
       await workbook.xlsx.write(res);
       res.end();
     } catch (error: unknown) {
-      res.status(500).json({ success: false, message: error instanceof Error ? error instanceof Error ? error.message : String(error) : String(error) });
+      res.status(500).json({ success: false, message: error instanceof Error ? error instanceof Error ? error instanceof Error ? error.message : String(error) : String(error) : String(error) });
     }
   });
 
@@ -204,7 +204,7 @@ export function registerExportRoutes(app: express.Express) {
       await workbook.xlsx.write(res);
       res.end();
     } catch (error: unknown) {
-      res.status(500).json({ success: false, message: error instanceof Error ? error instanceof Error ? error.message : String(error) : String(error) });
+      res.status(500).json({ success: false, message: error instanceof Error ? error instanceof Error ? error instanceof Error ? error.message : String(error) : String(error) : String(error) });
     }
   });
 
@@ -280,7 +280,7 @@ export function registerExportRoutes(app: express.Express) {
       await workbook.xlsx.write(res);
       res.end();
     } catch (error: unknown) {
-      res.status(500).json({ success: false, message: error instanceof Error ? error instanceof Error ? error.message : String(error) : String(error) });
+      res.status(500).json({ success: false, message: error instanceof Error ? error instanceof Error ? error instanceof Error ? error.message : String(error) : String(error) : String(error) });
     }
   });
 
@@ -319,7 +319,7 @@ export function registerExportRoutes(app: express.Express) {
       res.setHeader("Content-Disposition", `attachment; filename=AXIS_LAB_Customers_Outreach_${Date.now()}.csv`);
       res.send(csvContent);
     } catch (e: unknown) {
-      res.status(500).json({ error: "Failed to export customers CSV", details: e instanceof Error ? e.message : String(e) });
+      res.status(500).json({ error: "Failed to export customers CSV", details: e instanceof Error ? e instanceof Error ? e.message : String(e) : String(e) });
     }
   });
 
@@ -385,7 +385,7 @@ export function registerExportRoutes(app: express.Express) {
       res.setHeader("Content-Disposition", `attachment; filename=AXIS_LAB_Materials_Audit_${Date.now()}.csv`);
       res.send(csvContent);
     } catch (e: unknown) {
-      res.status(500).json({ error: "Failed to export materials CSV", details: e instanceof Error ? e.message : String(e) });
+      res.status(500).json({ error: "Failed to export materials CSV", details: e instanceof Error ? e instanceof Error ? e.message : String(e) : String(e) });
     }
   });
 
@@ -556,7 +556,7 @@ export function registerExportRoutes(app: express.Express) {
       doc.end();
     } catch (err: unknown) {
       console.error("Invoice PDF generation failed:", err);
-      res.status(500).json({ error: "فشل توليد ملف الـ PDF: " + err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err) });
+      res.status(500).json({ error: "فشل توليد ملف الـ PDF: " + err instanceof Error ? err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err) : String(err) });
     }
   });
 
@@ -648,7 +648,7 @@ export function registerExportRoutes(app: express.Express) {
       doc.end();
     } catch (err: unknown) {
       console.error("Delivery Note PDF generation failed:", err);
-      res.status(500).json({ error: "فشل توليد السند: " + err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err) });
+      res.status(500).json({ error: "فشل توليد السند: " + err instanceof Error ? err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err) : String(err) });
     }
   });
 
@@ -712,7 +712,7 @@ export function registerExportRoutes(app: express.Express) {
       doc.end();
     } catch (err: unknown) {
       console.error("Job ticket PDF generation failed:", err);
-      res.status(500).json({ error: "فشل توليد تذكرة التشغيل: " + err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err) });
+      res.status(500).json({ error: "فشل توليد تذكرة التشغيل: " + err instanceof Error ? err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err) : String(err) });
     }
   });
 
@@ -885,7 +885,7 @@ export function registerExportRoutes(app: express.Express) {
       doc.end();
     } catch (err: unknown) {
       console.error("PDF generation failed:", err);
-      res.status(500).json({ error: "فشل توليد ملف الـ PDF: " + err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err) });
+      res.status(500).json({ error: "فشل توليد ملف الـ PDF: " + err instanceof Error ? err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err) : String(err) });
     }
   });
 
@@ -926,7 +926,7 @@ export function registerExportRoutes(app: express.Express) {
       });
     } catch (err: unknown) {
       console.error("Error sharing order:", err);
-      res.status(500).json({ success: false, error: err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err) });
+      res.status(500).json({ success: false, error: err instanceof Error ? err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err) : String(err) });
     }
   });
 
