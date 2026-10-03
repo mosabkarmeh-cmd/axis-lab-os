@@ -1,4 +1,8 @@
 import express from "express";
+import fs from "fs";
+import https from "https";
+import ExcelJS from "exceljs";
+import PDFDocument from "pdfkit";
 import * as core from "../server-core.ts";
 
 type ExportItem = {
@@ -31,8 +35,29 @@ const {
   SETTINGS,
   EXPENSES,
   NOTIFICATIONS,
+  RESOURCE_FONT_PATH,
   getRequestUser,
 } = core;
+
+function ensureFontExists(): Promise<string | null> {
+  if (fs.existsSync(RESOURCE_FONT_PATH)) return Promise.resolve(RESOURCE_FONT_PATH);
+  return new Promise((resolve) => {
+    const file = fs.createWriteStream(RESOURCE_FONT_PATH);
+    https.get("https://raw.githubusercontent.com/google/fonts/main/ofl/amiri/Amiri-Regular.ttf", (response) => {
+      response.pipe(file);
+      file.on("finish", () => { file.close(); resolve(RESOURCE_FONT_PATH); });
+    }).on("error", () => {
+      fs.unlink(RESOURCE_FONT_PATH, () => {});
+      resolve(null);
+    });
+  });
+}
+
+function reverseArabicLine(text: string): string {
+  if (!text) return "";
+  if (!/[\u0600-\u06FF]/.test(text)) return text;
+  return text.split(" ").map((word) => /[\u0600-\u06FF]/.test(word) ? word.split("").reverse().join("") : word).reverse().join(" ");
+}
 
 export function registerExportRoutes(app: express.Express) {
 
