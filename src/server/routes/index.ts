@@ -1,32 +1,9 @@
-import "dotenv/config";
 import express from "express";
-import path from "path";
-import { GoogleGenAI, Type } from "@google/genai";
-import fs from "fs";
-import { createHash } from "crypto";
-import https from "https";
-import multer from "multer";
-import ExcelJS from "exceljs";
-import PDFDocument from "pdfkit";
-import cookieParser from "cookie-parser";
-import cors from "cors";
-import os from "os";
-import nodemailer from "nodemailer";
-import bcrypt from "bcryptjs";
-import crypto from "crypto";
-import jwt from "jsonwebtoken";
-import initSqlJs from "sql.js";
-import { materialPriceUSD } from "../../lib/materials.ts";
-import { sypToUsd } from "../../lib/currency.ts";
 import customersRouter from "./customers.ts";
 import productsRouter from "./products.ts";
 import materialsRouter from "./materials.ts";
 import productionRouter from "./production.ts";
-import { db } from "../../db/index.ts";
-import { appState, customers as customersTable, products as productsTable, materials as materialsTable, inventory as inventoryTable, inventoryTransactions as inventoryTransactionsTable, remnants as remnantsTable, suppliers as suppliersTable, supplyOrders as supplyOrdersTable, supplierQuotes as supplierQuotesTable, machines as machinesTable } from "../../db/schema.ts";
-import { eq, desc } from "drizzle-orm";
 import * as core from "../server-core.ts";
-import type { BenchmarkBucket } from "../server-core.ts";
 import { registerUserRoutes } from "./users.ts";
 import { registerOrderRoutes } from "./orders.ts";
 import { registerAuthRoutes } from "./auth.ts";
@@ -47,7 +24,7 @@ import { registerNotificationsStatusRoutes } from "./notifications-statuses.ts";
 import { registerQuotationRoutes } from "./quotation.ts";
 import { registerSystemRoutes } from "./system.ts";
 
-const { apiKey, ai, DB_MODE, USE_POSTGRES, USE_SQLITE, APP_RUNTIME_ROOT, LOCAL_DATA_FILE, RESOURCE_FONT_PATH, LOCAL_LEGACY_DATA_FILE, LOCAL_SCHEMA_VERSION, activityLogSequence, nextActivityLogId, entityIdSequence, nextEntityId, orderCreateBenchmarks, persistenceBenchmarks, persistQueueStats, recordBenchmark, benchmarkSnapshot, NORMALIZED_LOCAL_COLLECTIONS, NORMALIZED_FINANCIAL_COLLECTIONS, initLocalSqlite, setLocalSqlite, SQLITE_BUSY_RETRY_DELAYS_MS, withSqliteBusyRetry, flushLocalSqlite, syncNormalizedLocalEntities, assertFinancialStateInvariants, syncNormalizedFinancialEntities, readFinancialTablesFromSqlite, backupDirectory, checksumFile, createSqliteBackup, JWT_SECRET, JWT_ISSUER, JWT_AUDIENCE, publicUser, generateJWT, getRequestUser, USERS, FILES, CUSTOMERS, PRODUCTS, ORDERS, ACTIVITY_LOGS, MATERIALS, LEGACY_MATERIAL_PRICES_SYP_CANONICAL, LEGACY_MATERIAL_PRICES_SYP, normalizeLegacyMaterialPrices, INVENTORY, INVENTORY_TRANSACTIONS, normalizeInventoryState, REMNANTS, SUPPLIER_QUOTES, SUPPLIERS, SUPPLY_ORDERS, DEMO_LOW_PRICE_MATERIALS, DEMO_LOW_PRICE_INVENTORY, ensureDemoLowPriceMaterials, MACHINES, EXPENSES, NUMBERING_SETTINGS, getNextNumber, INVOICE_HISTORY, NOTIFICATIONS, DELETED_ITEMS, ORDER_STATUSES, normalizeOrderStatuses, createNotification, notifyOverdueOrders, WORKFLOW_NEXT_REMINDERS, INVOICES, SETTINGS, publicSettings, getPartnerSharePercentAt, mergeSmtpSettings, freezeOrderCurrencySnapshot, sendProductionJobEmailNotification, BACKUPS, PRODUCTION_JOBS, PERSISTED_COLLECTIONS, LOCAL_PERSISTED_COLLECTIONS, idNum, refreshWarehouseCache, loadPersistedState, persistTimer, persistInFlight, persistAgainAfter, persistWaiters, persistStateNow, persistMutationWithFastDurability, schedulePersist, RESETTABLE_BUSINESS_COLLECTIONS, resetBusinessData } = core;
+const { USE_POSTGRES, getRequestUser } = core;
 
 export async function registerRoutes(app: express.Express) {
   // Mount PostgreSQL-backed routers only when PostgreSQL mode is active.
