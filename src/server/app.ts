@@ -36,7 +36,9 @@ export async function startServer() {
   const PORT = Number(process.env.PORT || 3000);
   const allowedOrigin = process.env.APP_URL || `http://localhost:${PORT}`;
 
-  app.set("trust proxy", 1);
+  // Do not trust forwarded client IP headers unless the deployment explicitly sits behind a trusted reverse proxy.
+  // This keeps rate limiting and audit-related IP handling anchored to the direct peer by default.
+  app.set("trust proxy", process.env.TRUST_PROXY === "true" ? 1 : false);
   app.use(cors({
     origin: process.env.NODE_ENV === "production" ? allowedOrigin : true,
     credentials: true,
