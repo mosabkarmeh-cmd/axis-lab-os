@@ -56,6 +56,7 @@ export function registerReportRoutes(app: express.Express) {
     // 2. Financial Metrics
     const invoiceReportRate = currentRate;
     const invoiceSYP = (inv: Record<string, unknown>, usdField: string, sypField: string) => {
+      const record = inv;
       const fixedSYP = Number(record[sypField]);
       if (Number.isFinite(fixedSYP)) return Math.round(fixedSYP);
       const linkedOrder = ORDERS.find((order) => order.id === record.orderId);
@@ -164,8 +165,9 @@ export function registerReportRoutes(app: express.Express) {
       .slice(0, 10);
 
     const completedJobs = PRODUCTION_JOBS.filter((job) => job.status === "completed");
-    const materialCostSYP = completedJobs.reduce((sum: number, job: unknown) => {
-      const material = MATERIALS.find((item) => item.id === job.materialId);
+    const materialCostSYP = completedJobs.reduce((sum: number, job) => {
+      const jobRecord = job as Record<string, unknown>;
+      const material = MATERIALS.find((item) => item.id === jobRecord.materialId);
       return sum + Math.round(Number(material?.pricePerUnit) || 0);
     }, 0);
     const productionHours = PRODUCTION_JOBS.reduce((sum: number, job) => sum + ((Number(job.elapsedTimeSec || job.estTimeSec) || 0) / 3600), 0);
