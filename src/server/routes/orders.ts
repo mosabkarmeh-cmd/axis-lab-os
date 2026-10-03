@@ -290,7 +290,7 @@ export function registerOrderRoutes(app: express.Express) {
     recordBenchmark(orderCreateBenchmarks, "parse_items", parseItemsStartedAt);
     const totalsStartedAt = performance.now();
 
-    const itemsSubtotal = parsedItems.reduce((acc: number, cur: OrderItem) => acc + cur.totalPrice, 0);
+    const itemsSubtotal = parsedItems.reduce((acc: number, cur: OrderItem) => acc + Number(cur.totalPrice || 0), 0);
     const taxRate = Number(taxPercent) || 0;
     const discountAmt = Number(discount) || 0;
     const computedTotal = itemsSubtotal + (itemsSubtotal * (taxRate / 100)) - discountAmt;
@@ -455,7 +455,7 @@ export function registerOrderRoutes(app: express.Express) {
       });
     }
 
-    const itemsSubtotal = order.items.reduce((acc: number, cur: OrderItem) => acc + cur.totalPrice, 0);
+    const itemsSubtotal = order.items.reduce((acc: number, cur: OrderItem) => acc + Number(cur.totalPrice || 0), 0);
     const taxRate = order.taxPercent !== undefined ? order.taxPercent : 0;
     const discountAmt = order.discount !== undefined ? order.discount : 0;
     order.totalPrice = Math.max(0, itemsSubtotal + (itemsSubtotal * (taxRate / 100)) - discountAmt);
