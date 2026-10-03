@@ -56,10 +56,11 @@ export function registerReportRoutes(app: express.Express) {
     // 2. Financial Metrics
     const invoiceReportRate = currentRate;
     const invoiceSYP = (inv: unknown, usdField: string, sypField: string) => {
-      const fixedSYP = Number(inv[sypField]);
+      const record = inv && typeof inv === "object" ? inv as Record<string, unknown> : {};
+      const fixedSYP = Number(record[sypField]);
       if (Number.isFinite(fixedSYP)) return Math.round(fixedSYP);
-      const linkedOrder = ORDERS.find((order) => order.id === inv.orderId);
-      const historicalRate = Number(inv.exchangeRateAtFinalization || inv.exchangeRateAtIssue || linkedOrder?.exchangeRateAtCreation);
+      const linkedOrder = ORDERS.find((order) => order.id === record.orderId);
+      const historicalRate = Number(record.exchangeRateAtFinalization || record.exchangeRateAtIssue || linkedOrder?.exchangeRateAtCreation);
       const rate = historicalRate > 0 ? historicalRate : 135;
       return Math.round((Number(inv[usdField]) || 0) * rate);
     };
@@ -140,7 +141,7 @@ export function registerReportRoutes(app: express.Express) {
       reference: inv.invoiceNumber,
       amount: inv.totalPrice,
       amountUSD: Number(inv.totalPriceUSD ?? inv.totalPrice ?? 0),
-      amountSYP: Math.round(Number(inv.totalPriceSYP ?? ((Number(inv.totalPriceUSD ?? inv.totalPrice) || 0) * (Number(inv.exchangeRateAtFinalization || inv.exchangeRateAtIssue || ORDERS.find((order) => order.id === inv.orderId)?.exchangeRateAtCreation) || 135)))),
+      amountSYP: Math.round(Number(inv.totalPriceSYP ?? ((Number(inv.totalPriceUSD ?? inv.totalPrice) || 0) * (Number(record.exchangeRateAtFinalization || record.exchangeRateAtIssue || ORDERS.find((order) => order.id === record.orderId)?.exchangeRateAtCreation) || 135)))),
       date: inv.issueDate,
       description: `فاتورة مبيعات للعميل: ${CUSTOMERS.find(c => c.id === inv.customerId)?.name || "عميل غير معروف"}`,
       status: inv.status === "paid" ? "تم التحصيل" : (inv.status === "partially_paid" ? "محصل جزئياً" : "غير محصل")
