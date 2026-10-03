@@ -1,7 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const root = path.resolve(__dirname, "..");
+const root = path.resolve(__dirname, ".."); // CI verification branch
 const fail = (message) => { console.error("[STATIC-SOURCE-AUDIT] FAIL:", message); process.exitCode = 1; };
 const files = [];
 const scanRoots = ["src", "desktop"];
