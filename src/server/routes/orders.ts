@@ -423,7 +423,7 @@ export function registerOrderRoutes(app: express.Express) {
       priority: order.priority || "normal",
       notes: order.notes || "",
       itemsCount: order.items ? order.items.length : 0,
-      itemsTotalQty: order.items ? order.items.reduce((acc: number, cur: OrderItem) => acc + (cur.quantity || 1), 0) : 0,
+      itemsTotalQty: order.items ? order.items.reduce((acc: number, cur: OrderItem) => acc + Number(cur.quantity || 1), 0) : 0,
     };
 
     if (customerId) order.customerId = customerId;
@@ -513,7 +513,7 @@ export function registerOrderRoutes(app: express.Express) {
       changeDetails.push(`تغير العميل من "${oldCust}" إلى "${newCust}"`);
     }
 
-    const currentTotalQty = order.items ? order.items.reduce((acc: number, cur: OrderItem) => acc + (cur.quantity || 1), 0) : 0;
+    const currentTotalQty = order.items ? order.items.reduce((acc: number, cur: OrderItem) => acc + Number(cur.quantity || 1), 0) : 0;
     if (oldState.itemsCount !== (order.items?.length || 0) || oldState.itemsTotalQty !== currentTotalQty) {
       changeDetails.push(`تعديل بنود وعناصر الطلب (عدد البنود: ${order.items?.length || 0} / الكمية الإجمالية: ${currentTotalQty})`);
     }
@@ -845,7 +845,7 @@ export function registerOrderRoutes(app: express.Express) {
       return;
     }
     const { designRating, cuttingRating, assemblyRating, ratingNotes } = req.body;
-    const validateRating = (value: unknown) => value === undefined || value === null || (Number.isInteger(value) && value >= 1 && value <= 5);
+    const validateRating = (value: unknown) => value === undefined || value === null || (Number.isInteger(Number(value)) && Number(value) >= 1 && Number(value) <= 5);
     if (!validateRating(designRating) || !validateRating(cuttingRating) || !validateRating(assemblyRating)) {
       res.status(400).json({ error: "التقييم يجب أن يكون رقماً صحيحاً بين 1 و5" });
       return;
