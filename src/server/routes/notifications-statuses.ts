@@ -1,20 +1,15 @@
 import express from "express";
 import * as core from "../server-core.ts";
-
-const { NOTIFICATIONS, DELETED_ITEMS, ORDER_STATUSES, createNotification, getRequestUser } = core;
+import { db } from "../../db/index.ts";
+import { materials as materialsTable } from "../../db/schema.ts";
+import { eq } from "drizzle-orm";
+const { NOTIFICATIONS, DELETED_ITEMS, ORDER_STATUSES, createNotification, getRequestUser, CUSTOMERS, PRODUCTS, MATERIALS, EXPENSES, ACTIVITY_LOGS, nextActivityLogId, idNum } = core;
 
 function getActorId(req: express.Request): string {
   return getRequestUser(req)?.id || "system";
 }
 
 export function registerNotificationsStatusRoutes(app: express.Express) {
-  app.get("/api/logs", (req, res) => {
-    res.json(ACTIVITY_LOGS);
-  });
-
-  // ==================== ADVANCED ADDITIONS APIs ====================
-
-  // 1. NOTIFICATIONS APIs
   app.get("/api/notifications", (req, res) => {
     res.json({ success: true, notifications: NOTIFICATIONS });
   });
@@ -49,8 +44,6 @@ export function registerNotificationsStatusRoutes(app: express.Express) {
     const notif = createNotification(title, message, type || "system", priority || "normal", link || "");
     res.json({ success: true, notification: notif });
   });
-
-  // 2. RECYCLE BIN APIs
   app.get("/api/recycle-bin", (req, res) => {
     res.json({ success: true, items: DELETED_ITEMS });
   });
@@ -117,8 +110,6 @@ export function registerNotificationsStatusRoutes(app: express.Express) {
     const removed = DELETED_ITEMS.splice(index, 1)[0];
     res.json({ success: true, message: "تم الحذف النهائي بنجاح", id: removed.id });
   });
-
-  // 3. CUSTOM ORDER STATUS APIs
   app.get("/api/order-statuses", (req, res) => {
     res.json({ success: true, statuses: ORDER_STATUSES.sort((a, b) => a.order - b.order) });
   });
@@ -180,30 +171,5 @@ export function registerNotificationsStatusRoutes(app: express.Express) {
     res.json({ success: true, statuses: ORDER_STATUSES.sort((a, b) => a.order - b.order) });
   });
 
-  // 4. BULK IMPORT APIs
-  const requireImportAdmin = (req: any, res: any) => {
-    const user = getRequestUser(req);
-    if (!user || user.role !== "admin") {
-      res.status(403).json({ success: false, message: "استيراد البيانات متاح لمدير النظام فقط" });
-      return false;
-    }
-    return true;
-  };
-  const normalizeImportHeader = (value: any) => String(value ?? "").trim().toLowerCase().replace(/[\\s_\\-\\/()]+/g, "");
-  const importCell = (row: any[], headers: string[], aliases: string[]) => {
-    const wanted = aliases.map(normalizeImportHeader);
-    const index = headers.findIndex((header) => wanted.includes(normalizeImportHeader(header)));
-    return index >= 0 ? row[index] ?? "" : "";
-  };
-  const inferImportSheet = (name: string, headers: string[]) => {
-    const normalizedName = normalizeImportHeader(name);
-    const normalizedHeaders = headers.map(normalizeImportHeader);
-    if (normalizedName.includes("تعليمات") || normalizedName.includes("قوائم") || normalizedName.includes("instructions") || normalizedName.includes("lists")) return "ignore";
-    if (normalizedName.includes("مورد") || normalizedHeaders.includes("كودالمورد") || normalizedHeaders.includes("suppliercode")) return "suppliers";
-    if (normalizedName.includes("مخزون") || normalizedHeaders.includes("الكميةالافتتاحية") || normalizedHeaders.includes("openingquantity")) return "inventory";
-    return "materials";
-  };
-  // 5. GLOBAL SEARCH API
 
-  // 6. QUOTATION PDF API
 }
