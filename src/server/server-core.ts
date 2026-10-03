@@ -315,6 +315,8 @@ function syncNormalizedFinancialEntities(sqlite: Database) {
   }
 }
 
+type LocalSqliteRow = Array<string | number | Uint8Array | null>;
+
 function readFinancialTablesFromSqlite() {
   if (!USE_SQLITE || !localSqlite) return null;
   const invoiceRows = localSqlite.exec("SELECT payload FROM local_invoices ORDER BY updated_at, id")[0]?.values || [];
@@ -322,7 +324,7 @@ function readFinancialTablesFromSqlite() {
   const historyRows = localSqlite.exec("SELECT invoice_id, payload FROM local_invoice_history ORDER BY created_at, id")[0]?.values || [];
   const paymentRows = localSqlite.exec("SELECT payload FROM local_payments ORDER BY updated_at, id")[0]?.values || [];
   const expenseRows = localSqlite.exec("SELECT payload FROM local_expenses ORDER BY updated_at, id")[0]?.values || [];
-  const invoices = invoiceRows.map(([payload]: any[]) => JSON.parse(String(payload)));
+  const invoices = invoiceRows.map(([payload]: LocalSqliteRow) => JSON.parse(String(payload)));
   const itemsByInvoice = new Map<string, any[]>();
   for (const [invoiceId, payload] of itemRows) {
     const list = itemsByInvoice.get(String(invoiceId)) || [];
@@ -341,8 +343,8 @@ function readFinancialTablesFromSqlite() {
   }
   return {
     invoices,
-    payments: paymentRows.map(([payload]: any[]) => JSON.parse(String(payload))),
-    expenses: expenseRows.map(([payload]: any[]) => JSON.parse(String(payload))),
+    payments: paymentRows.map(([payload]: LocalSqliteRow) => JSON.parse(String(payload))),
+    expenses: expenseRows.map(([payload]: LocalSqliteRow) => JSON.parse(String(payload))),
   };
 }
 function backupDirectory() {
