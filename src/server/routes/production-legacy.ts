@@ -37,7 +37,7 @@ type ProductionJobView = {
   laserPower?: number;
   laserSpeed?: number;
   operatorId?: string;
-  priority?: string;
+  priority?: string | number;
   createdAt?: string;
   completedAt?: string;
   materialCostUSD?: number;
