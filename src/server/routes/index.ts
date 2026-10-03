@@ -108,6 +108,17 @@ export async function registerRoutes(app: express.Express) {
     next();
   });
 
+  // Financial PDF exports must use the same server-side boundary as accounting/reports.
+  // Employees must never receive profit data, even when they call the export endpoint directly.
+  app.use("/api/export/profit", (req, res, next) => {
+    const user = getRequestUser(req);
+    if (!user || user.role === "employee") {
+      res.status(403).json({ success: false, message: "غير مصرح لك بالوصول إلى تقارير الأرباح" });
+      return;
+    }
+    next();
+  });
+
   app.use("/api/settings", (req, res, next) => {
     const user = getRequestUser(req);
     if (!user || user.role !== "admin") {
@@ -7866,7 +7877,7 @@ Role Guidelines:
       // Record Activity
       ACTIVITY_LOGS.unshift({
         id: nextActivityLogId(),
-        userId: "u-1",
+        userId: getRequestUser(req)?.id || "system",
         action: `SHARE_ORDER_${method.toUpperCase()}`,
         entityType: "Order",
         entityId: order.id,
