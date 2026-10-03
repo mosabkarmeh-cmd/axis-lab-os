@@ -10,6 +10,10 @@ const {
   INVOICES,
   CUSTOMERS,
   getRequestUser,
+  getPartnerSharePercentAt,
+  sypToUsd,
+  MACHINES,
+  SETTINGS,
 } = core;
 
 export function registerReportRoutes(app: express.Express) {
@@ -246,32 +250,6 @@ export function registerReportRoutes(app: express.Express) {
           totalInventoryValue
         }
       }
-    });
-  });
-
-  // ==================== SETTINGS & BACKUP API ====================
-  app.get("/api/network/info", (req, res) => {
-    const interfaces = os.networkInterfaces();
-    const ips: { name: string; address: string; family: string; internal: boolean }[] = [];
-    for (const name of Object.keys(interfaces)) {
-      for (const net of interfaces[name] || []) {
-        if (net.family === "IPv4") {
-          ips.push({
-            name: name,
-            address: net.address,
-            family: net.family,
-            internal: net.internal
-          });
-        }
-      }
-    }
-    res.json({
-      success: true,
-      ips: ips,
-      port: 3000,
-      platform: os.platform(),
-      hostname: os.hostname(),
-      env: process.env.NODE_ENV || "development"
     });
   });
 
