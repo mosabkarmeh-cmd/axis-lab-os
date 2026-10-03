@@ -1,5 +1,5 @@
 import express from "express";
-import { GoogleGenAI, Type } from "@google/genai";
+import { Type } from "@google/genai";
 import * as core from "../server-core.ts";
 
 type AiItem = {
@@ -8,6 +8,7 @@ type AiItem = {
   quantity?: number | string;
   qty?: number | string;
   price?: number | string;
+  notes?: string;
 };
 
 function asAiItem(value: unknown): AiItem {
@@ -16,25 +17,21 @@ function asAiItem(value: unknown): AiItem {
 
 const {
   apiKey,
+  ai,
   ORDERS,
   CUSTOMERS,
+  PRODUCTS,
   MATERIALS,
+  INVENTORY,
+  REMNANTS,
+  MACHINES,
+  PRODUCTION_JOBS,
   EXPENSES,
   SETTINGS,
   INVOICES,
-  getRequestUser,
 } = core;
 
 export function registerAIRoutes(app: express.Express) {
-      const responseText = response.text || "{}";
-      const result = JSON.parse(responseText.trim());
-      res.json(result);
-    } catch (error: unknown) {
-      console.warn("G-Code Compiler API Error, falling back to local compiler:", error);
-      res.json(fallbackGcode());
-    }
-  });
-
   // API - AI Laser Order Advisor and Parameter Estimator
   app.post("/api/ai/order-advisor", async (req, res) => {
     const { items, notes } = req.body;
@@ -44,8 +41,9 @@ export function registerAIRoutes(app: express.Express) {
     }
 
     const fallbackAdvisor = () => {
-      const itemsParameters = items.map(item => {
-        const text = (typedItem.name || typedItem.productName || "").toLowerCase();
+      const itemsParameters = items.map(rawItem => {
+        const item = asAiItem(rawItem);
+        const text = (item.name || item.productName || "").toLowerCase();
         let speed = "15-25 mm/s";
         let power = "80%";
         let lens = "2.0\" focal lens";
@@ -69,7 +67,7 @@ export function registerAIRoutes(app: express.Express) {
         }
 
         return {
-          itemName: typedItem.name || typedItem.productName || "عنصر غير مسمى",
+          itemName: item.name || item.productName || "عنصر غير مسمى",
           speed,
           power,
           lens,
@@ -94,9 +92,9 @@ export function registerAIRoutes(app: express.Express) {
 
       const itemsStr = items.map((it, idx) => `
 Item #${idx + 1}:
-- Name/Material: "${typedItem.name}"
-- Quantity: ${typedItem.qty}
-- Input Price: $${typedItem.price}
+- Name/Material: "${it.name}"
+- Quantity: ${it.qty}
+- Input Price: $${it.price}
 - Custom Notes: "${it.notes || "None"}"
 `).join("\n");
 
@@ -226,10 +224,10 @@ Do not include any markdown format tags like \`\`\`json or \`\`\` in your respon
             const productCounts: Record<string, number> = {};
             customerOrders.forEach(o => {
               if (o.items && Array.isArray(o.items)) {
-                o.items.forEach((item) => { const typedItem = asAiItem(item);
-                  const pName = typedItem.productName || typedItem.name || "";
+                o.items.forEach((item) => {
+                  const pName = item.productName || item.name || "";
                   if (pName) {
-                    productCounts[pName] = (productCounts[pName] || 0) + (typedItem.quantity || 1);
+                    productCounts[pName] = (productCounts[pName] || 0) + (item.quantity || 1);
                   }
                 });
               }
@@ -268,9 +266,9 @@ Do not include any markdown format tags like \`\`\`json or \`\`\` in your respon
             const itemCounts: Record<string, number> = {};
             customerOrders.forEach(o => {
               if (o.items && Array.isArray(o.items)) {
-                o.items.forEach((it) => { const typedItem = asAiItem(it);
-                  const name = typedItem.name || typedItem.productName || "";
-                  if (name) itemCounts[name] = (itemCounts[name] || 0) + (typedItem.quantity || 1);
+                o.items.forEach((it) => {
+                  const name = it.name || it.productName || "";
+                  if (name) itemCounts[name] = (itemCounts[name] || 0) + (it.quantity || 1);
                 });
               }
             });
@@ -328,9 +326,9 @@ Do not include any markdown format tags like \`\`\`json or \`\`\` in your respon
         case "pricing-advisor": {
           const items = payload?.items || [];
           let totalSubtotal = 0;
-          items.forEach((it) => { const typedItem = asAiItem(it);
-            const q = Number(typedItem.qty || typedItem.quantity) || 1;
-            const p = Number(typedItem.price) || 0;
+          items.forEach((it) => {
+            const q = Number(it.qty || it.quantity) || 1;
+            const p = Number(it.price) || 0;
             totalSubtotal += q * p;
           });
 
@@ -452,9 +450,9 @@ Do not include any markdown format tags like \`\`\`json or \`\`\` in your respon
           const productSales: Record<string, number> = {};
           ORDERS.forEach(o => {
             if (o.items && Array.isArray(o.items)) {
-              o.items.forEach((item) => { const typedItem = asAiItem(item);
-                const name = typedItem.productName || typedItem.name || "عام";
-                productSales[name] = (productSales[name] || 0) + (typedItem.quantity || 1);
+              o.items.forEach((item) => {
+                const name = item.productName || item.name || "عام";
+                productSales[name] = (productSales[name] || 0) + (item.quantity || 1);
               });
             }
           });
@@ -523,8 +521,8 @@ Do not include any markdown format tags like \`\`\`json or \`\`\` in your respon
           // Material prices are stored in SYP. Convert to USD only for this legacy USD-based costing model.
           const matPricePerSheetSYP = Number(mat?.pricePerUnit || 0) || 1350;
           const matPricePerSheetUSD = matPricePerSheetSYP / exchangeRate;
-          const sheetWidthCm = (mat as Record<string, unknown>).widthCm || mat?.width || 122;
-          const sheetLengthCm = (mat as Record<string, unknown>).lengthCm || mat?.height || 244;
+          const sheetWidthCm = (mat as Record<string, unknown>)?.widthCm || mat?.width || 122;
+          const sheetLengthCm = (mat as Record<string, unknown>)?.lengthCm || mat?.height || 244;
           const sheetAreaCm2 = sheetWidthCm * sheetLengthCm;
           const pieceAreaCm2 = Math.max(1, widthCm * lengthCm);
 
@@ -1013,7 +1011,7 @@ Do not include any markdown format tags like \`\`\`json or \`\`\` in your respon
       }
     } catch (error: unknown) {
       console.error("Fast local AI Error:", error);
-      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ error: error.message });
     }
   });
 
@@ -1053,7 +1051,19 @@ Do not include any markdown format tags like \`\`\`json or \`\`\` in your respon
   };
 
   // Local Chat Response Generator for offline or high-demand fallback
-  const getLocalChatResponse = (message: string, stats: unknown, userExchangeRate?: number) => {
+  type AiStats = {
+    customersCount: number;
+    ordersCount: number;
+    pendingOrdersCount: number;
+    totalRevenue: number;
+    totalPaid: number;
+    totalDebt: number;
+    machinesCount: number;
+    activeJobsCount: number;
+    lowStockMaterials: string[];
+  };
+
+  const getLocalChatResponse = (message: string, stats: AiStats, userExchangeRate?: number) => {
     const rate = userExchangeRate || 15000;
     const msgNorm = normalizeArabicAndDialect(message);
 
@@ -1550,11 +1560,117 @@ Role Guidelines:
         }
       });
     } catch (err: unknown) {
-      res.status(500).json({ success: false, message: err instanceof Error ? err.message : String(err) || "فشل قراءة الذاكرة المتعلمة" });
+      res.status(500).json({ success: false, message: err.message || "فشل قراءة الذاكرة المتعلمة" });
     }
   });
 
   // API - Semantic Intelligent Search crossing orders, customers, and materials
   app.post("/api/ai/semantic-search", (req, res) => {
     try {
+      const { query } = req.body;
+      if (!query || query.trim() === "") {
+        res.json({ success: true, results: [] });
+        return;
+      }
+
+      const q = query.toLowerCase().trim();
+      const results: Array<Record<string, unknown>> = [];
+
+      // Search Customers
+      CUSTOMERS.forEach(c => {
+        if (c.name.toLowerCase().includes(q) || (c.company && c.company.toLowerCase().includes(q)) || (c.phone && c.phone.includes(q))) {
+          results.push({
+            type: "customer",
+            title: c.name,
+            subtitle: `شركة: ${c.company || "فردي"} • هاتف: ${c.phone || "غير محدد"}`,
+            entityId: c.id,
+            relevance: 100,
+            reason: "مطابقة مباشرة لاسم العميل أو رقم الهاتف في دفتر الحسابات."
+          });
+        }
+      });
+
+      // Search Orders
+      ORDERS.forEach(o => {
+        if (o.orderNumber.toLowerCase().includes(q) || o.customerName.toLowerCase().includes(q) || (o.notes && o.notes.toLowerCase().includes(q))) {
+          results.push({
+            type: "order",
+            title: `طلب رقم ${o.orderNumber}`,
+            subtitle: `العميل: ${o.customerName} • القيمة: ${Math.round(Number(o.totalPrice || 0)).toLocaleString()} ل.س • الحالة: ${o.status}`,
+            entityId: o.id,
+            relevance: 95,
+            reason: `عثرنا على مطابقة في بيانات الطلبات المرتبطة بـ ${o.customerName}.`
+          });
+        }
+      });
+
+      // Search Materials
+      MATERIALS.forEach(m => {
+        if (m.name.toLowerCase().includes(q) || m.category.toLowerCase().includes(q)) {
+          results.push({
+            type: "material",
+            title: m.name,
+            subtitle: `الفئة: ${m.category} • السماكة: ${m.thickness || "غير محدد"} مم • السعر: ${Math.round(Number(m.pricePerUnit || 0)).toLocaleString()} ل.س (≈ $${(Number(m.pricePerUnit || 0) / (Number(SETTINGS.exchangeRate) || 135)).toFixed(2)})`,
+            entityId: m.id,
+            relevance: 90,
+            reason: `تطابق دلالي مع الخامات المخزنية المسجلة من نوع ${m.category}.`
+          });
+        }
+      });
+
+      // Simple AI Match explanation generator if query is semantic e.g. "معلق" (pending), "مخزن" (stock), "أرباح" (money)
+      if (q.includes("معلق") || q.includes("جديد")) {
+        ORDERS.filter(o => o.status === "new" || o.status === "in_progress").forEach(o => {
+          if (!results.some(r => r.entityId === o.id)) {
+            results.push({
+              type: "order",
+              title: `طلب معلق رقم ${o.orderNumber}`,
+              subtitle: `العميل: ${o.customerName} • الحالة: ${o.status}`,
+              entityId: o.id,
+              relevance: 85,
+              reason: "فهم دلالي: تم العثور على هذا الطلب لأنه في حالة 'جديد' أو 'قيد التنفيذ' المطلوبة في بحثك عن معلق."
+            });
+          }
+        });
+      }
+
+      if (q.includes("خشب") || q.includes("wood")) {
+        MATERIALS.filter(m => m.category === "wood").forEach(m => {
+          if (!results.some(r => r.entityId === m.id)) {
+            results.push({
+              type: "material",
+              title: m.name,
+              subtitle: `خامة خشبية بسماكة ${m.thickness || 3} مم`,
+              entityId: m.id,
+              relevance: 80,
+              reason: "تحليل دلالي: تم تصنيف هذه الخامة كخشب بناءً على تصنيف الفئة الخاص بها."
+            });
+          }
+        });
+      }
+
+      if (q.includes("أكريليك") || q.includes("acrylic")) {
+        MATERIALS.filter(m => m.category === "acrylic").forEach(m => {
+          if (!results.some(r => r.entityId === m.id)) {
+            results.push({
+              type: "material",
+              title: m.name,
+              subtitle: `لوح أكريليك بسماكة ${m.thickness || 3} مم`,
+              entityId: m.id,
+              relevance: 80,
+              reason: "تحليل دلالي: تم ربطها بطلبك للأكريليك لتسهيل قص ونقش الموديلات."
+            });
+          }
+        });
+      }
+
+      // Sort by relevance
+      results.sort((a, b) => b.relevance - a.relevance);
+
+      res.json({ success: true, results: results.slice(0, 10) });
+    } catch (err: unknown) {
+      res.status(500).json({ success: false, message: err.message || "فشل البحث الدلالي" });
+    }
+  });
+
 }
