@@ -9,6 +9,8 @@ const {
   MATERIALS,
   PRODUCTION_JOBS,
   SETTINGS,
+  EXPENSES,
+  NOTIFICATIONS,
   getRequestUser,
 } = core;
 
@@ -93,7 +95,7 @@ export function registerExportRoutes(app: express.Express) {
       await workbook.xlsx.write(res);
       res.end();
     } catch (error: unknown) {
-      res.status(500).json({ success: false, message: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ success: false, message: error instanceof Error ? error instanceof Error ? error.message : String(error) : String(error) });
     }
   });
 
@@ -182,7 +184,7 @@ export function registerExportRoutes(app: express.Express) {
       await workbook.xlsx.write(res);
       res.end();
     } catch (error: unknown) {
-      res.status(500).json({ success: false, message: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ success: false, message: error instanceof Error ? error instanceof Error ? error.message : String(error) : String(error) });
     }
   });
 
@@ -258,7 +260,7 @@ export function registerExportRoutes(app: express.Express) {
       await workbook.xlsx.write(res);
       res.end();
     } catch (error: unknown) {
-      res.status(500).json({ success: false, message: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ success: false, message: error instanceof Error ? error instanceof Error ? error.message : String(error) : String(error) });
     }
   });
 
@@ -533,7 +535,7 @@ export function registerExportRoutes(app: express.Express) {
       doc.end();
     } catch (err: unknown) {
       console.error("Invoice PDF generation failed:", err);
-      res.status(500).json({ error: "فشل توليد ملف الـ PDF: " + err instanceof Error ? err.message : String(err) });
+      res.status(500).json({ error: "فشل توليد ملف الـ PDF: " + err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err) });
     }
   });
 
@@ -624,7 +626,7 @@ export function registerExportRoutes(app: express.Express) {
       doc.end();
     } catch (err: unknown) {
       console.error("Delivery Note PDF generation failed:", err);
-      res.status(500).json({ error: "فشل توليد السند: " + err instanceof Error ? err.message : String(err) });
+      res.status(500).json({ error: "فشل توليد السند: " + err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err) });
     }
   });
 
@@ -688,7 +690,7 @@ export function registerExportRoutes(app: express.Express) {
       doc.end();
     } catch (err: unknown) {
       console.error("Job ticket PDF generation failed:", err);
-      res.status(500).json({ error: "فشل توليد تذكرة التشغيل: " + err instanceof Error ? err.message : String(err) });
+      res.status(500).json({ error: "فشل توليد تذكرة التشغيل: " + err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err) });
     }
   });
 
@@ -859,7 +861,7 @@ export function registerExportRoutes(app: express.Express) {
       doc.end();
     } catch (err: unknown) {
       console.error("PDF generation failed:", err);
-      res.status(500).json({ error: "فشل توليد ملف الـ PDF: " + err instanceof Error ? err.message : String(err) });
+      res.status(500).json({ error: "فشل توليد ملف الـ PDF: " + err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err) });
     }
   });
 
@@ -900,7 +902,7 @@ export function registerExportRoutes(app: express.Express) {
       });
     } catch (err: unknown) {
       console.error("Error sharing order:", err);
-      res.status(500).json({ success: false, error: err instanceof Error ? err.message : String(err) });
+      res.status(500).json({ success: false, error: err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err) });
     }
   });
 
