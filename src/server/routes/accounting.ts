@@ -200,7 +200,6 @@ export function registerAccountingRoutes(app: express.Express) {
         total: (Number(it.quantity) || 1) * (Number(it.unitPrice) || 0) - (Number(it.discount) || 0) + (Number(it.tax) || 0),
         createdAt: it.createdAt || new Date().toISOString()
       }));
-      }
     }
 
     const computedSubtotal = inv.items ? inv.items.reduce((sum: number, it) => sum + (it.quantity * it.unitPrice), 0) : inv.totalPrice;
