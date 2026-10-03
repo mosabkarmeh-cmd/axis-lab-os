@@ -57,8 +57,8 @@ type MachineView = {
   [key: string]: unknown;
 };
 
-const productionJobs = productionJobs as unknown as ProductionJobView[];
-const machines = machines as unknown as MachineView[];
+const productionJobs = PRODUCTION_JOBS as unknown as ProductionJobView[];
+const machines = MACHINES as unknown as MachineView[];
 
 function getActorId(req: express.Request): string {
   return getRequestUser(req)?.id || "system";
