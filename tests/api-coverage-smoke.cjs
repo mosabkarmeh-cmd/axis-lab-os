@@ -44,7 +44,7 @@ async function waitForHealth() {
 async function request(pathname, options = {}) {
   const response = await fetch(`http://127.0.0.1:${port}${pathname}`, {
     ...options,
-    headers: { ...(options.headers || {}) },
+    headers: { ...(request.cookie ? { cookie: request.cookie } : {}), ...(options.headers || {}) },
   });
   const text = await response.text();
   let body;
