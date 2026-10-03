@@ -14,6 +14,7 @@ const {
   createSqliteBackup,
   checksumFile,
   persistStateNow,
+  schedulePersist,
 } = core;
 
 function getActorId(req: express.Request): string {
