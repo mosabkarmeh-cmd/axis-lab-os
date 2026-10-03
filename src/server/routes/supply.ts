@@ -25,7 +25,6 @@ function getActorId(req: express.Request): string {
 }
 
 export function registerSupplyRoutes(app: express.Express) {
-  registerOrderRoutes(app);
 
   // ==================== MATERIALS API ====================
 
