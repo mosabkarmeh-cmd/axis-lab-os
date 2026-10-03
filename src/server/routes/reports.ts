@@ -97,7 +97,7 @@ export function registerReportRoutes(app: express.Express) {
       // Find total jobs assigned to this machine
       // (The PRODUCTION_JOBS array) - let's find jobs belonging to this machine
       // Let's safe-guard with global array existence
-      const totalJobs = (global as any).PRODUCTION_JOBS ? (global as any).PRODUCTION_JOBS.filter((j: unknown) => j.machineId === m.id).length : 0;
+      const totalJobs = PRODUCTION_JOBS ? PRODUCTION_JOBS.filter((j: unknown) => j.machineId === m.id).length : 0;
       const completedJobs = (global as any).PRODUCTION_JOBS ? (global as any).PRODUCTION_JOBS.filter((j: unknown) => j.machineId === m.id && j.status === "completed").length : 0;
       
       return {
