@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import * as core from "../server-core.ts";
 
 const {
-  PRODUCTION_JOBS,
+  productionJobs,
   MATERIALS,
   USERS,
   ORDERS,
@@ -15,12 +15,50 @@ const {
   createNotification,
   sendProductionJobEmailNotification,
   idNum,
-  MACHINES,
+  machines,
   ACTIVITY_LOGS,
   nextEntityId,
   nextActivityLogId,
   getRequestUser,
 } = core;
+
+type ProductionJobView = {
+  id: string;
+  jobNo?: string;
+  orderId?: string;
+  orderNumber?: string;
+  itemName?: string;
+  materialId?: string;
+  machineId?: string;
+  status?: string;
+  progress?: number;
+  estTimeSec?: number;
+  elapsedTimeSec?: number;
+  laserPower?: number;
+  laserSpeed?: number;
+  operatorId?: string;
+  priority?: string;
+  createdAt?: string;
+  completedAt?: string;
+  materialCostUSD?: number;
+  technicianCostUSD?: number;
+  [key: string]: unknown;
+};
+
+type MachineView = {
+  id: string;
+  name: string;
+  type: string;
+  status: string;
+  currentJobId: string | null;
+  lastMaintenance: string;
+  workingHours: number;
+  calibrationSettings?: Record<string, unknown>;
+  [key: string]: unknown;
+};
+
+const productionJobs = productionJobs as unknown as ProductionJobView[];
+const machines = machines as unknown as MachineView[];
 
 function getActorId(req: express.Request): string {
   return getRequestUser(req)?.id || "system";
@@ -30,7 +68,7 @@ export function registerProductionLegacyRoutes(app: express.Express) {
 
   // API - Get Production Machines
   app.get("/api/production/machines", (req, res) => {
-    res.json({ success: true, machines: MACHINES });
+    res.json({ success: true, machines: machines });
   });
 
   // API - Add Production Machine (Admin only)
@@ -54,7 +92,7 @@ export function registerProductionLegacyRoutes(app: express.Express) {
       lastMaintenance: new Date().toISOString().slice(0, 10),
       workingHours: Number(workingHours) || 0
     };
-    MACHINES.push(newMachine);
+    machines.push(newMachine);
     res.json({ success: true, machine: newMachine });
   });
 
@@ -66,12 +104,12 @@ export function registerProductionLegacyRoutes(app: express.Express) {
       return;
     }
     const { id } = req.params;
-    const index = MACHINES.findIndex(m => m.id === id);
+    const index = machines.findIndex(m => m.id === id);
     if (index === -1) {
       res.status(404).json({ success: false, message: "الآلة غير موجودة" });
       return;
     }
-    MACHINES.splice(index, 1);
+    machines.splice(index, 1);
     res.json({ success: true, message: "تم حذف الآلة بنجاح" });
   });
 
@@ -83,7 +121,7 @@ export function registerProductionLegacyRoutes(app: express.Express) {
       return;
     }
     const { id } = req.params;
-    const machine = MACHINES.find(m => m.id === id);
+    const machine = machines.find(m => m.id === id);
     if (!machine) {
       res.status(404).json({ success: false, message: "الآلة غير موجودة" });
       return;
@@ -104,10 +142,10 @@ export function registerProductionLegacyRoutes(app: express.Express) {
 
   // API - Get Production Jobs
   app.get("/api/production/jobs", (req, res) => {
-    const list = PRODUCTION_JOBS.map(job => {
+    const list = productionJobs.map(job => {
       const mat = MATERIALS.find(m => m.id === job.materialId);
       const op = USERS.find(u => u.id === job.operatorId);
-      const mac = MACHINES.find(m => m.id === job.machineId);
+      const mac = machines.find(m => m.id === job.machineId);
 
       // Estimated technician cost based on cutting time (e.g. $15/hr = $0.25/min)
       const technicianCostUSD = Number(((job.estTimeSec / 60) * 0.25).toFixed(2));
@@ -155,9 +193,9 @@ export function registerProductionLegacyRoutes(app: express.Express) {
         preferredType = "cnc_router";
       }
 
-      let candidates = MACHINES.filter(m => m.status !== "maintenance" && m.status !== "offline" && (m.type === preferredType || m.type?.includes(preferredType)));
+      let candidates = machines.filter(m => m.status !== "maintenance" && m.status !== "offline" && (m.type === preferredType || m.type?.includes(preferredType)));
       if (candidates.length === 0) {
-        candidates = MACHINES.filter(m => m.status !== "maintenance" && m.status !== "offline");
+        candidates = machines.filter(m => m.status !== "maintenance" && m.status !== "offline");
       }
 
       candidates.sort((a, b) => {
@@ -173,7 +211,7 @@ export function registerProductionLegacyRoutes(app: express.Express) {
 
     const newJob = {
       id: "job-" + Date.now(),
-      jobNo: "JOB-2026-" + String(PRODUCTION_JOBS.length + 1).padStart(3, '0'),
+      jobNo: "JOB-2026-" + String(productionJobs.length + 1).padStart(3, '0'),
       orderId: orderId || null,
       orderNumber: orderNumber || "يدوي",
       itemName,
@@ -191,7 +229,7 @@ export function registerProductionLegacyRoutes(app: express.Express) {
       createdAt: new Date().toISOString()
     };
 
-    PRODUCTION_JOBS.push(newJob);
+    productionJobs.push(newJob);
 
     ACTIVITY_LOGS.unshift({
       id: nextActivityLogId(),
@@ -215,8 +253,8 @@ export function registerProductionLegacyRoutes(app: express.Express) {
       return res.status(400).json({ success: false, message: "Invalid orderedIds array" });
     }
 
-    const jobMap = new Map(PRODUCTION_JOBS.map(j => [j.id, j]));
-    const reordered: typeof PRODUCTION_JOBS = [];
+    const jobMap = new Map(productionJobs.map(j => [j.id, j]));
+    const reordered: typeof productionJobs = [];
 
     orderedIds.forEach((id, idx) => {
       const job = jobMap.get(id);
@@ -232,17 +270,17 @@ export function registerProductionLegacyRoutes(app: express.Express) {
       reordered.push(job);
     });
 
-    PRODUCTION_JOBS.length = 0;
-    PRODUCTION_JOBS.push(...reordered);
+    productionJobs.length = 0;
+    productionJobs.push(...reordered);
 
-    res.json({ success: true, jobs: PRODUCTION_JOBS });
+    res.json({ success: true, jobs: productionJobs });
   });
 
   // API - Auto-Assign Pending Jobs to Least-Used Machines by Machine Type
   app.post("/api/production/jobs/auto-assign", (req, res) => {
     const { jobIds, autoStart } = req.body;
     
-    let targetJobs = PRODUCTION_JOBS.filter(j => j.status === "pending");
+    let targetJobs = productionJobs.filter(j => j.status === "pending");
     if (Array.isArray(jobIds) && jobIds.length > 0) {
       targetJobs = targetJobs.filter(j => jobIds.includes(j.id));
     }
@@ -252,7 +290,7 @@ export function registerProductionLegacyRoutes(app: express.Express) {
       return;
     }
 
-    const availableMachines = MACHINES.filter(m => m.status !== "maintenance" && m.status !== "offline");
+    const availableMachines = machines.filter(m => m.status !== "maintenance" && m.status !== "offline");
     if (availableMachines.length === 0) {
       res.status(400).json({ success: false, message: "لا توجد ماكينات متاحة أو غير متوقفة للصيانة حالياً" });
       return;
@@ -261,11 +299,11 @@ export function registerProductionLegacyRoutes(app: express.Express) {
     const machineSimulatedJobsCount = new Map<string, number>();
     availableMachines.forEach(m => machineSimulatedJobsCount.set(m.id, 0));
 
-    const assignmentResults: Array<{ jobId: string; operatorId?: string; status?: string }> = [];
+    const assignmentResults: Array<Record<string, unknown>> = [];
 
     for (const job of targetJobs) {
       const jobObj = job as typeof job & Record<string, unknown>;
-      const matName = (jobObj.materialName || job.itemName || "").toLowerCase();
+      const matName = String(jobObj.materialName ?? job.itemName ?? "").toLowerCase();
       let preferredType = "laser_co2";
       if (matName.includes("فايبر") || matName.includes("حديد") || matName.includes("معدن") || matName.includes("استيل") || matName.includes("fiber")) {
         preferredType = "fiber_laser";
@@ -336,14 +374,14 @@ export function registerProductionLegacyRoutes(app: express.Express) {
     const { id } = req.params;
     const { machineId, operatorId } = req.body;
 
-    const job = PRODUCTION_JOBS.find(j => j.id === id);
+    const job = productionJobs.find(j => j.id === id);
     if (!job) {
       res.status(404).json({ success: false, message: "لم يتم العثور على مهمة الإنتاج" });
       return;
     }
 
     if (machineId) {
-      const mac = MACHINES.find(m => m.id === machineId);
+      const mac = machines.find(m => m.id === machineId);
       if (mac && mac.status !== "idle" && mac.currentJobId !== id) {
         res.status(400).json({ success: false, message: "الآلة قيد التشغيل حالياً في مهمة أخرى" });
         return;
@@ -363,7 +401,7 @@ export function registerProductionLegacyRoutes(app: express.Express) {
     const { id } = req.params;
     const { machineId, operatorId } = req.body;
 
-    const job = PRODUCTION_JOBS.find(j => j.id === id);
+    const job = productionJobs.find(j => j.id === id);
     if (!job) {
       res.status(404).json({ success: false, message: "مهمة الإنتاج غير موجودة" });
       return;
@@ -378,7 +416,7 @@ export function registerProductionLegacyRoutes(app: express.Express) {
     }
 
     // Set Machine status to running
-    const mac = MACHINES.find(m => m.id === finalMachineId);
+    const mac = machines.find(m => m.id === finalMachineId);
     if (mac) {
       mac.status = "running";
       mac.currentJobId = id;
@@ -439,7 +477,7 @@ export function registerProductionLegacyRoutes(app: express.Express) {
   app.post("/api/production/jobs/:id/pause", async (req, res) => {
     const { id } = req.params;
 
-    const job = PRODUCTION_JOBS.find(j => j.id === id);
+    const job = productionJobs.find(j => j.id === id);
     if (!job) {
       res.status(404).json({ success: false, message: "المهمة غير موجودة" });
       return;
@@ -448,7 +486,7 @@ export function registerProductionLegacyRoutes(app: express.Express) {
     job.status = "paused";
 
     if (job.machineId) {
-      const mac = MACHINES.find(m => m.id === job.machineId);
+      const mac = machines.find(m => m.id === job.machineId);
       if (mac && mac.currentJobId === id) {
         mac.status = "idle";
         const macId = idNum(mac.id, "mach-");
@@ -473,7 +511,7 @@ export function registerProductionLegacyRoutes(app: express.Express) {
     const { id } = req.params;
     const { progress, elapsedTimeSec } = req.body;
 
-    const job = PRODUCTION_JOBS.find(j => j.id === id);
+    const job = productionJobs.find(j => j.id === id);
     if (!job) {
       res.status(404).json({ success: false, message: "المهمة غير موجودة" });
       return;
@@ -495,7 +533,7 @@ export function registerProductionLegacyRoutes(app: express.Express) {
     const { id } = req.params;
     const { remnantWidth, remnantHeight, remnantLocation } = req.body;
 
-    const job = PRODUCTION_JOBS.find(j => j.id === id);
+    const job = productionJobs.find(j => j.id === id);
     if (!job) {
       res.status(404).json({ success: false, message: "المهمة غير موجودة" });
       return;
@@ -545,7 +583,7 @@ export function registerProductionLegacyRoutes(app: express.Express) {
 
     // Release machine
     if (job.machineId) {
-      const mac = MACHINES.find(m => m.id === job.machineId);
+      const mac = machines.find(m => m.id === job.machineId);
       if (mac) {
         mac.status = "idle";
         mac.currentJobId = null;
@@ -666,7 +704,7 @@ export function registerProductionLegacyRoutes(app: express.Express) {
     const { id } = req.params;
     const { status } = req.body; // "maintenance" or "idle"
 
-    const mac = MACHINES.find(m => m.id === id);
+    const mac = machines.find(m => m.id === id);
     if (!mac) {
       res.status(404).json({ success: false, message: "الآلة غير موجودة" });
       return;
