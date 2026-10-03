@@ -24,7 +24,6 @@ function getActorId(req: express.Request): string {
 }
 
 export function registerAccountingRoutes(app: express.Express) {
-  });
 
   // ==================== ACCOUNTING & FINANCE API ====================
 
@@ -599,5 +598,4 @@ export function registerAccountingRoutes(app: express.Express) {
     });
   });
 
-  // ==================== REPORTS & ANALYTICS API ====================
 }
