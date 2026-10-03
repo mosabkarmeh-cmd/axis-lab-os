@@ -86,7 +86,7 @@ function ordersForResponse(req: express.Request, orders: unknown[]): unknown[] {
     : orders;
 }
 
-async function withAtomicFinancialMutation<T>(mutation: () => T | Promise<T>): Promise<T> {
+export async function withAtomicFinancialMutation<T>(mutation: () => T | Promise<T>): Promise<T> {
   const snapshot = {
     orders: JSON.stringify(ORDERS),
     invoices: JSON.stringify(INVOICES),
