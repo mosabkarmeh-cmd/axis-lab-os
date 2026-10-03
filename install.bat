@@ -32,20 +32,17 @@ if errorlevel 1 (
         echo then put that password in the .env file when prompted below^)...
         winget install --id PostgreSQL.PostgreSQL.16 -e --accept-package-agreements --accept-source-agreements
         echo.
-        echo If the installer asked you to set a superuser password, open the
-        echo .env file in this folder and put that same password after
-        echo SQL_PASSWORD= so it matches. If you kept the suggested password
-        echo "axislab_dev_pass", you don't need to change anything.
+        echo If the installer asked you to set a superuser password, remember it.
+echo The installer will use the password stored in .env below.
     ) else (
         echo winget is not available on this computer, so it can't be installed automatically.
         echo.
         echo Please install it yourself, it only takes a couple of minutes:
         echo   1. Go to: https://www.postgresql.org/download/windows/
         echo   2. Download and run the installer.
-        echo   3. When it asks for a password, type:  axislab_dev_pass
-        echo      ^(or any password you like - just also change SQL_PASSWORD in the .env file to match^)
-        echo   4. Keep the default port ^(5432^) and finish the installer.
-        echo   5. Run this install.bat file again.
+        echo   3. When it asks for a password, choose a strong password and remember it.
+echo   4. Keep the default port (5432) and finish the installer.
+echo   5. Run this install.bat file again and enter the password in .env.
         pause
         exit /b 1
     )
@@ -54,19 +51,24 @@ if errorlevel 1 (
 REM --- 3) Set up .env if it does not exist ---
 if not exist ".env" (
     echo.
-    echo No .env file found, creating one with local default values...
+    echo No .env file found. Creating a template without any password...
     (
         echo GEMINI_API_KEY="MY_GEMINI_API_KEY"
         echo APP_URL="http://localhost:3000"
         echo.
         echo SQL_HOST="localhost"
         echo SQL_USER="postgres"
-        echo SQL_PASSWORD="axislab_dev_pass"
+        echo SQL_PASSWORD=""
         echo SQL_DB_NAME="axislab"
         echo.
         echo SQL_ADMIN_USER="postgres"
-        echo SQL_ADMIN_PASSWORD="axislab_dev_pass"
+        echo SQL_ADMIN_PASSWORD=""
     ) > .env
+    echo.
+    echo [!] Open .env and set SQL_PASSWORD and SQL_ADMIN_PASSWORD.
+    echo     Both must contain the PostgreSQL password you chose during installation.
+    pause
+    exit /b 1
 )
 
 REM --- 4) Install dependencies ---
