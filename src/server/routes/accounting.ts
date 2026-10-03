@@ -57,7 +57,7 @@ export function registerAccountingRoutes(app: express.Express) {
     }
 
     const invoiceId = nextEntityId("inv");
-    const invItems = (items && items.length > 0) ? items.map((raw, idx: number) => { const it = asInvoiceItem(raw); => ({
+    const invItems = (items && items.length > 0) ? items.map((raw, idx: number) => ({
       id: `invitem-${Date.now()}-${idx}`,
       invoiceId: invoiceId,
       productName: it.productName || "بند مخصص",
@@ -190,7 +190,7 @@ export function registerAccountingRoutes(app: express.Express) {
     if (discount !== undefined) inv.discount = Number(discount) || 0;
 
     if (items && Array.isArray(items)) {
-      inv.items = items.map((raw, idx: number) => { const it = asInvoiceItem(raw); => ({
+      inv.items = items.map((raw, idx: number) => ({
         id: it.id || `invitem-${Date.now()}-${idx}`,
         invoiceId: inv.id,
         productName: it.productName || "بند مخصص",
@@ -274,7 +274,7 @@ export function registerAccountingRoutes(app: express.Express) {
     }
 
     const creditNoteId = nextEntityId("inv");
-    const creditItems = inv.items ? inv.items.map((raw, idx: number) => { const it = asInvoiceItem(raw); => ({
+    const creditItems = inv.items ? inv.items.map((raw, idx: number) => ({
       id: `invitem-${Date.now()}-${idx}`,
       invoiceId: creditNoteId,
       productName: `مرتجع: ${it.productName}`,
