@@ -240,7 +240,7 @@ export function registerImportRoutes(app: express.Express) {
         MATERIALS.push(newMat);
         INVENTORY.push({
           id: "inv-pending", materialId: newMat.id, quantity: stock, reservedQuantity: 0,
-          availableQuantity: stock, location: it.location || "المستودع الرئيسي",
+          availableQuantity: stock, location: it.location ? String(it.location) : "المستودع الرئيسي",
         });
         imported.push(newMat);
       } catch (err: unknown) {
@@ -309,7 +309,7 @@ export function registerImportRoutes(app: express.Express) {
         await db.update(inventoryTable).set({ quantity, reservedQuantity: existing.reservedQuantity, availableQuantity: existing.availableQuantity, location: existing.location }).where(eq(inventoryTable.materialId, idNum(material.id, "m-")));
         await db.insert(inventoryTransactionsTable).values({ materialId: idNum(material.id, "m-"), type: "adjustment", quantity: quantity - before, beforeQty: before, afterQty: quantity, referenceType: "opening_import", referenceId: "excel", reason: "تثبيت الرصيد الافتتاحي المستورد", createdById: idNum(getRequestUser(req)?.id, "u-") });
       } else {
-        const inserted = await db.insert(inventoryTable).values({ materialId: idNum(material.id, "m-"), quantity, reservedQuantity: 0, availableQuantity: quantity, location: it.location || it.warehouse || "المستودع الرئيسي" }).returning();
+        const inserted = await db.insert(inventoryTable).values({ materialId: idNum(material.id, "m-"), quantity, reservedQuantity: 0, availableQuantity: quantity, location: it.location || it.warehouse ? String(it.location ?? it.warehouse) : "المستودع الرئيسي" }).returning();
         INVENTORY.push({ id: "inv-" + inserted[0].id, materialId: material.id, quantity, reservedQuantity: 0, availableQuantity: quantity, location: inserted[0].location || "المستودع الرئيسي" });
       }
       imported.push({ materialId: material.id, quantity });
