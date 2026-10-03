@@ -1,13 +1,4 @@
-import express from "express";
-import bcrypt from "bcryptjs";
-import * as core from "../server-core.ts";
-
-const { getRequestUser, USERS, ACTIVITY_LOGS, nextActivityLogId, nextEntityId, publicUser, schedulePersist } = core;
-
-export function registerUserRoutes(app: express.Express) {
-  // ==================== USERS & EMPLOYEES MANAGEMENT API ====================
-
-  // API - Get Users
+// API - Get Users
   app.get("/api/users", (req, res) => {
     const user = getRequestUser(req);
     if (!user || user.role !== "admin") {
@@ -148,5 +139,3 @@ export function registerUserRoutes(app: express.Express) {
     res.json({ success: true, user: publicUser(removed) });
   });
 
-
-}
