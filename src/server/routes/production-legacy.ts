@@ -676,4 +676,7 @@ export function registerProductionLegacyRoutes(app: express.Express) {
       res.json({ success: true, machine: mac });
     } catch (err: unknown) {
       console.error("Error updating machine maintenance status:", err);
+      res.status(500).json({ success: false, message: err instanceof Error ? err.message : String(err) });
+    }
+  });
 }
