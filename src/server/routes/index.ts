@@ -45,57 +45,11 @@ import { registerCompilerRoutes } from "./compiler.ts";
 import { registerAIRoutes } from "./ai.ts";
 import { registerNotificationsStatusRoutes } from "./notifications-statuses.ts";
 import { registerQuotationRoutes } from "./quotation.ts";
+import { registerSystemRoutes } from "./system.ts";
 
 const { apiKey, ai, DB_MODE, USE_POSTGRES, USE_SQLITE, APP_RUNTIME_ROOT, LOCAL_DATA_FILE, RESOURCE_FONT_PATH, LOCAL_LEGACY_DATA_FILE, LOCAL_SCHEMA_VERSION, activityLogSequence, nextActivityLogId, entityIdSequence, nextEntityId, orderCreateBenchmarks, persistenceBenchmarks, persistQueueStats, recordBenchmark, benchmarkSnapshot, NORMALIZED_LOCAL_COLLECTIONS, NORMALIZED_FINANCIAL_COLLECTIONS, initLocalSqlite, setLocalSqlite, SQLITE_BUSY_RETRY_DELAYS_MS, withSqliteBusyRetry, flushLocalSqlite, syncNormalizedLocalEntities, assertFinancialStateInvariants, syncNormalizedFinancialEntities, readFinancialTablesFromSqlite, backupDirectory, checksumFile, createSqliteBackup, JWT_SECRET, JWT_ISSUER, JWT_AUDIENCE, publicUser, generateJWT, getRequestUser, USERS, FILES, CUSTOMERS, PRODUCTS, ORDERS, ACTIVITY_LOGS, MATERIALS, LEGACY_MATERIAL_PRICES_SYP_CANONICAL, LEGACY_MATERIAL_PRICES_SYP, normalizeLegacyMaterialPrices, INVENTORY, INVENTORY_TRANSACTIONS, normalizeInventoryState, REMNANTS, SUPPLIER_QUOTES, SUPPLIERS, SUPPLY_ORDERS, DEMO_LOW_PRICE_MATERIALS, DEMO_LOW_PRICE_INVENTORY, ensureDemoLowPriceMaterials, MACHINES, EXPENSES, NUMBERING_SETTINGS, getNextNumber, INVOICE_HISTORY, NOTIFICATIONS, DELETED_ITEMS, ORDER_STATUSES, normalizeOrderStatuses, createNotification, notifyOverdueOrders, WORKFLOW_NEXT_REMINDERS, INVOICES, SETTINGS, publicSettings, getPartnerSharePercentAt, mergeSmtpSettings, freezeOrderCurrencySnapshot, sendProductionJobEmailNotification, BACKUPS, PRODUCTION_JOBS, PERSISTED_COLLECTIONS, LOCAL_PERSISTED_COLLECTIONS, idNum, refreshWarehouseCache, loadPersistedState, persistTimer, persistInFlight, persistAgainAfter, persistWaiters, persistStateNow, persistMutationWithFastDurability, schedulePersist, RESETTABLE_BUSINESS_COLLECTIONS, resetBusinessData } = core;
 
 export async function registerRoutes(app: express.Express) {
-  // API Health Check Route. This is intentionally safe for LAN diagnostics:
-  // expose only the database type, basename, schema version, and integrity result.
-  app.get("/api/health", async (req, res) => {
-    const database = USE_POSTGRES ? "postgres" : USE_SQLITE ? "sqlite" : "memory";
-    let status = "ok";
-    let sqliteIntegrity: string | null = null;
-    let schemaVersion: number | null = null;
-    if (USE_SQLITE) {
-      try {
-        const databaseHandle = await initLocalSqlite();
-        const integrityResult = databaseHandle.exec("PRAGMA integrity_check");
-        sqliteIntegrity = String(integrityResult[0]?.values?.[0]?.[0] || "unknown");
-        const schemaResult = databaseHandle.exec("SELECT value FROM local_metadata WHERE key = 'schema_version' LIMIT 1");
-        const parsedVersion = Number(schemaResult[0]?.values?.[0]?.[0]);
-        schemaVersion = Number.isFinite(parsedVersion) ? parsedVersion : null;
-        if (sqliteIntegrity !== "ok") status = "degraded";
-      } catch (error) {
-        status = "degraded";
-        sqliteIntegrity = "error";
-        console.error("[HEALTH] SQLite integrity check failed:", error);
-      }
-    }
-    res.status(status === "ok" ? 200 : 503).json({
-      success: status === "ok",
-      status,
-      database,
-      databaseFile: USE_SQLITE ? path.basename(LOCAL_DATA_FILE) : null,
-      sqliteIntegrity,
-      schemaVersion,
-    });
-  });
-
-  app.get("/api/diagnostics/benchmarks", (req, res) => {
-    const user = req.user;
-    if (!user || user.role !== "admin") {
-      res.status(403).json({ success: false, message: "غير مصرح لك بعرض قياسات الأداء الداخلية" });
-      return;
-    }
-    res.json({
-      success: true,
-      collectedAt: new Date().toISOString(),
-      orderCreate: benchmarkSnapshot(orderCreateBenchmarks),
-      persistence: benchmarkSnapshot(persistenceBenchmarks),
-      persistenceQueue: { ...persistQueueStats, pendingTimer: Boolean(persistTimer), inFlight: persistInFlight, pendingFollowUp: persistAgainAfter },
-    });
-  });
-
   // Mount PostgreSQL-backed routers only when PostgreSQL mode is active.
   // Memory mode uses the built-in seeded handlers below and never emits connection errors.
   if (USE_POSTGRES) {
@@ -177,23 +131,9 @@ export async function registerRoutes(app: express.Express) {
     next();
   });
 
-  // Safe reset: business data only. System settings, admin users, numbering and statuses remain.
-  app.post("/api/admin/reset-business-data", async (req, res) => {
-    const user = getRequestUser(req);
-    if (!user || user.role !== "admin") {
-      res.status(403).json({ success: false, message: "هذه العملية متاحة لمدير النظام فقط" });
-      return;
-    }
-    try {
-      await resetBusinessData();
-      res.json({ success: true, message: "تم تصفير بيانات الأعمال مع الحفاظ على الإعدادات والحساب الإداري" });
-    } catch (error) {
-      console.error("[RESET] Business data reset failed:", error);
-      res.status(500).json({ success: false, message: "تعذر تصفير بيانات الأعمال بأمان" });
-    }
-  });
-
   registerAuthRoutes(app);
+
+  registerSystemRoutes(app);
 
   registerUserRoutes(app);
 
@@ -230,14 +170,5 @@ export async function registerRoutes(app: express.Express) {
 
   registerOrderRoutes(app);
 
-  // ==================== MATERIALS API ====================
-
-  app.get("/api/logs", (req, res) => {
-    res.json(ACTIVITY_LOGS);
-  });
-
-  // ==================== ADVANCED ADDITIONS APIs ====================
-
-  // 1. NOTIFICATIONS APIs
 
 }
