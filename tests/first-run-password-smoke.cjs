@@ -49,7 +49,10 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
     });
     const login = await loginResponse.json();
     assert(loginResponse.ok && login.user.mustChangePassword === true, "Bootstrap Admin was not marked for password change");
-    const auth = { "content-type": "application/json", authorization: `Bearer ${login.token}` };
+    const setCookies = loginResponse.headers.getSetCookie ? loginResponse.headers.getSetCookie() : [loginResponse.headers.get("set-cookie")].filter(Boolean);
+    const authCookie = setCookies.find((value) => value.startsWith("axislab_token="));
+    assert(authCookie, "Login did not establish an authentication cookie");
+    const auth = { "content-type": "application/json", cookie: authCookie.split(";")[0] };
     const blocked = await fetch(`http://127.0.0.1:${port}/api/customers`, { headers: auth });
     assert(blocked.status === 428, `Expected 428 before password change, got ${blocked.status}`);
     const changeResponse = await fetch(`http://127.0.0.1:${port}/api/auth/change-password`, {
