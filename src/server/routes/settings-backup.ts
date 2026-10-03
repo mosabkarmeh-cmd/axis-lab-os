@@ -158,10 +158,10 @@ export function registerSettingsBackupRoutes(app: express.Express) {
         const info = await transporter.sendMail(mailOptions);
         res.json({ success: true, message: `تم إرسال بريد الاختبار بنجاح إلى ${targetEmail}`, messageId: info.messageId });
       } catch (sendErr: unknown) {
-        res.json({ success: true, warning: `تم اختبار التكوين وإرسال الطلب للخادم: ${sendErr instanceof Error ? sendErr.message : String(sendErr)}`, targetEmail });
+        res.json({ success: true, warning: `تم اختبار التكوين وإرسال الطلب للخادم: ${sendErr instanceof Error ? sendErr instanceof Error ? sendErr.message : String(sendErr) : String(sendErr)}`, targetEmail });
       }
     } catch (err: unknown) {
-      res.status(500).json({ success: false, message: `فشل إرسال بريد الاختبار: ${err instanceof Error ? err.message : String(err)}` });
+      res.status(500).json({ success: false, message: `فشل إرسال بريد الاختبار: ${err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err)}` });
     }
   });
 
@@ -190,7 +190,7 @@ export function registerSettingsBackupRoutes(app: express.Express) {
       schedulePersist();
       res.json({ success: true, backup: publicBackup(newBackup) });
     } catch (error: unknown) {
-      res.status(500).json({ success: false, message: `فشل إنشاء النسخة الاحتياطية: ${error instanceof Error ? error.message : String(error)}` });
+      res.status(500).json({ success: false, message: `فشل إنشاء النسخة الاحتياطية: ${error instanceof Error ? error instanceof Error ? error.message : String(error) : String(error)}` });
     }
   });
 
@@ -226,7 +226,7 @@ export function registerSettingsBackupRoutes(app: express.Express) {
       schedulePersist();
       res.json({ success: true, message: "تم التحقق من النسخة واستعادتها. تم الاحتفاظ بنسخة أمان قبل الاستعادة." });
     } catch (error: unknown) {
-      res.status(500).json({ success: false, message: `فشل استعادة النسخة الاحتياطية: ${error instanceof Error ? error.message : String(error)}` });
+      res.status(500).json({ success: false, message: `فشل استعادة النسخة الاحتياطية: ${error instanceof Error ? error instanceof Error ? error.message : String(error) : String(error)}` });
     }
   });
 
