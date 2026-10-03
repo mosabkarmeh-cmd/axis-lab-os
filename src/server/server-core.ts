@@ -210,7 +210,7 @@ async function flushLocalSqlite() {
   await fs.promises.rename(tempFile, LOCAL_DATA_FILE);
 }
 
-function syncNormalizedLocalEntities(sqlite: any) {
+function syncNormalizedLocalEntities(sqlite: Database) {
   const now = new Date().toISOString();
   for (const collection of NORMALIZED_LOCAL_COLLECTIONS) {
     const values = LOCAL_PERSISTED_COLLECTIONS[collection] || [];
@@ -252,7 +252,7 @@ function assertFinancialStateInvariants() {
     }
   }
 }
-function syncNormalizedFinancialEntities(sqlite: any) {
+function syncNormalizedFinancialEntities(sqlite: Database) {
   const now = new Date().toISOString();
   sqlite.run("DELETE FROM local_invoice_items");
   sqlite.run("DELETE FROM local_invoice_history");
@@ -407,7 +407,7 @@ function generateJWT(user: UserRecord): string {
   );
 }
 
-function getRequestUser(req: any): UserRecord | null {
+function getRequestUser(req: express.Request): UserRecord | null {
   const authHeader = req.headers.authorization;
   let token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
   if (!token && req.cookies) token = req.cookies.axislab_token;
