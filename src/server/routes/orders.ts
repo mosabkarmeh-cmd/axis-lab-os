@@ -24,8 +24,14 @@ const {
   WORKFLOW_NEXT_REMINDERS,
 } = core;
 
-type OrderRecord = Record<string, unknown>;
-type PaymentRecord = Record<string, unknown>;
+type OrderRecord = (typeof ORDERS)[number];
+type PaymentRecord = {
+  id?: string;
+  amountSYP?: number;
+  amountUSD?: number;
+  exchangeRate?: number;
+  [key: string]: unknown;
+};
 
 const EMPLOYEE_HIDDEN_FIELDS = new Set([
   "matCost", "finalPrice", "profit", "profitPercent", "costPrice", "unitCost",
