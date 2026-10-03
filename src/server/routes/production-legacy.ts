@@ -15,7 +15,6 @@ function getActorId(req: express.Request): string {
 }
 
 export function registerProductionLegacyRoutes(app: express.Express) {
-  });
 
   // API - Get Production Machines
   app.get("/api/production/machines", (req, res) => {
