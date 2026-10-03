@@ -80,7 +80,7 @@ export function registerImportRoutes(app: express.Express) {
       res.json({ success: true, fileName: req.file.originalname, sheets: sheets.filter((sheet) => sheet.kind !== "ignore") });
     } catch (error: unknown) {
       console.error("Excel preview failed:", error);
-      res.status(400).json({ success: false, message: "تعذر قراءة ملف Excel: " + (error instanceof Error ? error.message : String(error)) });
+      res.status(400).json({ success: false, message: "تعذر قراءة ملف Excel: " + (error instanceof Error ? error instanceof Error ? error.message : String(error) : String(error)) });
     }
   });
 
@@ -117,7 +117,7 @@ export function registerImportRoutes(app: express.Express) {
         imported.push(newCust);
       } catch (err: unknown) {
         console.error("Error importing customer row:", err);
-        errors.push(`السطر ${idx + 1}: فشل الحفظ - ${err instanceof Error ? err.message : String(err)}`);
+        errors.push(`السطر ${idx + 1}: فشل الحفظ - ${err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err)}`);
       }
     }
 
@@ -164,7 +164,7 @@ export function registerImportRoutes(app: express.Express) {
         imported.push(newProd);
       } catch (err: unknown) {
         console.error("Error importing product row:", err);
-        errors.push(`السطر ${idx + 1}: فشل الحفظ - ${err instanceof Error ? err.message : String(err)}`);
+        errors.push(`السطر ${idx + 1}: فشل الحفظ - ${err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err)}`);
       }
     }
 
@@ -245,7 +245,7 @@ export function registerImportRoutes(app: express.Express) {
         imported.push(newMat);
       } catch (err: unknown) {
         console.error("Error importing material row:", err);
-        errors.push(`السطر ${idx + 1}: فشل الحفظ - ${err instanceof Error ? err.message : String(err)}`);
+        errors.push(`السطر ${idx + 1}: فشل الحفظ - ${err instanceof Error ? err instanceof Error ? err.message : String(err) : String(err)}`);
       }
     }
 
@@ -279,7 +279,7 @@ export function registerImportRoutes(app: express.Express) {
         const supplier = { id: "s-" + row.id, code, name: row.name, phone: row.phone || "", email: row.email || "", address: row.address || "", notes: it.notes || "" };
         SUPPLIERS.push(supplier);
         imported.push(supplier);
-      } catch (error: unknown) { errors.push(`السطر ${idx + 1}: فشل الحفظ - ${error instanceof Error ? error.message : String(error)}`); }
+      } catch (error: unknown) { errors.push(`السطر ${idx + 1}: فشل الحفظ - ${error instanceof Error ? error instanceof Error ? error.message : String(error) : String(error)}`); }
     }
     if (imported.length > 0) createNotification("استيراد موردين جماعي", `تم استيراد ${imported.length} موردين بنجاح.`, "system");
     res.json({ success: true, count: imported.length, imported, errors });
