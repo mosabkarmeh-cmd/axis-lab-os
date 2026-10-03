@@ -57,10 +57,10 @@ export async function registerRoutes(app: express.Express) {
 
   // Financial PDF exports must use the same server-side boundary as accounting/reports.
   // Employees must never receive profit data, even when they call the export endpoint directly.
-  app.use("/api/export/profit", (req, res, next) => {
+  app.use("/api/export", (req, res, next) => {
     const user = getRequestUser(req);
     if (!user || user.role === "employee") {
-      res.status(403).json({ success: false, message: "غير مصرح لك بالوصول إلى تقارير الأرباح" });
+      res.status(403).json({ success: false, message: "غير مصرح للموظف باستخدام عمليات التصدير" });
       return;
     }
     next();
