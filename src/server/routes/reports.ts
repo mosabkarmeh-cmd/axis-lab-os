@@ -55,8 +55,7 @@ export function registerReportRoutes(app: express.Express) {
 
     // 2. Financial Metrics
     const invoiceReportRate = currentRate;
-    const invoiceSYP = (inv: unknown, usdField: string, sypField: string) => {
-      const record = inv && typeof inv === "object" ? inv as Record<string, unknown> : {};
+    const invoiceSYP = (inv: Record<string, unknown>, usdField: string, sypField: string) => {
       const fixedSYP = Number(record[sypField]);
       if (Number.isFinite(fixedSYP)) return Math.round(fixedSYP);
       const linkedOrder = ORDERS.find((order) => order.id === record.orderId);
@@ -68,7 +67,7 @@ export function registerReportRoutes(app: express.Express) {
     const totalReceivables = sourceInvoices.reduce((sum, inv) => sum + (inv.remaining || 0), 0);
     const totalRevenueSYP = sourceInvoices.reduce((sum, inv) => sum + invoiceSYP(inv, "paidAmount", "paidAmountSYP"), 0);
     const totalReceivablesSYP = sourceInvoices.reduce((sum, inv) => sum + invoiceSYP(inv, "remaining", "remainingSYP"), 0);
-    const expenseSYP = (exp: unknown) => {
+    const expenseSYP = (exp: Record<string, unknown>) => {
       const fixedSYP = Number(exp.amountSYP);
       if (Number.isFinite(fixedSYP)) return Math.round(fixedSYP);
       const historicalRate = Number(exp.exchangeRateAtCreation);
@@ -96,8 +95,8 @@ export function registerReportRoutes(app: express.Express) {
       // Find total jobs assigned to this machine
       // (The PRODUCTION_JOBS array) - let's find jobs belonging to this machine
       // Let's safe-guard with global array existence
-      const totalJobs = PRODUCTION_JOBS ? PRODUCTION_JOBS.filter((j: unknown) => j.machineId === m.id).length : 0;
-      const completedJobs = PRODUCTION_JOBS ? PRODUCTION_JOBS.filter((j: unknown) => j.machineId === m.id && j.status === "completed").length : 0;
+      const totalJobs = PRODUCTION_JOBS ? PRODUCTION_JOBS.filter((j) => j.machineId === m.id).length : 0;
+      const completedJobs = PRODUCTION_JOBS ? PRODUCTION_JOBS.filter((j) => j.machineId === m.id && j.status === "completed").length : 0;
       
       return {
         id: m.id,
@@ -135,7 +134,8 @@ export function registerReportRoutes(app: express.Express) {
     const totalInventoryValue = stockStatus.reduce((sum, item) => sum + item.stockValue, 0);
 
     // Recent Financial Transactions Combined
-    const recentInvoices = sourceInvoices.map(inv => ({
+    const recentInvoices = sourceInvoices.map(inv => {
+      const record = inv as Record<string, unknown>;
       id: inv.id,
       type: "invoice",
       reference: inv.invoiceNumber,
@@ -145,7 +145,8 @@ export function registerReportRoutes(app: express.Express) {
       date: inv.issueDate,
       description: `فاتورة مبيعات للعميل: ${CUSTOMERS.find(c => c.id === inv.customerId)?.name || "عميل غير معروف"}`,
       status: inv.status === "paid" ? "تم التحصيل" : (inv.status === "partially_paid" ? "محصل جزئياً" : "غير محصل")
-    }));
+    };
+    });
 
     const recentExpenses = sourceExpenses.map(exp => ({
       id: exp.id,
@@ -166,7 +167,7 @@ export function registerReportRoutes(app: express.Express) {
       const material = MATERIALS.find((item) => item.id === job.materialId);
       return sum + Math.round(Number(material?.pricePerUnit) || 0);
     }, 0);
-    const productionHours = PRODUCTION_JOBS.reduce((sum: number, job: unknown) => sum + ((Number(job.elapsedTimeSec || job.estTimeSec) || 0) / 3600), 0);
+    const productionHours = PRODUCTION_JOBS.reduce((sum: number, job) => sum + ((Number(job.elapsedTimeSec || job.estTimeSec) || 0) / 3600), 0);
     const laborCostSYP = Math.round(productionHours * (Number(SETTINGS.pricing?.assemblyCostPerHour) || 0) * currentRate);
     const directCostSYP = materialCostSYP + laborCostSYP;
     const trueProfitSYP = totalRevenueSYP - totalExpensesSYP - directCostSYP;
