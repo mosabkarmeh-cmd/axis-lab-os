@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import * as core from "../server-core.ts";
 
 const {
-  productionJobs,
+  PRODUCTION_JOBS,
   MATERIALS,
   USERS,
   ORDERS,
@@ -15,7 +15,7 @@ const {
   createNotification,
   sendProductionJobEmailNotification,
   idNum,
-  machines,
+  MACHINES,
   ACTIVITY_LOGS,
   nextEntityId,
   nextActivityLogId,
