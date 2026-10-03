@@ -81,8 +81,8 @@ export function registerAccountingRoutes(app: express.Express) {
       }
     ];
 
-    const computedSubtotal = invItems.reduce((sum: number, it: any) => sum + (it.quantity * it.unitPrice), 0);
-    const computedTotal = invItems.reduce((sum: number, it: any) => sum + it.total, 0);
+    const computedSubtotal = invItems.reduce((sum: number, it: InvoiceItem) => sum + (it.quantity * it.unitPrice), 0);
+    const computedTotal = invItems.reduce((sum: number, it: InvoiceItem) => sum + it.total, 0);
     const finalTotal = totalPrice !== undefined ? Number(totalPrice) : computedTotal;
 
     const newInv = {
