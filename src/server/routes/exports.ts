@@ -1,6 +1,26 @@
 import express from "express";
 import * as core from "../server-core.ts";
 
+type ExportItem = {
+  quantity?: number | string;
+  qty?: number | string;
+  unitPrice?: number | string;
+  price?: number | string;
+  discount?: number | string;
+  total?: number | string;
+  totalPrice?: number | string;
+  productName?: string;
+  name?: string;
+};
+
+function asExportItem(value: unknown): ExportItem {
+  return value && typeof value === "object" ? value as ExportItem : {};
+}
+
+function asExportRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? value as Record<string, unknown> : {};
+}
+
 const {
   ORDERS,
   INVOICES,
@@ -278,12 +298,12 @@ export function registerExportRoutes(app: express.Express) {
           c.id,
           c.name || "",
           c.phone || "",
-          (c as any).whatsapp || c.phone || "",
+          asExportRecord(c).whatsapp || c.phone || "",
           c.company || "فردي",
           c.address || "",
           cOrders.length,
           totalSpent,
-          (c as any).notes || ""
+          asExportRecord(c).notes || ""
         ];
       });
 
@@ -298,8 +318,8 @@ export function registerExportRoutes(app: express.Express) {
       res.setHeader("Content-Type", "text/csv; charset=utf-8");
       res.setHeader("Content-Disposition", `attachment; filename=AXIS_LAB_Customers_Outreach_${Date.now()}.csv`);
       res.send(csvContent);
-    } catch (e: any) {
-      res.status(500).json({ error: "Failed to export customers CSV", details: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ error: "Failed to export customers CSV", details: e instanceof Error ? e.message : String(e) });
     }
   });
 
@@ -332,7 +352,7 @@ export function registerExportRoutes(app: express.Express) {
         const min = m.minimumStock || 0;
         const priceSYP = Math.round(Number(m.pricePerUnit) || 0);
         const totalVal = Math.round(qty * priceSYP);
-        const quality = (m as any).qualityStatus === 'defective' ? 'معيبة' : (m as any).qualityStatus === 'in_preparation' ? 'قيد التجهيز' : 'مفحوصة';
+        const quality = asExportRecord(m).qualityStatus === 'defective' ? 'معيبة' : asExportRecord(m).qualityStatus === 'in_preparation' ? 'قيد التجهيز' : 'مفحوصة';
         const statusText = qty <= 0 ? 'نافذ بالكامل' : qty <= min ? 'منخفض / يتطلب توريد' : 'سليم ومتوفر';
 
         return [
@@ -364,8 +384,8 @@ export function registerExportRoutes(app: express.Express) {
       res.setHeader("Content-Type", "text/csv; charset=utf-8");
       res.setHeader("Content-Disposition", `attachment; filename=AXIS_LAB_Materials_Audit_${Date.now()}.csv`);
       res.send(csvContent);
-    } catch (e: any) {
-      res.status(500).json({ error: "Failed to export materials CSV", details: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ error: "Failed to export materials CSV", details: e instanceof Error ? e.message : String(e) });
     }
   });
 
@@ -459,7 +479,8 @@ export function registerExportRoutes(app: express.Express) {
       doc.fillColor("#27272a").fontSize(10);
 
       const items = inv.items || [];
-      items.forEach((item: any, idx: number) => {
+      items.forEach((rawItem, idx: number) => {
+        const item = asExportItem(rawItem);
         // Stripe line background for readability
         if (idx % 2 === 1) {
           doc.rect(50, currentY, 495, 22).fill("#f4f4f5");
@@ -597,7 +618,8 @@ export function registerExportRoutes(app: express.Express) {
 
       let currentY = tableY + 25;
       const items = order.items || [];
-      items.forEach((item: any, idx: number) => {
+      items.forEach((rawItem, idx: number) => {
+        const item = asExportItem(rawItem);
         if (idx % 2 === 1) {
           doc.rect(50, currentY, 495, 22).fill("#f4f4f5");
         }
@@ -770,7 +792,8 @@ export function registerExportRoutes(app: express.Express) {
       doc.fillColor("#27272a").fontSize(10);
 
       const items = order.items || [];
-      items.forEach((item: any, idx: number) => {
+      items.forEach((rawItem, idx: number) => {
+        const item = asExportItem(rawItem);
         // Stripe line background for readability
         if (idx % 2 === 1) {
           doc.rect(50, currentY, 495, 22).fill("#f4f4f5");
