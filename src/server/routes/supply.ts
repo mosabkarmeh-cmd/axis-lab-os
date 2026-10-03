@@ -1,8 +1,15 @@
 import express from "express";
+import { db } from "../../db/index.ts";
+import { remnants as remnantsTable, suppliers as suppliersTable, supplyOrders as supplyOrdersTable, inventory as inventoryTable, inventoryTransactions as inventoryTransactionsTable } from "../../db/schema.ts";
+import { eq } from "drizzle-orm";
 import * as core from "../server-core.ts";
 
 const {
   REMNANTS,
+  USE_SQLITE,
+  USE_POSTGRES,
+  INVENTORY_TRANSACTIONS,
+  schedulePersist,
   MATERIALS,
   INVENTORY,
   SUPPLIERS,
