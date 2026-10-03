@@ -1,13 +1,20 @@
 import express from "express";
 import * as core from "../server-core.ts";
-import { db } from "../../db/index.ts";
-import { materials as materialsTable } from "../../db/schema.ts";
-import { eq } from "drizzle-orm";
-const { NOTIFICATIONS, DELETED_ITEMS, ORDER_STATUSES, createNotification, getRequestUser, CUSTOMERS, PRODUCTS, MATERIALS, EXPENSES, ACTIVITY_LOGS, nextActivityLogId, idNum } = core;
 
-function getActorId(req: express.Request): string {
-  return getRequestUser(req)?.id || "system";
-}
+const {
+  NOTIFICATIONS,
+  DELETED_ITEMS,
+  ORDER_STATUSES,
+  createNotification,
+  getRequestUser,
+  CUSTOMERS,
+  PRODUCTS,
+  MATERIALS,
+  EXPENSES,
+  ACTIVITY_LOGS,
+  nextActivityLogId,
+  idNum,
+} = core;
 
 export function registerNotificationsStatusRoutes(app: express.Express) {
   app.get("/api/notifications", (req, res) => {
