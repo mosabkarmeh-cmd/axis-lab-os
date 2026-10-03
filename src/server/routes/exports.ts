@@ -35,6 +35,9 @@ const {
   SETTINGS,
   EXPENSES,
   NOTIFICATIONS,
+  MACHINES,
+  ACTIVITY_LOGS,
+  nextActivityLogId,
   RESOURCE_FONT_PATH,
   getRequestUser,
 } = core;
