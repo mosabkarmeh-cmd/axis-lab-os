@@ -16,6 +16,15 @@ const {
 export function registerOrderPdfRoute(app: express.Express) {
   app.get("/api/orders/:id/pdf", async (req, res) => {
     try {
+      const user = core.getRequestUser(req);
+      if (!user) {
+        res.status(401).json({ success: false, error: "يجب تسجيل الدخول" });
+        return;
+      }
+      if (user.role === "employee") {
+        res.status(403).json({ success: false, error: "المستند المالي للطلب محجوب عن حساب الموظف" });
+        return;
+      }
       const orderId = req.params.id;
       const order = ORDERS.find(o => o.id === orderId);
       if (!order) {
