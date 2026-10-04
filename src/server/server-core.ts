@@ -32,7 +32,6 @@ import https from "https";
 import multer from "multer";
 import cors from "cors";
 import os from "os";
-import bcrypt from "bcryptjs";
 
 
 
