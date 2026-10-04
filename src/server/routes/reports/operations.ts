@@ -36,7 +36,6 @@ export function buildOperationsAnalytics(
   }).length;
 
   const totalOrdersCount = orders.length;
-  const totalOrdersValueSYP = orders.reduce((sum, order) => sum + Math.round(Number(order.totalPrice) || 0), 0);
   const completedOrderRate = totalOrdersCount > 0 ? (completedOrders / totalOrdersCount) * 100 : 0;
 
   const workflowLabels: Record<string, string> = {
@@ -67,8 +66,6 @@ export function buildOperationsAnalytics(
     productionHours: Number(productionHours.toFixed(2)),
     laborCostSYP,
     directCostSYP,
-    trueProfitSYP: totalOrdersValueSYP - directCostSYP,
-    trueProfitUSD: sypToUsd(totalOrdersValueSYP - directCostSYP, currentRate),
     overdueOrders,
     completedOrders,
     completionRate: completedOrderRate,
