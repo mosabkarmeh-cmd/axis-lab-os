@@ -8,6 +8,18 @@ const router = express.Router();
 
 const getRequestUser = getVerifiedRequestUser;
 
+function sanitizeCustomer<T extends Record<string, unknown>>(customer: T, req: express.Request): T {
+  if (getRequestUser(req)?.role === "admin") return customer;
+  return {
+    ...customer,
+    phone: "🔒 محجوب للأمان",
+    whatsapp: "🔒 محجوب للأمان",
+    email: "🔒 محجوب للأمان",
+    address: "🔒 محجوب للأمان",
+    notes: "🔒 محجوب للأمان",
+  } as T;
+}
+
 const errorMessage = (err: unknown) => err instanceof Error ? err.message : String(err);
 
 // 1. Get all customers
@@ -43,7 +55,7 @@ router.get("/", async (req, res) => {
       notes: c.notes || "",
       category: c.category || "شركة"
     }));
-    res.json(mapped);
+    res.json(mapped.map(customer => sanitizeCustomer(customer, req)));
   } catch (err: unknown) {
     console.error("Error fetching customers:", err);
     res.status(500).json({ error: "Failed to fetch customers: " + errorMessage(err) });
@@ -79,7 +91,7 @@ router.post("/", async (req, res) => {
       id: "c-" + inserted[0].id,
       ...values
     };
-    res.json(result);
+    res.json(sanitizeCustomer(result, req));
   } catch (err: unknown) {
     console.error("Error adding customer:", err);
     res.status(500).json({ error: "Failed to add customer: " + errorMessage(err) });
