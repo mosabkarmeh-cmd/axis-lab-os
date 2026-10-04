@@ -25,6 +25,11 @@ function getActorId(req: express.Request): string {
   return core.getRequestUser(req)?.id || "system";
 }
 
+function publicBackup(backup: Record<string, unknown>) {
+  const { filePath, ...safeBackup } = backup;
+  return safeBackup;
+}
+
 export function registerBackupRoutes(app: express.Express) {
 app.get("/api/backup", (req, res) => {
     res.json({ success: true, backups: BACKUPS.map(publicBackup) });
