@@ -70,9 +70,9 @@ export function registerNotificationsStatusRoutes(app: express.Express) {
 
     // Restore to appropriate array
     if (delItem.entityType === "Customer") {
-      CUSTOMERS.push(data);
+      CUSTOMERS.push(data as typeof CUSTOMERS[number]);
     } else if (delItem.entityType === "Product") {
-      PRODUCTS.push(data);
+      PRODUCTS.push(data as typeof PRODUCTS[number]);
     } else if (delItem.entityType === "Material") {
       const existing = MATERIALS.find(m => m.id === data.id);
       const matId = idNum(data.id, "m-");
@@ -87,10 +87,10 @@ export function registerNotificationsStatusRoutes(app: express.Express) {
         existing.status = "active";
       } else {
         data.status = "active";
-        MATERIALS.push(data);
+        MATERIALS.push(data as typeof MATERIALS[number]);
       }
     } else if (delItem.entityType === "Expense") {
-      EXPENSES.push(data);
+      EXPENSES.push(data as typeof EXPENSES[number]);
     }
 
     ACTIVITY_LOGS.unshift({
