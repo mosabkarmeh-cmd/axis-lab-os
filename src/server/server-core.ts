@@ -18,6 +18,7 @@ import { createCurrencyRuntime } from "./runtime/currency-runtime.ts";
 import { createSettingsRuntime } from "./runtime/settings-runtime.ts";
 import { EXPENSES, NUMBERING_SETTINGS, INVOICE_HISTORY, NOTIFICATIONS, DELETED_ITEMS, ORDER_STATUSES, BACKUPS, PRODUCTION_JOBS } from "./runtime/operational-seeds.ts";
 import { createMasterDataNormalizationRuntime, LEGACY_MATERIAL_PRICES_SYP_CANONICAL, LEGACY_MATERIAL_PRICES_SYP, DEMO_LOW_PRICE_MATERIALS, DEMO_LOW_PRICE_INVENTORY } from "./runtime/master-data-normalization.ts";
+import { createAuthRuntime, JWT_ISSUER_DEFAULT, JWT_AUDIENCE_DEFAULT, type UserRecord } from "./runtime/auth-runtime.ts";
 import { syncNormalizedLocalEntities as syncLocalEntities, assertFinancialStateInvariants as assertFinancialState, syncNormalizedFinancialEntities as syncFinancialEntities } from "./runtime/local-sqlite-sync.ts";
 
 import express from "express";
@@ -34,7 +35,6 @@ import rateLimit from "express-rate-limit";
 import os from "os";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import jwt from "jsonwebtoken";
 import { materialPriceUSD } from "../lib/materials.ts";
 
 
@@ -133,51 +133,11 @@ function syncNormalizedFinancialEntities(database: Parameters<typeof syncFinanci
   return syncFinancialEntities(database, { invoices: INVOICES, expenses: EXPENSES, orders: ORDERS });
 }
 
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET || JWT_SECRET.length < 32) {
-  throw new Error("JWT_SECRET must be set and contain at least 32 characters");
-}
-const JWT_ISSUER = process.env.JWT_ISSUER || "axislab-api";
-const JWT_AUDIENCE = process.env.JWT_AUDIENCE || "axislab-web";
-
-type UserRecord = {
-  id: string;
-  email: string;
-  fullName: string;
-  role: string;
-  isActive: boolean;
-  passwordHash: string;
-  mustChangePassword?: boolean;
-};
-
-function publicUser(user: UserRecord) {
-  return { id: user.id, email: user.email, fullName: user.fullName, role: user.role, isActive: user.isActive, mustChangePassword: Boolean(user.mustChangePassword) };
-}
-
-function generateJWT(user: UserRecord): string {
-  return jwt.sign(
-    { sub: user.id, email: user.email, fullName: user.fullName, role: user.role },
-    JWT_SECRET,
-    { algorithm: "HS256", expiresIn: "24h", issuer: JWT_ISSUER, audience: JWT_AUDIENCE }
-  );
-}
-
-function getRequestUser(req: express.Request): UserRecord | null {
-  const authHeader = req.headers.authorization;
-  let token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
-  if (!token && req.cookies) token = req.cookies.axislab_token;
-  if (!token) return null;
-  try {
-    const payload = jwt.verify(token, JWT_SECRET, { algorithms: ["HS256"], issuer: JWT_ISSUER, audience: JWT_AUDIENCE }) as jwt.JwtPayload;
-    if (!payload.sub) return null;
-    const user = USERS.find(u => u.id === payload.sub);
-    return user && user.isActive ? user : null;
-  } catch {
-    return null;
-  }
-}
-
 // Memory database states
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_ISSUER = JWT_ISSUER_DEFAULT;
+const JWT_AUDIENCE = JWT_AUDIENCE_DEFAULT;
+
 const USERS: UserRecord[] = [
   { id: "u-1", email: "admin@axislab.com", fullName: "المدير العام", role: "admin", isActive: true, mustChangePassword: Boolean(process.env.BOOTSTRAP_ADMIN_PASSWORD), passwordHash: process.env.DEMO_ADMIN_PASSWORD_HASH || (process.env.BOOTSTRAP_ADMIN_PASSWORD ? bcrypt.hashSync(process.env.BOOTSTRAP_ADMIN_PASSWORD, 12) : "") },
   { id: "u-2", email: "employee@axislab.com", fullName: "فني تشغيل الليزر", role: "employee", isActive: Boolean(process.env.DEMO_EMPLOYEE_PASSWORD_HASH), passwordHash: process.env.DEMO_EMPLOYEE_PASSWORD_HASH || "" },
@@ -719,6 +679,18 @@ const SETTINGS = {
     notifyDaysBefore: 3
   }
 };
+
+const authRuntime = createAuthRuntime({
+  users: USERS,
+  jwtSecret: JWT_SECRET,
+  jwtIssuer: JWT_ISSUER,
+  jwtAudience: JWT_AUDIENCE,
+});
+const {
+  publicUser,
+  generateJWT,
+  getRequestUser,
+} = authRuntime;
 
 const productionEmailRuntime = createProductionEmailRuntime({
   settings: SETTINGS,
