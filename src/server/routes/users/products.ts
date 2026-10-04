@@ -15,6 +15,11 @@ const {
   getRequestUser,
 } = core;
 
+function sanitizeProduct<T extends Record<string, unknown>>(product: T, req: express.Request): T {
+  if (getRequestUser(req)?.role !== "employee") return product;
+  return { ...product, price: 0 } as T;
+}
+
 export function registerLegacyProductRoutes(app: express.Express) {
 // API - Get Products
   app.get("/api/products", (req, res) => {
@@ -26,9 +31,9 @@ export function registerLegacyProductRoutes(app: express.Express) {
         p.code.toLowerCase().includes(searchStr) ||
         p.category.toLowerCase().includes(searchStr)
       );
-      res.json(filtered);
+      res.json(filtered.map(product => sanitizeProduct(product, req)));
     } else {
-      res.json(PRODUCTS);
+      res.json(PRODUCTS.map(product => sanitizeProduct(product, req)));
     }
   });
 
@@ -61,7 +66,7 @@ export function registerLegacyProductRoutes(app: express.Express) {
       createdAt: new Date().toISOString()
     });
 
-    res.json(newProd);
+    res.json(sanitizeProduct(newProd, req));
   });
 
   // API - Update Product
@@ -89,7 +94,7 @@ export function registerLegacyProductRoutes(app: express.Express) {
       createdAt: new Date().toISOString()
     });
 
-    res.json(prod);
+    res.json(sanitizeProduct(prod, req));
   });
 
   // API - Delete Product
@@ -128,6 +133,6 @@ export function registerLegacyProductRoutes(app: express.Express) {
       "system"
     );
 
-    res.json(removed);
+    res.json(sanitizeProduct(removed, req));
   });
 }
