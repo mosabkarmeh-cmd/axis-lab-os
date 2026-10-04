@@ -30,3 +30,9 @@ jobs:
 
       - name: Production build
         run: npm run build
+      - name: Decomposition audit
+        run: npm run test:decomposition
+      - name: Static source audit
+        run: npm run test:source
+      - name: Static security audit
+        run: npm run test:security-static
