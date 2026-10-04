@@ -188,7 +188,7 @@ export function createProductionEmailRuntime(deps: ProductionEmailRuntimeDepende
 
         deps.activityLogs.unshift({
           id: deps.nextActivityLogId("log_smtp"),
-          userId: job.operatorId || "u-1",
+          userId: job.operatorId || "system",
           action: "SEND_SMTP_NOTIFICATION",
           entityType: "ProductionJob",
           entityId: job.id,
