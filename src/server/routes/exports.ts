@@ -939,8 +939,10 @@ export function registerExportRoutes(app: express.Express) {
         title: "مشاركة طلب",
         message: `تم مشاركة الطلب رقم ${order.orderNumber} بنجاح عبر ${method === "email" ? "البريد الإلكتروني" : method === "whatsapp" ? "واتساب" : "رابط PDF"} للعميل.`,
         type: "success",
+        priority: "normal",
         isRead: false,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        link: ""
       });
 
       res.json({
