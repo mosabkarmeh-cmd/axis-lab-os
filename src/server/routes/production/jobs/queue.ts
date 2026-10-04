@@ -61,6 +61,7 @@ export function registerProductionJobQueueRoutes(app: express.Express) {
     }
 
     const material = MATERIALS.find(m => m.id === materialId);
+    const canViewPricing = ["admin", "accountant"].includes(core.getRequestUser(req)?.role || "");
     const estSec = Number(estTimeSec) || 90;
     const calcTechCost = Number(((estSec / 60) * 0.25).toFixed(2));
     const calcMatCost = material ? Number(((Number(material.pricePerUnit) || 15) * 0.15).toFixed(2)) : 2.25;
@@ -119,8 +120,8 @@ export function registerProductionJobQueueRoutes(app: express.Express) {
       laserPower: Number(laserPower) || 80,
       laserSpeed: Number(laserSpeed) || 30,
       operatorId: null,
-      materialCostUSD: Number(materialCostUSD) || calcMatCost,
-      technicianCostUSD: Number(technicianCostUSD) || calcTechCost,
+      materialCostUSD: canViewPricing && Number(materialCostUSD) > 0 ? Number(materialCostUSD) : calcMatCost,
+      technicianCostUSD: canViewPricing && Number(technicianCostUSD) > 0 ? Number(technicianCostUSD) : calcTechCost,
       createdAt: new Date().toISOString(),
     };
 
