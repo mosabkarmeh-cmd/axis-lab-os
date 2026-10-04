@@ -112,4 +112,3 @@ app.get("/api/accounting/stats", (req, res) => {
   });
 
 }
-}
