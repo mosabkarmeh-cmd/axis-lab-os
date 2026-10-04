@@ -3,6 +3,10 @@ import os from "node:os";
 import nodemailer from "nodemailer";
 import * as core from "../../server-core.ts";
 
+function getActorId(req: express.Request): string {
+  return core.getRequestUser(req)?.id || "system";
+}
+
 const {
   SETTINGS,
   ACTIVITY_LOGS,
@@ -158,8 +162,4 @@ app.get("/api/network/info", (req, res) => {
     }
   });
 
-  const publicBackup = (backup: Record<string, unknown>) => {
-    const { filePath, ...safeBackup } = backup;
-    return safeBackup;
-  };
 }
