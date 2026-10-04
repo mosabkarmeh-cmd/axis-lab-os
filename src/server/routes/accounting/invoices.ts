@@ -126,7 +126,7 @@ app.get("/api/accounting/invoices", (req, res) => {
 
   // Record Payment on Invoice
   app.post("/api/accounting/invoices/:id/payments", async (req, res) => {
-    const { amount, currency = "USD", notes, paymentMethod, changedById, paymentId } = req.body;
+    const { amount, currency = "USD", notes, paymentMethod, paymentId } = req.body;
     const inv = INVOICES.find(i => i.id === req.params.id);
     if (!inv) {
       res.status(404).json({ success: false, message: "الفاتورة غير موجودة" });
@@ -134,7 +134,7 @@ app.get("/api/accounting/invoices", (req, res) => {
     }
     let result;
     try {
-      result = await withAtomicFinancialMutation(() => applyPayment({ order: null, inv, amount, currency, notes, paymentMethod, changedById, paymentId }));
+      result = await withAtomicFinancialMutation(() => applyPayment({ order: null, inv, amount, currency, notes, paymentMethod, actorId: getActorId(req), paymentId }));
     } catch (error) {
       console.error("[FINANCE] Atomic invoice payment failed:", error);
       res.status(500).json({ success: false, message: "تعذر حفظ الدفعة بشكل ذري؛ لم يتم تغيير البيانات." });
