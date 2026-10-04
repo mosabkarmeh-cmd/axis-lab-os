@@ -1,6 +1,6 @@
 import type { Router } from "express";
-import { db } from "../../../db/index.ts";
-import { inventory } from "../../../db/schema.ts";
+import { db } from "../../../../db/index.ts";
+import { inventory } from "../../../../db/schema.ts";
 import { errorMessage } from "./shared.ts";
 
 export function registerPostgresInventoryRoutes(router: Router) {
