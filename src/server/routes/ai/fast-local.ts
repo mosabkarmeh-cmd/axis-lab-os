@@ -1,6 +1,6 @@
 import express from "express";
 import * as core from "../../server-core.ts";
-import { getLocalChatResponse } from "./local-chat.ts";
+import { getLocalChatResponse, normalizeArabicAndDialect } from "./local-chat.ts";
 
 const {
   ai,
