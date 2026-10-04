@@ -1,6 +1,6 @@
 import express from "express";
-import * as core from "../../server-core.ts";
-import { getActorId, orderForResponse } from "./response.ts";
+import * as core from "../../../server-core.ts";
+import { getActorId, orderForResponse } from "../response.ts";
 import { asOrderItem, type OrderItem } from "../crud-shared.ts";
 
 const {
