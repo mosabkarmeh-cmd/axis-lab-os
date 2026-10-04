@@ -53,7 +53,7 @@ async function loadPersistedState(): Promise<number> {
         restored++;
       }
       for (const [key, target] of Object.entries(LOCAL_PERSISTED_COLLECTIONS)) {
-        if (key !== "collections.USERS" && !snapshotKeys.has(key) && Array.isArray(target) && !NORMALIZED_LOCAL_COLLECTIONS.includes(key as typeof NORMALIZED_LOCAL_COLLECTIONS[number]) && !NORMALIZED_FINANCIAL_COLLECTIONS.includes(key as typeof NORMALIZED_FINANCIAL_COLLECTIONS[number])) {
+        if (key !== "USERS" && !snapshotKeys.has(key) && Array.isArray(target) && !NORMALIZED_LOCAL_COLLECTIONS.includes(key as typeof NORMALIZED_LOCAL_COLLECTIONS[number]) && !NORMALIZED_FINANCIAL_COLLECTIONS.includes(key as typeof NORMALIZED_FINANCIAL_COLLECTIONS[number])) {
           target.length = 0;
         }
       }
@@ -83,13 +83,13 @@ async function loadPersistedState(): Promise<number> {
       }
       let financialMigrated = false;
       const invoiceRows = sqlite.exec("SELECT payload FROM local_invoices ORDER BY updated_at, id");
-      if (snapshotKeys.has("collections.INVOICES")) {
-        const legacyInvoices = JSON.parse(String(snapshotValues.get("collections.INVOICES") || "[]"));
+      if (snapshotKeys.has("INVOICES")) {
+        const legacyInvoices = JSON.parse(String(snapshotValues.get("INVOICES") || "[]"));
         if (Array.isArray(legacyInvoices)) {
           collections.INVOICES.length = 0;
           collections.INVOICES.push(...legacyInvoices);
         }
-        sqlite.run("DELETE FROM app_state WHERE key = ?", ["collections.INVOICES"]);
+        sqlite.run("DELETE FROM app_state WHERE key = ?", ["INVOICES"]);
         financialMigrated = true;
       } else if (invoiceRows.length && invoiceRows[0].values.length > 0) {
         collections.INVOICES.length = 0;
@@ -99,13 +99,13 @@ async function loadPersistedState(): Promise<number> {
         collections.INVOICES.length = 0;
       }
       const expenseRows = sqlite.exec("SELECT payload FROM local_expenses ORDER BY updated_at, id");
-      if (snapshotKeys.has("collections.EXPENSES")) {
-        const legacyExpenses = JSON.parse(String(snapshotValues.get("collections.EXPENSES") || "[]"));
+      if (snapshotKeys.has("EXPENSES")) {
+        const legacyExpenses = JSON.parse(String(snapshotValues.get("EXPENSES") || "[]"));
         if (Array.isArray(legacyExpenses)) {
           collections.EXPENSES.length = 0;
           collections.EXPENSES.push(...legacyExpenses);
         }
-        sqlite.run("DELETE FROM app_state WHERE key = ?", ["collections.EXPENSES"]);
+        sqlite.run("DELETE FROM app_state WHERE key = ?", ["EXPENSES"]);
         financialMigrated = true;
       } else if (expenseRows.length && expenseRows[0].values.length > 0) {
         collections.EXPENSES.length = 0;
@@ -258,10 +258,10 @@ async function resetBusinessData() {
         sqlite.run("DELETE FROM local_expenses");
         sqlite.run("DELETE FROM local_entities");
         sqlite.run("DELETE FROM app_state WHERE key IN (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
-          "collections.FILES", "collections.ORDERS", "collections.ACTIVITY_LOGS", "collections.EXPENSES", "collections.INVOICE_HISTORY", "collections.NOTIFICATIONS",
-          "collections.DELETED_ITEMS", "collections.INVOICES", "collections.BACKUPS", "collections.PRODUCTION_JOBS", "collections.CUSTOMERS", "collections.PRODUCTS",
-          "collections.MATERIALS", "collections.INVENTORY", "collections.INVENTORY_TRANSACTIONS", "collections.REMNANTS", "collections.SUPPLIERS",
-          "collections.SUPPLY_ORDERS", "collections.SUPPLIER_QUOTES", "collections.MACHINES",
+          "FILES", "ORDERS", "ACTIVITY_LOGS", "EXPENSES", "INVOICE_HISTORY", "NOTIFICATIONS",
+          "DELETED_ITEMS", "INVOICES", "BACKUPS", "PRODUCTION_JOBS", "CUSTOMERS", "PRODUCTS",
+          "MATERIALS", "INVENTORY", "INVENTORY_TRANSACTIONS", "REMNANTS", "SUPPLIERS",
+          "SUPPLY_ORDERS", "SUPPLIER_QUOTES", "MACHINES",
         ]);
         sqlite.run("COMMIT");
       } catch (error) {
@@ -289,5 +289,4 @@ async function resetBusinessData() {
     get persistInFlight() { return persistInFlight; },
     get persistAgainAfter() { return persistAgainAfter; },
   };
-}
 }
