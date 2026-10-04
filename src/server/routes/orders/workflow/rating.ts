@@ -3,6 +3,10 @@ import * as core from "../../../server-core.ts";
 
 const {
   ORDERS,
+  ACTIVITY_LOGS,
+  nextActivityLogId,
+  persistStateNow,
+  orderForResponse,
   getRequestUser,
   schedulePersist,
 } = core;
