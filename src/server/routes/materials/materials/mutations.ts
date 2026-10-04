@@ -1,5 +1,5 @@
 import express from "express";
-import * as core from "../../server-core.ts";
+import * as core from "../../../server-core.ts";
 import { getActorId, sanitizeMaterialForEmployee } from "./shared.ts";
 
 const {
