@@ -31,6 +31,10 @@ export function registerAiSemanticSearchRoutes(app: express.Express) {
 
       const q = query.toLowerCase().trim();
       const access = getAiAccessScope(req);
+      if (!access.role) {
+        res.status(401).json({ success: false, error: "يجب تسجيل الدخول" });
+        return;
+      }
       const results: SemanticResult[] = [];
 
       // Search Customers
