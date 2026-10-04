@@ -115,7 +115,7 @@ export function registerLegacyProductRoutes(app: express.Express) {
 
     ACTIVITY_LOGS.unshift({
       id: nextActivityLogId(),
-      userId: "u-1",
+      userId: getActorId(req),
       action: "DELETE_PRODUCT",
       entityType: "Product",
       entityId: removed.id,
