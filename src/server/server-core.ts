@@ -1375,7 +1375,7 @@ async function sendProductionJobEmailNotification(
       });
 
       return { success: true, messageId: info.messageId, recipients };
-    } catch (smtpErr: any) {
+    } catch (smtpErr: unknown) {
       console.warn(`[SMTP WARN] Transport response for job ${job.jobNo}: ${smtpErr.message}`);
       ACTIVITY_LOGS.unshift({
         id: nextActivityLogId("log_smtp"),
@@ -1388,9 +1388,10 @@ async function sendProductionJobEmailNotification(
       });
       return { success: true, warning: smtpErr.message, recipients };
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
     console.error("[SMTP ERROR] Error sending production job email:", err);
-    return { success: false, error: err.message };
+    return { success: false, error: message };
   }
 }
 
@@ -1500,7 +1501,7 @@ const LOCAL_PERSISTED_COLLECTIONS: Record<string, any> = {
 // make every remaining write route in this file (suppliers, supply-orders, inventory
 // adjustments, remnants consume/waste, supplier quotes) also write through to the real
 // tables. That makes the real Postgres tables the single source of truth everywhere.
-function idNum(prefixedId: any, prefix: string): number | null {
+function idNum(prefixedId: unknown, prefix: string): number | null {
   if (prefixedId === null || prefixedId === undefined) return null;
   const n = parseInt(String(prefixedId).replace(prefix, ""));
   return isNaN(n) ? null : n;
