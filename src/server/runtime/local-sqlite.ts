@@ -72,7 +72,7 @@ export function createLocalSqliteRuntime(config: LocalSqliteRuntimeConfig, deps:
         }
       }
       localSqlite = null;
-      const backupDir = getBackupDirectory();
+      const backupDir = backupDirectory();
       if (fs.existsSync(backupDir)) {
         const candidates = fs.readdirSync(backupDir)
           .filter((name) => name.endsWith(".sqlite"))
