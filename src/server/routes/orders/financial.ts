@@ -56,7 +56,7 @@ export function applyPayment(params: {
   currency: string;
   notes: string | undefined;
   paymentMethod: string | undefined;
-  changedById: string | undefined;
+  actorId: string | undefined;
   paymentId: string | undefined;
 }): { ok: boolean; status: number; body: Record<string, unknown>; order: OrderRecord | null; invoice: InvoiceRecord | null } {
   const { order, inv, currency, notes, paymentMethod, paymentId } = params;
