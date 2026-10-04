@@ -188,4 +188,3 @@ app.get("/api/supply-orders", (req, res) => {
 
   // API - Get Activity Logs
 }
-}
