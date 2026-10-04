@@ -133,7 +133,7 @@ export function createProductionEmailRuntime(deps: ProductionEmailRuntimeDepende
             <td style="padding: 8px; color: #a1a1aa;">الماكينة المستخدمة:</td>
             <td style="padding: 8px;">${machineName}</td>
           </tr>
-          <tr style="border-bottom: 1px solid #27272aa;">
+          <tr style="border-bottom: 1px solid #27272a;">
             <td style="padding: 8px; color: #a1a1aa;">الفني المسؤول:</td>
             <td style="padding: 8px;">${operatorName}</td>
           </tr>
