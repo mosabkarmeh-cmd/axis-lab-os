@@ -12,16 +12,20 @@ const {
 
 type OrderRecord = (typeof ORDERS)[number];
 type InvoiceRecord = (typeof INVOICES)[number];
-
-
-type OrderRecord = (typeof ORDERS)[number];
-type InvoiceRecord = (typeof INVOICES)[number];
 type OrderItem = {
   productName?: string;
   quantity?: number | string;
   unitPrice?: number | string;
   totalPrice?: number | string;
   notes?: string;
+  [key: string]: unknown;
+};
+
+type PaymentRecord = {
+  id?: string;
+  amountSYP?: number;
+  amountUSD?: number;
+  exchangeRate?: number;
   [key: string]: unknown;
 };
 
