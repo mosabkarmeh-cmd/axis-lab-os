@@ -1,4 +1,4 @@
-import { db } from "../db/index.ts";
+import { db } from "../../db/index.ts";
 import {
   customers as customersTable,
   products as productsTable,
@@ -10,7 +10,7 @@ import {
   supplyOrders as supplyOrdersTable,
   supplierQuotes as supplierQuotesTable,
   machines as machinesTable,
-} from "../db/schema.ts";
+} from "../../db/schema.ts";
 import { eq, desc } from "drizzle-orm";
 
 export interface WarehouseCacheCollections {
