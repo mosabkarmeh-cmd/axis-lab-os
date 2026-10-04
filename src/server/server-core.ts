@@ -10,6 +10,8 @@
 import "dotenv/config";
 
 import { refreshWarehouseCache as createWarehouseCacheRuntime } from "./runtime/warehouse-cache.ts";
+import { idNum } from "./runtime/identifiers.ts";
+import { sypToUsd } from "../lib/currency.ts";
 import { createStatePersistence } from "./runtime/state-persistence.ts";
 import { createLocalSqliteRuntime, localSqlite, setLocalSqlite } from "./runtime/local-sqlite.ts";
 import { createProductionEmailRuntime } from "./runtime/production-email.ts";
@@ -22,7 +24,7 @@ import { createAuthRuntime, JWT_ISSUER_DEFAULT, JWT_AUDIENCE_DEFAULT, type UserR
 import { createNumberingRuntime } from "./runtime/numbering-runtime.ts";
 import { activityLogSequence, nextActivityLogId, entityIdSequence, nextEntityId, orderCreateBenchmarks, persistenceBenchmarks, persistQueueStats, recordBenchmark, benchmarkSnapshot, type BenchmarkBucket } from "./runtime/metrics.ts";
 import { apiKey, ai } from "./runtime/ai-client.ts";
-import { USERS, FILES, CUSTOMERS, PRODUCTS, ACTIVITY_LOGS, MATERIALS, INVENTORY, INVENTORY_TRANSACTIONS, REMNANTS, SUPPLIER_QUOTES, SUPPLIERS, SUPPLY_ORDERS, MACHINES, SETTINGS } from "./runtime/core-state.ts";
+import { JWT_SECRET, JWT_ISSUER, JWT_AUDIENCE, USERS, FILES, CUSTOMERS, PRODUCTS, ACTIVITY_LOGS, MATERIALS, INVENTORY, INVENTORY_TRANSACTIONS, REMNANTS, SUPPLIER_QUOTES, SUPPLIERS, SUPPLY_ORDERS, MACHINES, SETTINGS } from "./runtime/core-state.ts";
 import { ORDERS, INVOICES } from "./runtime/business-state.ts";
 import { syncNormalizedLocalEntities as syncLocalEntities, assertFinancialStateInvariants as assertFinancialState, syncNormalizedFinancialEntities as syncFinancialEntities } from "./runtime/local-sqlite-sync.ts";
 
@@ -48,6 +50,37 @@ const LOCAL_LEGACY_DATA_FILE = process.env.AXIS_LEGACY_DATA_FILE || path.join(os
 const LOCAL_SCHEMA_VERSION = 6;
 const NORMALIZED_LOCAL_COLLECTIONS = ["CUSTOMERS", "PRODUCTS", "MATERIALS", "INVENTORY", "INVENTORY_TRANSACTIONS", "REMNANTS", "SUPPLIERS", "SUPPLY_ORDERS", "SUPPLIER_QUOTES", "MACHINES", "ORDERS", "ACTIVITY_LOGS", "NOTIFICATIONS", "PRODUCTION_JOBS"] as const;
 const NORMALIZED_FINANCIAL_COLLECTIONS = ["INVOICES", "EXPENSES"] as const;
+const LOCAL_ENTITY_COLLECTIONS: Record<string, readonly unknown[]> = {
+  CUSTOMERS,
+  PRODUCTS,
+  MATERIALS,
+  INVENTORY,
+  INVENTORY_TRANSACTIONS,
+  REMNANTS,
+  SUPPLIERS,
+  SUPPLY_ORDERS,
+  SUPPLIER_QUOTES,
+  MACHINES,
+  ORDERS,
+  ACTIVITY_LOGS,
+  NOTIFICATIONS,
+  PRODUCTION_JOBS,
+};
+
+async function refreshWarehouseCache() {
+  return createWarehouseCacheRuntime(USE_POSTGRES, {
+    MACHINES,
+    CUSTOMERS,
+    PRODUCTS,
+    MATERIALS,
+    INVENTORY,
+    INVENTORY_TRANSACTIONS,
+    REMNANTS,
+    SUPPLIERS,
+    SUPPLY_ORDERS,
+    SUPPLIER_QUOTES,
+  });
+}
 let persistStateNowForSqlite: () => Promise<void> = async () => {
   throw new Error("SQLite persistence callback is not initialized");
 };
@@ -74,7 +107,7 @@ const {
   readFinancialTablesFromSqlite,
 } = localSqliteRuntime;
 function syncNormalizedLocalEntities(database: Parameters<typeof syncLocalEntities>[0]) {
-  return syncLocalEntities(database, NORMALIZED_LOCAL_COLLECTIONS, LOCAL_PERSISTED_COLLECTIONS);
+  return syncLocalEntities(database, NORMALIZED_LOCAL_COLLECTIONS, LOCAL_ENTITY_COLLECTIONS);
 }
 function assertFinancialStateInvariants() {
   return assertFinancialState({ invoices: INVOICES, expenses: EXPENSES });
@@ -169,6 +202,8 @@ const statePersistence = createStatePersistence(
     recordBenchmark,
     persistenceBenchmarks,
     persistQueueStats,
+    normalizedLocalCollections: NORMALIZED_LOCAL_COLLECTIONS,
+    normalizedFinancialCollections: NORMALIZED_FINANCIAL_COLLECTIONS,
   }
 );
 const {
