@@ -7,7 +7,6 @@ import { getActorId, isEmployee, sanitizeMaterialForEmployee, sanitizeSupplierQu
 
 const {
   MATERIALS,
-  SUPPLER_QUOTES,
   SUPPLIERS,
   SUPPLIER_QUOTES,
   ACTIVITY_LOGS,
