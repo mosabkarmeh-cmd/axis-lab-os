@@ -1376,7 +1376,8 @@ async function sendProductionJobEmailNotification(
 
       return { success: true, messageId: info.messageId, recipients };
     } catch (smtpErr: unknown) {
-      console.warn(`[SMTP WARN] Transport response for job ${job.jobNo}: ${smtpErr.message}`);
+      const message = smtpErr instanceof Error ? smtpErr.message : String(smtpErr);
+      console.warn(`[SMTP WARN] Transport response for job ${job.jobNo}: ${message}`);
       ACTIVITY_LOGS.unshift({
         id: nextActivityLogId("log_smtp"),
         userId: job.operatorId || "u-1",
@@ -1384,9 +1385,9 @@ async function sendProductionJobEmailNotification(
         entityType: "ProductionJob",
         entityId: job.id,
         createdAt: new Date().toISOString(),
-        details: `SMTP dispatch attempted for ${job.jobNo} (${eventType}) to ${recipients.join(", ")}. Transport note: ${smtpErr.message}`
+        details: `SMTP dispatch attempted for ${job.jobNo} (${eventType}) to ${recipients.join(", ")}. Transport note: ${message}`
       });
-      return { success: true, warning: smtpErr.message, recipients };
+      return { success: true, warning: message, recipients };
     }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
