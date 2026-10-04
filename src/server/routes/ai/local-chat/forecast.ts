@@ -1,40 +1,36 @@
-import * as core from "../../../server-core.ts";
 import type { AiStats } from "./types.ts";
-import { normalizeArabicAndDialect } from "./normalization.ts";
 
-const { CUSTOMERS, ORDERS, MATERIALS, REMNANTS, EXPENSES } = core;
+export function getForecastChatResponse(
+  msgNorm: string,
+  stats: AiStats,
+  rate: number,
+): string | null {
+  const forecastKeywords = [
+    "توقع",
+    "تنبؤ",
+    "مستقبل",
+    "الشهر",
+    "القادم",
+    "تحليل",
+  ];
+  if (!forecastKeywords.some(keyword => msgNorm.includes(keyword))) {
+    return null;
+  }
 
-export function getForecastChatResponse(msgNorm: string, stats: AiStats, rate: number): string | null {
+  if (stats.canViewFinancials !== true) {
+    return "🔒 التنبؤات المالية مؤمنة لحسابات الإدارة والحسابات فقط.";
+  }
 
-    if (!stats.canViewFinancials && (
-      msgNorm.includes("توقع") ||
-      msgNorm.includes("تنبؤ") ||
-      msgNorm.includes("الشهر") ||
-      msgNorm.includes("القادم") ||
-      msgNorm.includes("تحليل")
-    )) {
-      return "🔒 التنبؤات المالية مؤمنة لحسابات الإدارة والحسابات فقط.";
-    }
-    if (
-      msgNorm.includes("توقع") || 
-      msgNorm.includes("تنبؤ") || 
-      msgNorm.includes("مستقبل") || 
-      msgNorm.includes("الشهر") || 
-      msgNorm.includes("القادم") ||
-      msgNorm.includes("تحليل")
-    ) {
-      const averageOrderVal = ordersCount > 0 ? (totalRevenue / ordersCount) : 0;
-      const forecastedRevenue = averageOrderVal * (ordersCount * 1.15);
-      return `🔮 **تنبؤات ومؤشرات التنمية الذكية لورشة AXIS LAB** (استدلال محلي):
+  const averageOrderValue =
+    stats.ordersCount > 0 ? stats.totalRevenue / stats.ordersCount : 0;
+  const forecastedRevenue = averageOrderValue * (stats.ordersCount * 1.15);
 
-استناداً إلى تحليل نشاط الورشة وتاريخ الطلبات والعملاء الحالي:
-• **متوسط قيمة الطلب الفردي (Ticket Size)**: $${averageOrderVal.toFixed(2)} (${Math.round(averageOrderVal * rate).toLocaleString()} ل.س)
-• **معدل نمو الطلبات المتوقع**: زيادة بنسبة **%15** في حجم الطلبيات للربع السنوي القادم.
+  return `🔮 **تنبؤات ومؤشرات التنمية الذكية لورشة AXIS LAB**:
 
-📈 **توقعات الشهر القادم**:
-- **تقدير المبيعات**: **$${forecastedRevenue.toFixed(2)}** (${Math.round(forecastedRevenue * rate).toLocaleString()} ل.س)
-- **المواد الأكثر استهلاكاً**: الأكريليك الشفاف 3مم، خشب MDF 5مم.
-- **توصية تشغيلية**: يُقترح تأمين كميات احتياطية من ألواح الأكريليك وتأكيد صيانة رؤوس الليزر والمرايا قبل انطلاق موسم الأعياد واللوحات الدعائية لضمان استمرارية التشغيل دون انقطاع.`;
-    }
-  return null;
+• **متوسط قيمة الطلب**: $${averageOrderValue.toFixed(2)} (${Math.round(averageOrderValue * rate).toLocaleString()} ل.س)
+• **معدل النمو المفترض**: زيادة بنسبة **%15** في حجم الطلبات القادمة.
+• **تقدير المبيعات القادم**: **$${forecastedRevenue.toFixed(2)}** (${Math.round(forecastedRevenue * rate).toLocaleString()} ل.س)
+
+📈 **توصية تشغيلية**:
+تأمين المواد ذات الاستهلاك الأعلى ومراجعة خطة صيانة الليزر قبل فترات الضغط التشغيلي.`;
 }
