@@ -6,6 +6,7 @@ const {
   ACTIVITY_LOGS,
   SETTINGS,
   nextActivityLogId,
+  nextEntityId,
   getRequestUser,
   persistMutationWithFastDurability,
 } = core;
