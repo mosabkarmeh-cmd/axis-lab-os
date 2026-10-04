@@ -9,13 +9,8 @@ const {
   getActorId,
   persistStateNow,
   orderForResponse,
-  ACTIVITY_LOGS,
-  getRequestUser,
   createNotification,
-  schedulePersist,
-  nextActivityLogId,
   WORKFLOW_NEXT_REMINDERS,
-  normalizeOrderStatuses,
   freezeOrderCurrencySnapshot,
 } = core;
 
