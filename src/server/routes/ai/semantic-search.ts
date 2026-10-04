@@ -1,5 +1,6 @@
 import express from "express";
 import * as core from "../../server-core.ts";
+import { getAiAccessScope } from "./access.ts";
 
 type SemanticResult = {
   type: string;
@@ -29,6 +30,7 @@ export function registerAiSemanticSearchRoutes(app: express.Express) {
       }
 
       const q = query.toLowerCase().trim();
+      const access = getAiAccessScope(req);
       const results: SemanticResult[] = [];
 
       // Search Customers
@@ -37,7 +39,7 @@ export function registerAiSemanticSearchRoutes(app: express.Express) {
           results.push({
             type: "customer",
             title: c.name,
-            subtitle: `شركة: ${c.company || "فردي"} • هاتف: ${c.phone || "غير محدد"}`,
+            subtitle: access.canViewCustomerPrivateData ? `شركة: ${c.company || "فردي"} • هاتف: ${c.phone || "غير محدد"}` : `شركة: ${c.company || "فردي"}`,
             entityId: c.id,
             relevance: 100,
             reason: "مطابقة مباشرة لاسم العميل أو رقم الهاتف في دفتر الحسابات."
@@ -51,7 +53,7 @@ export function registerAiSemanticSearchRoutes(app: express.Express) {
           results.push({
             type: "order",
             title: `طلب رقم ${o.orderNumber}`,
-            subtitle: `العميل: ${o.customerName} • القيمة: ${Math.round(Number(o.totalPrice || 0)).toLocaleString()} ل.س • الحالة: ${o.status}`,
+            subtitle: access.canViewFinancials ? `العميل: ${o.customerName} • القيمة: ${Math.round(Number(o.totalPrice || 0)).toLocaleString()} ل.س • الحالة: ${o.status}` : `العميل: ${o.customerName} • الحالة: ${o.status}`,
             entityId: o.id,
             relevance: 95,
             reason: `عثرنا على مطابقة في بيانات الطلبات المرتبطة بـ ${o.customerName}.`
@@ -65,7 +67,7 @@ export function registerAiSemanticSearchRoutes(app: express.Express) {
           results.push({
             type: "material",
             title: m.name,
-            subtitle: `الفئة: ${m.category} • السماكة: ${m.thickness || "غير محدد"} مم • السعر: ${Math.round(Number(m.pricePerUnit || 0)).toLocaleString()} ل.س (≈ $${(Number(m.pricePerUnit || 0) / (Number(SETTINGS.exchangeRate) || 135)).toFixed(2)})`,
+            subtitle: access.canViewFinancials ? `الفئة: ${m.category} • السماكة: ${m.thickness || "غير محدد"} مم • السعر: ${Math.round(Number(m.pricePerUnit || 0)).toLocaleString()} ل.س (≈ ${(Number(m.pricePerUnit || 0) / (Number(SETTINGS.exchangeRate) || 135)).toFixed(2)})` : `الفئة: ${m.category} • السماكة: ${m.thickness || "غير محدد"} مم`,
             entityId: m.id,
             relevance: 90,
             reason: `تطابق دلالي مع الخامات المخزنية المسجلة من نوع ${m.category}.`
