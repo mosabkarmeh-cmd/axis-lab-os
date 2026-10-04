@@ -158,4 +158,3 @@ export function registerOrderUpdateRoutes(app: express.Express) {
     res.json(orderForResponse(req, order));
   });
 }
-}
