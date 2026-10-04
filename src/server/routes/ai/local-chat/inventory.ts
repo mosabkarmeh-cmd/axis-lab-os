@@ -1,6 +1,6 @@
 import * as core from "../../../server-core.ts";
-import type { AiStats } from "../local-chat/types.ts";
-import { normalizeArabicAndDialect } from "../local-chat/normalization.ts";
+import type { AiStats } from "./types.ts";
+import { normalizeArabicAndDialect } from "./normalization.ts";
 
 const { CUSTOMERS, ORDERS, MATERIALS, REMNANTS, EXPENSES } = core;
 
