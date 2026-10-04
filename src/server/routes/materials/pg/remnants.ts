@@ -1,6 +1,6 @@
 import type { Router } from "express";
-import { db } from "../../../db/index.ts";
-import { remnants } from "../../../db/schema.ts";
+import { db } from "../../../../db/index.ts";
+import { remnants } from "../../../../db/schema.ts";
 
 const errorMessage = (err: unknown) => err instanceof Error ? err.message : String(err);
 
