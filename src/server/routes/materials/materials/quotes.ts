@@ -1,8 +1,8 @@
 import express from "express";
-import { db } from "../../../db/index.ts";
-import { materials as materialsTable, supplierQuotes as supplierQuotesTable } from "../../../db/schema.ts";
+import { db } from "../../../../db/index.ts";
+import { materials as materialsTable, supplierQuotes as supplierQuotesTable } from "../../../../db/schema.ts";
 import { eq } from "drizzle-orm";
-import * as core from "../../server-core.ts";
+import * as core from "../../../server-core.ts";
 import { getActorId, isEmployee, sanitizeMaterialForEmployee, sanitizeSupplierQuote } from "./shared.ts";
 
 const {
