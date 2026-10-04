@@ -21,6 +21,10 @@ const {
   schedulePersist,
 } = core;
 
+function getActorId(req: express.Request): string {
+  return core.getRequestUser(req)?.id || "system";
+}
+
 export function registerBackupRoutes(app: express.Express) {
 app.get("/api/backup", (req, res) => {
     res.json({ success: true, backups: BACKUPS.map(publicBackup) });
@@ -83,39 +87,4 @@ app.get("/api/backup", (req, res) => {
     }
   });
 
-  // ==================== FILES & DOCUMENTS API ====================
-  const UPLOAD_DIR = path.join(process.cwd(), "uploads");
-  if (!fs.existsSync(UPLOAD_DIR)) {
-    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-  }
-
-  const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-      cb(null, UPLOAD_DIR);
-    },
-    filename: (req, file, cb) => {
-      const ext = path.extname(file.originalname);
-      const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
-      cb(null, uniqueName);
-    }
-  });
-  const ALLOWED_UPLOAD_EXTENSIONS = new Set([
-    ".dxf", ".dwg", ".svg", ".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp",
-    ".xlsx", ".xls", ".csv", ".doc", ".docx"
-  ]);
-  const upload = multer({
-    storage,
-    limits: { fileSize: 25 * 1024 * 1024 },
-    fileFilter: (req, file, cb) => {
-      const ext = path.extname(file.originalname).toLowerCase();
-      if (!ALLOWED_UPLOAD_EXTENSIONS.has(ext)) {
-        cb(new Error("نوع الملف غير مسموح به"));
-        return;
-      }
-      cb(null, true);
-    }
-  });
-
-  // File Upload
-}
 }
