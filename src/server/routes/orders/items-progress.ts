@@ -7,7 +7,7 @@ const { ORDERS, ACTIVITY_LOGS, nextActivityLogId } = core;
 export function registerOrderItemProgressRoutes(app: express.Express) {
 // API - Update Order Item Progress (تحديث نسبة إنجاز أجزاء ومواد الطلب والتكرارات)
   app.patch("/api/orders/:id/items-progress", (req, res) => {
-    const { itemId, materialName, setAllCompleted, resetAll, addItem, removeItemId, completedQuantity, changedById } = req.body;
+    const { itemId, materialName, setAllCompleted, resetAll, addItem, removeItemId, completedQuantity } = req.body;
     const order = ORDERS.find(o => o.id === req.params.id);
     if (!order) {
       res.status(404).json({ error: "الطلب غير موجود" });
