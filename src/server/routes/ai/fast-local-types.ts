@@ -12,5 +12,17 @@ export interface FastLocalPayload {
   wasteOverridePercent?: number;
   targetProfitMarginPercent?: number;
   workType?: string;
+  machineId?: string;
+  widthCm?: number;
+  lengthCm?: number;
+  cutLengthCm?: number;
+  engraveAreaCm2?: number;
+  quantity?: number;
+  laserPowerWatts?: number;
+  tubeCostUSD?: number;
+  tubeLifespanHours?: number;
+  electricityRatePerKwh?: number;
+  operatorRatePerHour?: number;
+  setupFeeUSD?: number;
   [key: string]: unknown;
 }
