@@ -11,12 +11,12 @@ import "dotenv/config";
 
 import { refreshWarehouseCache as createWarehouseCacheRuntime } from "./runtime/warehouse-cache.ts";
 import { createStatePersistence } from "./runtime/state-persistence.ts";
+import { createLocalSqliteRuntime, localSqlite, setLocalSqlite } from "./runtime/local-sqlite.ts";
 
 import express from "express";
 import path from "path";
 import { GoogleGenAI, Type } from "@google/genai";
 import fs from "fs";
-import { createHash } from "crypto";
 import https from "https";
 import multer from "multer";
 import ExcelJS from "exceljs";
@@ -29,7 +29,7 @@ import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
-import initSqlJs, { type Database } from "sql.js";
+import { type Database } from "sql.js";
 import { materialPriceUSD } from "../lib/materials.ts";
 import { sypToUsd } from "../lib/currency.ts";
 
@@ -94,125 +94,31 @@ function benchmarkSnapshot(target: Map<string, BenchmarkBucket>) {
 }
 const NORMALIZED_LOCAL_COLLECTIONS = ["CUSTOMERS", "PRODUCTS", "MATERIALS", "INVENTORY", "INVENTORY_TRANSACTIONS", "REMNANTS", "SUPPLIERS", "SUPPLY_ORDERS", "SUPPLIER_QUOTES", "MACHINES", "ORDERS", "ACTIVITY_LOGS", "NOTIFICATIONS", "PRODUCTION_JOBS"] as const;
 const NORMALIZED_FINANCIAL_COLLECTIONS = ["INVOICES", "EXPENSES"] as const;
-export let localSqlite: Database | null = null;
-export function setLocalSqlite(database: Database) {
-  localSqlite = database;
-  return localSqlite;
-}
-
-async function initLocalSqlite() {
-  if (localSqlite) return localSqlite;
-  const SQL = await initSqlJs({
-    locateFile: (file: string) => process.env.SQLITE_WASM_PATH || path.join(APP_RUNTIME_ROOT, "node_modules", "sql.js", "dist", file),
-  });
-  const openDatabase = (candidateBytes?: Uint8Array) => {
-    let database: Database | null = null;
-    try {
-      database = candidateBytes ? new SQL.Database(candidateBytes) : new SQL.Database();
-      database.run("PRAGMA foreign_keys = ON");
-      database.run("CREATE TABLE IF NOT EXISTS app_state (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL, updated_at TEXT NOT NULL)");
-      database.run("CREATE TABLE IF NOT EXISTS local_entities (collection TEXT NOT NULL, entity_id TEXT NOT NULL, payload TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (collection, entity_id))");
-      database.run("CREATE INDEX IF NOT EXISTS idx_local_entities_collection_updated ON local_entities (collection, updated_at)");
-      database.run("CREATE INDEX IF NOT EXISTS idx_local_entities_entity ON local_entities (entity_id)");
-      database.run("CREATE TABLE IF NOT EXISTS local_metadata (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL, updated_at TEXT NOT NULL)");
-      database.run("CREATE TABLE IF NOT EXISTS local_invoices (id TEXT PRIMARY KEY NOT NULL, invoice_number TEXT NOT NULL, order_id TEXT, customer_id TEXT NOT NULL, issue_date TEXT NOT NULL, due_date TEXT NOT NULL, total_price REAL NOT NULL, subtotal REAL, tax_percent REAL, discount REAL, paid_amount REAL NOT NULL, remaining REAL NOT NULL, status TEXT NOT NULL, notes TEXT, payload TEXT NOT NULL, updated_at TEXT NOT NULL)");
-      database.run("CREATE TABLE IF NOT EXISTS local_invoice_items (id TEXT PRIMARY KEY NOT NULL, invoice_id TEXT NOT NULL, product_name TEXT NOT NULL, quantity REAL NOT NULL, unit_price REAL NOT NULL, discount REAL NOT NULL, tax REAL NOT NULL, total REAL NOT NULL, created_at TEXT NOT NULL, payload TEXT NOT NULL, FOREIGN KEY (invoice_id) REFERENCES local_invoices(id) ON DELETE CASCADE)");
-      database.run("CREATE TABLE IF NOT EXISTS local_invoice_history (id TEXT PRIMARY KEY NOT NULL, invoice_id TEXT NOT NULL, action TEXT NOT NULL, created_at TEXT NOT NULL, payload TEXT NOT NULL, FOREIGN KEY (invoice_id) REFERENCES local_invoices(id) ON DELETE CASCADE)");
-      database.run("CREATE TABLE IF NOT EXISTS local_payments (id TEXT PRIMARY KEY NOT NULL, order_id TEXT, invoice_id TEXT, amount REAL NOT NULL, method TEXT NOT NULL, reference TEXT, date TEXT NOT NULL, notes TEXT, payload TEXT NOT NULL, updated_at TEXT NOT NULL)");
-      database.run("CREATE TABLE IF NOT EXISTS local_expenses (id TEXT PRIMARY KEY NOT NULL, category TEXT NOT NULL, amount REAL NOT NULL, date TEXT NOT NULL, status TEXT NOT NULL, payload TEXT NOT NULL, updated_at TEXT NOT NULL)");
-      database.run("INSERT OR IGNORE INTO local_metadata (key, value, updated_at) VALUES ('schema_version', ?, ?)", [String(LOCAL_SCHEMA_VERSION), new Date().toISOString()]);
-      database.run("UPDATE local_metadata SET value = ?, updated_at = ? WHERE key = 'schema_version' AND CAST(value AS INTEGER) < ?", [String(LOCAL_SCHEMA_VERSION), new Date().toISOString(), LOCAL_SCHEMA_VERSION]);
-      return database;
-    } catch (error) {
-      try { database?.close(); } catch {}
-      throw error;
-    }
-  };
-  const hasCurrentFile = fs.existsSync(LOCAL_DATA_FILE);
-  let bytes = hasCurrentFile ? fs.readFileSync(LOCAL_DATA_FILE) : undefined;
-  let recoveredFrom: string | null = null;
-  try {
-    localSqlite = openDatabase(bytes);
-  } catch (error) {
-    const corruptPath = `${LOCAL_DATA_FILE}.corrupt-${Date.now()}`;
-    if (hasCurrentFile) {
-      try {
-        fs.renameSync(LOCAL_DATA_FILE, corruptPath);
-        console.error(`[SQLITE] Current database was corrupt and was preserved at ${corruptPath}:`, error);
-      } catch (renameError) {
-        console.error("[SQLITE] Could not preserve the corrupt database:", renameError);
-      }
-    }
-    localSqlite = null;
-    const backupDir = backupDirectory();
-    if (fs.existsSync(backupDir)) {
-      const candidates = fs.readdirSync(backupDir)
-        .filter((name) => name.endsWith(".sqlite"))
-        .map((name) => path.join(backupDir, name))
-        .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
-      for (const candidate of candidates) {
-        try {
-          bytes = fs.readFileSync(candidate);
-          localSqlite = openDatabase(bytes);
-          recoveredFrom = candidate;
-          console.error(`[SQLITE] Recovered database from backup ${candidate}`);
-          break;
-        } catch {
-          localSqlite = null;
-        }
-      }
-    }
-    if (!localSqlite) {
-      bytes = undefined;
-      localSqlite = openDatabase();
-    }
-  }
-  if (!bytes && fs.existsSync(LOCAL_LEGACY_DATA_FILE)) {
-    try {
-      const legacy = JSON.parse(fs.readFileSync(LOCAL_LEGACY_DATA_FILE, "utf8"));
-      for (const [key, value] of Object.entries(legacy)) {
-        localSqlite.run("INSERT OR REPLACE INTO app_state (key, value, updated_at) VALUES (?, ?, ?)", [key, JSON.stringify(value), new Date().toISOString()]);
-      }
-      console.log(`[SQLITE] Migrated legacy JSON data from ${LOCAL_LEGACY_DATA_FILE}`);
-    } catch (error) {
-      console.error("[SQLITE] Legacy JSON migration failed:", error);
-    }
-  }
-  if (recoveredFrom) await flushLocalSqlite();
-  return localSqlite;
-}
-
-const SQLITE_BUSY_RETRY_DELAYS_MS = [25, 50, 100, 200, 400];
-async function withSqliteBusyRetry<T>(operation: () => Promise<T>): Promise<T> {
-  let lastError: unknown;
-  for (let attempt = 0; attempt <= SQLITE_BUSY_RETRY_DELAYS_MS.length; attempt++) {
-    try {
-      return await operation();
-    } catch (error) {
-      lastError = error;
-      const message = String((error as Error)?.message || error).toLowerCase();
-      const isBusy = message.includes("busy") || message.includes("locked");
-      if (!isBusy || attempt === SQLITE_BUSY_RETRY_DELAYS_MS.length) throw error;
-      await new Promise((resolve) => setTimeout(resolve, SQLITE_BUSY_RETRY_DELAYS_MS[attempt]));
-    }
-  }
-  throw lastError;
-}
-async function flushLocalSqlite() {
-  if (!localSqlite) return;
-  await fs.promises.mkdir(path.dirname(LOCAL_DATA_FILE), { recursive: true });
-  const bytes = localSqlite.export();
-  const tempFile = `${LOCAL_DATA_FILE}.tmp`;
-  const handle = await fs.promises.open(tempFile, "w");
-  try {
-    await handle.writeFile(Buffer.from(bytes));
-    await handle.sync();
-  } finally {
-    await handle.close();
-  }
-  await fs.promises.rename(tempFile, LOCAL_DATA_FILE);
-}
-
+let persistStateNowForSqlite: () => Promise<void> = async () => {
+  throw new Error("SQLite persistence callback is not initialized");
+};
+const localSqliteRuntime = createLocalSqliteRuntime(
+  {
+    dataFile: LOCAL_DATA_FILE,
+    legacyDataFile: LOCAL_LEGACY_DATA_FILE,
+    appRuntimeRoot: APP_RUNTIME_ROOT,
+    schemaVersion: LOCAL_SCHEMA_VERSION,
+    useSqlite: USE_SQLITE,
+  },
+  {
+    persistStateNow: () => persistStateNowForSqlite(),
+  },
+);
+const {
+  initLocalSqlite,
+  SQLITE_BUSY_RETRY_DELAYS_MS,
+  withSqliteBusyRetry,
+  flushLocalSqlite,
+  backupDirectory,
+  checksumFile,
+  createSqliteBackup,
+  readFinancialTablesFromSqlite,
+} = localSqliteRuntime;
 function syncNormalizedLocalEntities(sqlite: Database) {
   const now = new Date().toISOString();
   for (const collection of NORMALIZED_LOCAL_COLLECTIONS) {
@@ -316,71 +222,6 @@ function syncNormalizedFinancialEntities(sqlite: Database) {
     usedExpenseIds.add(expenseId);
     sqlite.run("INSERT INTO local_expenses (id, category, amount, date, status, payload, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)", [expenseId, String(expense.category || "عام"), Number(expense.amount) || 0, String(expense.date || now), String(expense.status || "paid"), JSON.stringify(expense), now]);
   }
-}
-
-type LocalSqliteRow = Array<string | number | Uint8Array | null>;
-
-function readFinancialTablesFromSqlite() {
-  if (!USE_SQLITE || !localSqlite) return null;
-  const invoiceRows = localSqlite.exec("SELECT payload FROM local_invoices ORDER BY updated_at, id")[0]?.values || [];
-  const itemRows = localSqlite.exec("SELECT invoice_id, payload FROM local_invoice_items ORDER BY created_at, id")[0]?.values || [];
-  const historyRows = localSqlite.exec("SELECT invoice_id, payload FROM local_invoice_history ORDER BY created_at, id")[0]?.values || [];
-  const paymentRows = localSqlite.exec("SELECT payload FROM local_payments ORDER BY updated_at, id")[0]?.values || [];
-  const expenseRows = localSqlite.exec("SELECT payload FROM local_expenses ORDER BY updated_at, id")[0]?.values || [];
-  const invoices = invoiceRows.map(([payload]: LocalSqliteRow) => JSON.parse(String(payload)));
-  const itemsByInvoice = new Map<string, any[]>();
-  for (const [invoiceId, payload] of itemRows) {
-    const list = itemsByInvoice.get(String(invoiceId)) || [];
-    list.push(JSON.parse(String(payload)));
-    itemsByInvoice.set(String(invoiceId), list);
-  }
-  const historyByInvoice = new Map<string, any[]>();
-  for (const [invoiceId, payload] of historyRows) {
-    const list = historyByInvoice.get(String(invoiceId)) || [];
-    list.push(JSON.parse(String(payload)));
-    historyByInvoice.set(String(invoiceId), list);
-  }
-  for (const invoice of invoices) {
-    invoice.items = itemsByInvoice.get(String(invoice.id)) || invoice.items || [];
-    invoice.history = historyByInvoice.get(String(invoice.id)) || invoice.history || [];
-  }
-  return {
-    invoices,
-    payments: paymentRows.map(([payload]: LocalSqliteRow) => JSON.parse(String(payload))),
-    expenses: expenseRows.map(([payload]: LocalSqliteRow) => JSON.parse(String(payload))),
-  };
-}
-function backupDirectory() {
-  return path.join(path.dirname(LOCAL_DATA_FILE), "backups");
-}
-
-function checksumFile(filePath: string) {
-  return new Promise<string>((resolve, reject) => {
-    const hash = createHash("sha256");
-    const stream = fs.createReadStream(filePath);
-    stream.on("data", (chunk) => hash.update(chunk));
-    stream.on("error", reject);
-    stream.on("end", () => resolve(hash.digest("hex")));
-  });
-}
-
-async function createSqliteBackup(kind = "manual") {
-  if (!USE_SQLITE) return null;
-  await persistStateNow();
-  await fs.promises.mkdir(backupDirectory(), { recursive: true });
-  const id = `b_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const filePath = path.join(backupDirectory(), `${id}.sqlite`);
-  await fs.promises.copyFile(LOCAL_DATA_FILE, filePath);
-  const stat = await fs.promises.stat(filePath);
-  return {
-    id,
-    name: `${kind === "safety" ? "نسخة أمان قبل الاستعادة" : "نسخة احتياطية يدوية"} - ${new Date().toLocaleDateString("ar-EG")}`,
-    createdAt: new Date().toISOString(),
-    status: "completed",
-    filePath,
-    size: stat.size,
-    sha256: await checksumFile(filePath),
-  };
 }
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -1492,10 +1333,12 @@ const {
   RESETTABLE_BUSINESS_COLLECTIONS,
   resetBusinessData,
 } = statePersistence;
+persistStateNowForSqlite = statePersistence.persistStateNow;
+
 const persistTimer = statePersistence.persistTimer;
 const persistInFlight = statePersistence.persistInFlight;
 const persistAgainAfter = statePersistence.persistAgainAfter;
 
 // Public runtime contract consumed by the extracted API route modules.
-export { apiKey, ai, DB_MODE, USE_POSTGRES, USE_SQLITE, APP_RUNTIME_ROOT, LOCAL_DATA_FILE, RESOURCE_FONT_PATH, LOCAL_LEGACY_DATA_FILE, LOCAL_SCHEMA_VERSION, activityLogSequence, nextActivityLogId, entityIdSequence, nextEntityId, orderCreateBenchmarks, persistenceBenchmarks, persistQueueStats, recordBenchmark, benchmarkSnapshot, NORMALIZED_LOCAL_COLLECTIONS, NORMALIZED_FINANCIAL_COLLECTIONS, initLocalSqlite, SQLITE_BUSY_RETRY_DELAYS_MS, withSqliteBusyRetry, flushLocalSqlite, syncNormalizedLocalEntities, assertFinancialStateInvariants, syncNormalizedFinancialEntities, readFinancialTablesFromSqlite, backupDirectory, checksumFile, createSqliteBackup, JWT_SECRET, JWT_ISSUER, JWT_AUDIENCE, publicUser, generateJWT, getRequestUser, USERS, FILES, CUSTOMERS, PRODUCTS, ORDERS, ACTIVITY_LOGS, MATERIALS, LEGACY_MATERIAL_PRICES_SYP_CANONICAL, LEGACY_MATERIAL_PRICES_SYP, normalizeLegacyMaterialPrices, INVENTORY, INVENTORY_TRANSACTIONS, normalizeInventoryState, REMNANTS, SUPPLIER_QUOTES, SUPPLIERS, SUPPLY_ORDERS, DEMO_LOW_PRICE_MATERIALS, DEMO_LOW_PRICE_INVENTORY, ensureDemoLowPriceMaterials, MACHINES, EXPENSES, NUMBERING_SETTINGS, getNextNumber, INVOICE_HISTORY, NOTIFICATIONS, DELETED_ITEMS, ORDER_STATUSES, normalizeOrderStatuses, createNotification, notifyOverdueOrders, WORKFLOW_NEXT_REMINDERS, INVOICES, SETTINGS, publicSettings, getPartnerSharePercentAt, mergeSmtpSettings, freezeOrderCurrencySnapshot, sendProductionJobEmailNotification, BACKUPS, PRODUCTION_JOBS, PERSISTED_COLLECTIONS, LOCAL_PERSISTED_COLLECTIONS, idNum, refreshWarehouseCache, loadPersistedState, persistTimer, persistInFlight, persistAgainAfter, persistStateNow, persistMutationWithFastDurability, schedulePersist, RESETTABLE_BUSINESS_COLLECTIONS, resetBusinessData, sypToUsd };
+export { apiKey, ai, DB_MODE, USE_POSTGRES, USE_SQLITE, APP_RUNTIME_ROOT, LOCAL_DATA_FILE, RESOURCE_FONT_PATH, LOCAL_LEGACY_DATA_FILE, LOCAL_SCHEMA_VERSION, activityLogSequence, nextActivityLogId, entityIdSequence, nextEntityId, orderCreateBenchmarks, persistenceBenchmarks, persistQueueStats, recordBenchmark, benchmarkSnapshot, NORMALIZED_LOCAL_COLLECTIONS, NORMALIZED_FINANCIAL_COLLECTIONS, initLocalSqlite, SQLITE_BUSY_RETRY_DELAYS_MS, withSqliteBusyRetry, flushLocalSqlite, syncNormalizedLocalEntities, assertFinancialStateInvariants, syncNormalizedFinancialEntities, readFinancialTablesFromSqlite, backupDirectory, checksumFile, createSqliteBackup, JWT_SECRET, JWT_ISSUER, JWT_AUDIENCE, publicUser, generateJWT, getRequestUser, USERS, FILES, CUSTOMERS, PRODUCTS, ORDERS, ACTIVITY_LOGS, MATERIALS, LEGACY_MATERIAL_PRICES_SYP_CANONICAL, LEGACY_MATERIAL_PRICES_SYP, normalizeLegacyMaterialPrices, INVENTORY, INVENTORY_TRANSACTIONS, normalizeInventoryState, REMNANTS, SUPPLIER_QUOTES, SUPPLIERS, SUPPLY_ORDERS, DEMO_LOW_PRICE_MATERIALS, DEMO_LOW_PRICE_INVENTORY, ensureDemoLowPriceMaterials, MACHINES, EXPENSES, NUMBERING_SETTINGS, getNextNumber, INVOICE_HISTORY, NOTIFICATIONS, DELETED_ITEMS, ORDER_STATUSES, normalizeOrderStatuses, createNotification, notifyOverdueOrders, WORKFLOW_NEXT_REMINDERS, INVOICES, SETTINGS, publicSettings, getPartnerSharePercentAt, mergeSmtpSettings, freezeOrderCurrencySnapshot, sendProductionJobEmailNotification, BACKUPS, PRODUCTION_JOBS, localSqlite, setLocalSqlite, PERSISTED_COLLECTIONS, LOCAL_PERSISTED_COLLECTIONS, idNum, refreshWarehouseCache, loadPersistedState, persistTimer, persistInFlight, persistAgainAfter, persistStateNow, persistMutationWithFastDurability, schedulePersist, RESETTABLE_BUSINESS_COLLECTIONS, resetBusinessData, sypToUsd };
 export type { UserRecord, BenchmarkBucket };
