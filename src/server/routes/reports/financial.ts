@@ -8,8 +8,10 @@ import type {
 export function invoiceToSyp(
   invoice: InvoiceReportRecord,
   orders: OrderReportRecord[],
+  usdField: "paidAmount" | "remaining" | "totalPrice" = "totalPrice",
+  sypField: "paidAmountSYP" | "remainingSYP" | "totalPriceSYP" = "totalPriceSYP",
 ): number {
-  const fixedSYP = Number(invoice.totalPriceSYP ?? invoice.paidAmountSYP ?? invoice.remainingSYP);
+  const fixedSYP = Number(invoice[sypField]);
   if (Number.isFinite(fixedSYP)) return Math.round(fixedSYP);
 
   const linkedOrder = invoice.orderId
@@ -21,7 +23,7 @@ export function invoiceToSyp(
       ?? linkedOrder?.exchangeRateAtCreation,
   );
   const rate = historicalRate > 0 ? historicalRate : 135;
-  return Math.round((Number(invoice.totalPriceUSD ?? invoice.totalPrice) || 0) * rate);
+  return Math.round((Number(invoice[usdField]) || 0) * rate);
 }
 
 export function expenseToSyp(expense: ExpenseReportRecord): number {
@@ -44,18 +46,14 @@ export function buildFinancialAnalytics(
 ) {
   const totalRevenue = invoices.reduce((sum, invoice) => sum + Number(invoice.paidAmount || 0), 0);
   const totalReceivables = invoices.reduce((sum, invoice) => sum + Number(invoice.remaining || 0), 0);
-  const totalRevenueSYP = invoices.reduce((sum, invoice) => sum + invoiceToSyp(invoice, orders), 0);
-  const totalReceivablesSYP = invoices.reduce((sum, invoice) => {
-    const linkedOrder = invoice.orderId ? orders.find(order => order.id === invoice.orderId) : undefined;
-    const historicalRate = Number(
-      invoice.exchangeRateAtFinalization
-        ?? invoice.exchangeRateAtIssue
-        ?? linkedOrder?.exchangeRateAtCreation,
-    );
-    const rate = historicalRate > 0 ? historicalRate : 135;
-    const fixedSYP = Number(invoice.remainingSYP);
-    return sum + (Number.isFinite(fixedSYP) ? Math.round(fixedSYP) : Math.round((Number(invoice.remaining) || 0) * rate));
-  }, 0);
+  const totalRevenueSYP = invoices.reduce(
+    (sum, invoice) => sum + invoiceToSyp(invoice, orders, "paidAmount", "paidAmountSYP"),
+    0,
+  );
+  const totalReceivablesSYP = invoices.reduce(
+    (sum, invoice) => sum + invoiceToSyp(invoice, orders, "remaining", "remainingSYP"),
+    0,
+  );
 
   const totalExpenses = expenses.reduce((sum, expense) => sum + Number(expense.amountUSD ?? expense.amount ?? 0), 0);
   const totalExpensesSYP = expenses.reduce((sum, expense) => sum + expenseToSyp(expense), 0);
