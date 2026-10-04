@@ -83,13 +83,12 @@ export async function refreshWarehouseCache(enabled: boolean, collections: Wareh
         const migratedPrice = Math.round(price * 135);
         if ("minOrderQuantity" in row) {
           await db.update(supplierQuotesTable).set({ pricePerUnit: migratedPrice }).where(eq(supplierQuotesTable.id, row.id));
+          row.pricePerUnit = migratedPrice;
         } else {
-          await db.update(supplyOrdersTable).set({ unitPrice: migratedPrice, totalPrice: migratedPrice * Number(row.quantity || 0) }).where(eq(supplyOrdersTable.id, row.id));
-        }
-        row.pricePerUnit = migratedPrice;
-        if ("unitPrice" in row) {
+          const totalPrice = migratedPrice * Number(row.quantity || 0);
+          await db.update(supplyOrdersTable).set({ unitPrice: migratedPrice, totalPrice }).where(eq(supplyOrdersTable.id, row.id));
           row.unitPrice = migratedPrice;
-          row.totalPrice = migratedPrice * Number(row.quantity || 0);
+          row.totalPrice = totalPrice;
         }
       }
     }
