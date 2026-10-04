@@ -276,6 +276,18 @@ async function resetBusinessData() {
   await persistStateNow();
 }
 
-  return { PERSISTED_COLLECTIONS, LOCAL_PERSISTED_COLLECTIONS, loadPersistedState, persistTimer, persistInFlight, persistAgainAfter, persistStateNow, persistMutationWithFastDurability, schedulePersist, RESETTABLE_BUSINESS_COLLECTIONS, resetBusinessData };
+  return {
+    PERSISTED_COLLECTIONS,
+    LOCAL_PERSISTED_COLLECTIONS,
+    loadPersistedState,
+    persistStateNow,
+    persistMutationWithFastDurability,
+    schedulePersist,
+    RESETTABLE_BUSINESS_COLLECTIONS,
+    resetBusinessData,
+    get persistTimer() { return persistTimer; },
+    get persistInFlight() { return persistInFlight; },
+    get persistAgainAfter() { return persistAgainAfter; },
+  };
 }
 }
