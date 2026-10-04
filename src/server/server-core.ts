@@ -10,6 +10,7 @@
 import "dotenv/config";
 
 import { refreshWarehouseCache as createWarehouseCacheRuntime } from "./runtime/warehouse-cache.ts";
+import { createStatePersistence } from "./runtime/state-persistence.ts";
 
 import express from "express";
 import path from "path";
@@ -1458,317 +1459,39 @@ const PRODUCTION_JOBS = [
   }
 ];
 
-// ==================== STATE PERSISTENCE (survive server restarts) ====================
-// server.ts still keeps its core business data (users, orders, invoices, activity logs,
-// settings, ...) in plain in-memory arrays/objects instead of the Postgres tables already
-// defined for them in src/db/schema.ts. Rewriting every single route that touches this data
-// into hand-written SQL is a large, high-risk change given how tightly the order/invoice/
-// status-history logic is coupled together across ~150 routes.
-//
-// Instead, this snapshots ALL of these collections as JSON into one Postgres table
-// (app_state) whenever a write request finishes, and restores them at startup. Every
-// existing route keeps working exactly as before (same in-memory arrays, same logic) -
-// the only change is that the data no longer evaporates when the server restarts.
-//
-// NOTE: MATERIALS/INVENTORY/INVENTORY_TRANSACTIONS/REMNANTS/SUPPLIERS/SUPPLY_ORDERS/
-// SUPPLIER_QUOTES are intentionally NOT in this list. Those already have real, normalized
-// Postgres tables (used directly by src/server/routes/materials.ts), so they are kept in
-// sync via refreshWarehouseCache() below instead of the generic JSON snapshot - otherwise
-// we'd have two disagreeing copies of the warehouse data.
-const PERSISTED_COLLECTIONS: Record<string, any> = {
-  USERS, FILES, ORDERS, ACTIVITY_LOGS, EXPENSES,
-  NUMBERING_SETTINGS, INVOICE_HISTORY, NOTIFICATIONS, DELETED_ITEMS, ORDER_STATUSES,
-  INVOICES, SETTINGS, BACKUPS, PRODUCTION_JOBS,
-};
-
-const LOCAL_PERSISTED_COLLECTIONS: Record<string, any> = {
-  ...PERSISTED_COLLECTIONS,
-  CUSTOMERS, PRODUCTS, MATERIALS, INVENTORY, INVENTORY_TRANSACTIONS,
-  REMNANTS, SUPPLIERS, SUPPLY_ORDERS, SUPPLIER_QUOTES, MACHINES,
-};
-
-// ==================== WAREHOUSE + CUSTOMERS/PRODUCTS CACHE ====================
-// customers.ts, products.ts, and materials.ts (src/server/routes/) already read/write
-// the real `customers`, `products`, `materials`, `inventory`, `remnants`, and `suppliers`
-// Postgres tables directly for their own routes. But ~100+ other places in this file
-// (dashboards, reports, AI predictions, low-stock alerts, order/production lookups, plus
-// the remaining suppliers/supply-orders/inventory-adjustment/remnants routes that only
-// exist here) still read and write the old hardcoded in-memory CUSTOMERS/PRODUCTS/
-// MATERIALS/INVENTORY/SUPPLIERS/... arrays, completely disconnected from that real
-// database. Concretely this means: add a customer, material, or supplier from the UI
-// -> it's saved to Postgres correctly -> but its detail page, the dashboards, and order
-// creation/editing logic never see it, because they're still reading the old seed array.
-//
-// Fix: keep those in-memory arrays as-is (zero risk to the ~100 call sites that read them),
-// but refresh their contents from the real tables at the start of every /api request, and
-// make every remaining write route in this file (suppliers, supply-orders, inventory
-// adjustments, remnants consume/waste, supplier quotes) also write through to the real
-// tables. That makes the real Postgres tables the single source of truth everywhere.
-function idNum(prefixedId: unknown, prefix: string): number | null {
-  if (prefixedId === null || prefixedId === undefined) return null;
-  const n = parseInt(String(prefixedId).replace(prefix, ""));
-  return isNaN(n) ? null : n;
-}
-
-async function refreshWarehouseCache() {
-  return createWarehouseCacheRuntime(USE_POSTGRES, {
-    MACHINES,
-    CUSTOMERS,
-    PRODUCTS,
-    MATERIALS,
-    INVENTORY,
-    INVENTORY_TRANSACTIONS,
-    REMNANTS,
-    SUPPLIERS,
-    SUPPLY_ORDERS,
-    SUPPLIER_QUOTES,
-  });
-}
-
-async function loadPersistedState(): Promise<number> {
-  try {
-    if (USE_SQLITE) {
-      const sqlite = await initLocalSqlite();
-      const rows = sqlite.exec("SELECT key, value FROM app_state");
-      const values = rows.length ? rows[0].values : [];
-      let restored = 0;
-      const snapshotKeys = new Set(values.map(([key]) => String(key)));
-      const snapshotValues = new Map(values.map(([key, rawValue]) => [String(key), String(rawValue)]));
-      for (const [key, rawValue] of values) {
-        const target = LOCAL_PERSISTED_COLLECTIONS[String(key)];
-        if (!target || NORMALIZED_LOCAL_COLLECTIONS.includes(String(key) as typeof NORMALIZED_LOCAL_COLLECTIONS[number]) || NORMALIZED_FINANCIAL_COLLECTIONS.includes(String(key) as typeof NORMALIZED_FINANCIAL_COLLECTIONS[number])) continue;
-        const value = JSON.parse(String(rawValue));
-        if (Array.isArray(target) && Array.isArray(value)) {
-          target.length = 0;
-          target.push(...value);
-        } else if (target && typeof target === "object" && value && typeof value === "object") {
-          Object.assign(target, value);
-        }
-        restored++;
-      }
-      for (const [key, target] of Object.entries(LOCAL_PERSISTED_COLLECTIONS)) {
-        if (key !== "USERS" && !snapshotKeys.has(key) && Array.isArray(target) && !NORMALIZED_LOCAL_COLLECTIONS.includes(key as typeof NORMALIZED_LOCAL_COLLECTIONS[number]) && !NORMALIZED_FINANCIAL_COLLECTIONS.includes(key as typeof NORMALIZED_FINANCIAL_COLLECTIONS[number])) {
-          target.length = 0;
-        }
-      }
-      let migrated = false;
-      for (const collection of NORMALIZED_LOCAL_COLLECTIONS) {
-        const target = LOCAL_PERSISTED_COLLECTIONS[collection];
-        const entityRows = sqlite.exec("SELECT payload FROM local_entities WHERE collection = ? ORDER BY entity_id", [collection]);
-        const entityValues = entityRows.length ? entityRows[0].values : [];
-        if (snapshotKeys.has(collection)) {
-          const legacyValue = JSON.parse(String(snapshotValues.get(collection) || "[]"));
-          if (Array.isArray(legacyValue)) {
-            target.length = 0;
-            target.push(...legacyValue);
-          }
-          migrated = true;
-        } else if (entityValues.length > 0) {
-          target.length = 0;
-          target.push(...entityValues.map(([payload]) => JSON.parse(String(payload))));
-          restored++;
-        } else {
-          target.length = 0;
-        }
-        if (snapshotKeys.has(collection)) {
-          sqlite.run("DELETE FROM app_state WHERE key = ?", [collection]);
-          migrated = true;
-        }
-      }
-      let financialMigrated = false;
-      const invoiceRows = sqlite.exec("SELECT payload FROM local_invoices ORDER BY updated_at, id");
-      if (snapshotKeys.has("INVOICES")) {
-        const legacyInvoices = JSON.parse(String(snapshotValues.get("INVOICES") || "[]"));
-        if (Array.isArray(legacyInvoices)) {
-          INVOICES.length = 0;
-          INVOICES.push(...legacyInvoices);
-        }
-        sqlite.run("DELETE FROM app_state WHERE key = ?", ["INVOICES"]);
-        financialMigrated = true;
-      } else if (invoiceRows.length && invoiceRows[0].values.length > 0) {
-        INVOICES.length = 0;
-        INVOICES.push(...invoiceRows[0].values.map(([payload]) => JSON.parse(String(payload))));
-        restored++;
-      } else {
-        INVOICES.length = 0;
-      }
-      const expenseRows = sqlite.exec("SELECT payload FROM local_expenses ORDER BY updated_at, id");
-      if (snapshotKeys.has("EXPENSES")) {
-        const legacyExpenses = JSON.parse(String(snapshotValues.get("EXPENSES") || "[]"));
-        if (Array.isArray(legacyExpenses)) {
-          EXPENSES.length = 0;
-          EXPENSES.push(...legacyExpenses);
-        }
-        sqlite.run("DELETE FROM app_state WHERE key = ?", ["EXPENSES"]);
-        financialMigrated = true;
-      } else if (expenseRows.length && expenseRows[0].values.length > 0) {
-        EXPENSES.length = 0;
-        EXPENSES.push(...expenseRows[0].values.map(([payload]) => JSON.parse(String(payload))));
-        restored++;
-      } else {
-        EXPENSES.length = 0;
-      }
-      if (migrated || financialMigrated) {
-        if (migrated) syncNormalizedLocalEntities(sqlite);
-        if (financialMigrated) syncNormalizedFinancialEntities(sqlite);
-        await flushLocalSqlite();
-      }
-      return restored;
-    }
-    if (!USE_POSTGRES) return 0;
-    const rows = await db.select().from(appState);
-    let restored = 0;
-    for (const row of rows) {
-      const target = PERSISTED_COLLECTIONS[row.key];
-      if (!target) continue;
-      const value = row.value as any;
-      if (Array.isArray(target) && Array.isArray(value)) {
-        target.length = 0;
-        target.push(...value);
-        restored++;
-      } else if (target && typeof target === "object" && !Array.isArray(target) && value && typeof value === "object") {
-        Object.assign(target, value);
-        restored++;
-      }
-    }
-    return restored;
-  } catch (err) {
-    console.error("[STATE] Failed to load persisted app state, starting from built-in seed data:", err);
-    return 0;
+// ==================== STATE PERSISTENCE ====================
+const statePersistence = createStatePersistence(
+  {
+    USERS, FILES, ORDERS, ACTIVITY_LOGS, EXPENSES, NUMBERING_SETTINGS, INVOICE_HISTORY,
+    NOTIFICATIONS, DELETED_ITEMS, ORDER_STATUSES, INVOICES, SETTINGS, BACKUPS, PRODUCTION_JOBS,
+    CUSTOMERS, PRODUCTS, MATERIALS, INVENTORY, INVENTORY_TRANSACTIONS, REMNANTS, SUPPLIERS,
+    SUPPLY_ORDERS, SUPPLIER_QUOTES, MACHINES,
+  },
+  {
+    usePostgres: USE_POSTGRES,
+    useSqlite: USE_SQLITE,
+    localSchemaVersion: LOCAL_SCHEMA_VERSION,
+    initLocalSqlite,
+    withSqliteBusyRetry,
+    flushLocalSqlite,
+    syncNormalizedLocalEntities,
+    assertFinancialStateInvariants,
+    syncNormalizedFinancialEntities,
+    recordBenchmark,
+    persistenceBenchmarks,
+    persistQueueStats,
   }
-}
-
-let persistTimer: NodeJS.Timeout | null = null;
-let persistInFlight = false;
-let persistAgainAfter = false;
-let persistWaiters: Array<() => void> = [];
-async function persistStateNow() {
-  if (!USE_POSTGRES && !USE_SQLITE) return;
-  if (persistInFlight) {
-    persistAgainAfter = true;
-    persistQueueStats.coalesced += 1;
-    await new Promise<void>((resolve) => persistWaiters.push(resolve));
-    return;
-  }
-  persistInFlight = true;
-  const persistStartedAt = performance.now();
-  try {
-    if (USE_SQLITE) {
-      await withSqliteBusyRetry(async () => {
-        const sqlite = await initLocalSqlite();
-        const now = new Date().toISOString();
-        sqlite.run("BEGIN TRANSACTION");
-        try {
-          for (const [key, value] of Object.entries(LOCAL_PERSISTED_COLLECTIONS)) {
-            if (NORMALIZED_LOCAL_COLLECTIONS.includes(key as typeof NORMALIZED_LOCAL_COLLECTIONS[number]) || NORMALIZED_FINANCIAL_COLLECTIONS.includes(key as typeof NORMALIZED_FINANCIAL_COLLECTIONS[number])) continue;
-            sqlite.run("INSERT INTO app_state (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at", [key, JSON.stringify(value), now]);
-          }
-          syncNormalizedLocalEntities(sqlite);
-          assertFinancialStateInvariants();
-          syncNormalizedFinancialEntities(sqlite);
-          sqlite.run("UPDATE local_metadata SET value = ?, updated_at = ? WHERE key = 'schema_version'", [String(LOCAL_SCHEMA_VERSION), now]);
-          sqlite.run("COMMIT");
-        } catch (error) {
-          try { sqlite.run("ROLLBACK"); } catch {}
-          throw error;
-        }
-        const flushStartedAt = performance.now();
-        await flushLocalSqlite();
-        recordBenchmark(persistenceBenchmarks, "sqlite_export_and_atomic_flush", flushStartedAt);
-      });
-    } else {
-      for (const [key, value] of Object.entries(PERSISTED_COLLECTIONS)) {
-        await db
-          .insert(appState)
-          .values({ key, value: value as any })
-          .onConflictDoUpdate({ target: appState.key, set: { value: value as any, updatedAt: new Date() } });
-      }
-    }
-    recordBenchmark(persistenceBenchmarks, USE_SQLITE ? "persist_state_sqlite" : "persist_state_postgres", persistStartedAt);
-    persistQueueStats.completed += 1;
-  } catch (err) {
-    persistQueueStats.failed += 1;
-    console.error("[STATE] Failed to persist app state to database:", err);
-    throw err;
-    } finally {
-    persistInFlight = false;
-    if (persistAgainAfter) {
-      persistAgainAfter = false;
-      void persistStateNow();
-    } else {
-      const waiters = persistWaiters;
-      persistWaiters = [];
-      waiters.forEach((resolve) => resolve());
-    }
-  }
-}
-async function persistMutationWithFastDurability() {
-  if (!USE_POSTGRES && !USE_SQLITE) return;
-  if (persistInFlight) {
-    schedulePersist();
-    return;
-  }
-  if (persistTimer) {
-    clearTimeout(persistTimer);
-    persistTimer = null;
-  }
-  await persistStateNow();
-}
-function schedulePersist() {
-  persistQueueStats.scheduled += 1;
-  if (persistTimer) {
-    persistQueueStats.coalesced += 1;
-    clearTimeout(persistTimer);
-  }
-  persistTimer = setTimeout(() => {
-    persistTimer = null;
-    void persistStateNow();
-  }, 400);
-}
-
-const RESETTABLE_BUSINESS_COLLECTIONS = [
-  FILES, ORDERS, ACTIVITY_LOGS, EXPENSES, INVOICE_HISTORY, NOTIFICATIONS,
-  DELETED_ITEMS, INVOICES, BACKUPS, PRODUCTION_JOBS, CUSTOMERS, PRODUCTS,
-  MATERIALS, INVENTORY, INVENTORY_TRANSACTIONS, REMNANTS, SUPPLIERS,
-  SUPPLY_ORDERS, SUPPLIER_QUOTES, MACHINES,
-];
-
-async function resetBusinessData() {
-  if (persistTimer) {
-    clearTimeout(persistTimer);
-    persistTimer = null;
-  }
-  await persistStateNow();
-  for (const collection of RESETTABLE_BUSINESS_COLLECTIONS) collection.length = 0;
-  if (USE_SQLITE) {
-    const sqlite = await initLocalSqlite();
-    await withSqliteBusyRetry(async () => {
-      sqlite.run("BEGIN TRANSACTION");
-      try {
-        sqlite.run("DELETE FROM local_invoice_items");
-        sqlite.run("DELETE FROM local_invoice_history");
-        sqlite.run("DELETE FROM local_payments");
-        sqlite.run("DELETE FROM local_invoices");
-        sqlite.run("DELETE FROM local_expenses");
-        sqlite.run("DELETE FROM local_entities");
-        sqlite.run("DELETE FROM app_state WHERE key IN (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
-          "FILES", "ORDERS", "ACTIVITY_LOGS", "EXPENSES", "INVOICE_HISTORY", "NOTIFICATIONS",
-          "DELETED_ITEMS", "INVOICES", "BACKUPS", "PRODUCTION_JOBS", "CUSTOMERS", "PRODUCTS",
-          "MATERIALS", "INVENTORY", "INVENTORY_TRANSACTIONS", "REMNANTS", "SUPPLIERS",
-          "SUPPLY_ORDERS", "SUPPLIER_QUOTES", "MACHINES",
-        ]);
-        sqlite.run("COMMIT");
-      } catch (error) {
-        try { sqlite.run("ROLLBACK"); } catch {}
-        throw error;
-      }
-      await flushLocalSqlite();
-    });
-  }
-  await persistStateNow();
-  await new Promise((resolve) => setTimeout(resolve, 75));
-  await persistStateNow();
-}
+);
+const {
+  PERSISTED_COLLECTIONS,
+  LOCAL_PERSISTED_COLLECTIONS,
+  loadPersistedState,
+  persistStateNow,
+  persistMutationWithFastDurability,
+  schedulePersist,
+  RESETTABLE_BUSINESS_COLLECTIONS,
+  resetBusinessData,
+} = statePersistence;
 
 // Public runtime contract consumed by the extracted API route modules.
 export { apiKey, ai, DB_MODE, USE_POSTGRES, USE_SQLITE, APP_RUNTIME_ROOT, LOCAL_DATA_FILE, RESOURCE_FONT_PATH, LOCAL_LEGACY_DATA_FILE, LOCAL_SCHEMA_VERSION, activityLogSequence, nextActivityLogId, entityIdSequence, nextEntityId, orderCreateBenchmarks, persistenceBenchmarks, persistQueueStats, recordBenchmark, benchmarkSnapshot, NORMALIZED_LOCAL_COLLECTIONS, NORMALIZED_FINANCIAL_COLLECTIONS, initLocalSqlite, SQLITE_BUSY_RETRY_DELAYS_MS, withSqliteBusyRetry, flushLocalSqlite, syncNormalizedLocalEntities, assertFinancialStateInvariants, syncNormalizedFinancialEntities, readFinancialTablesFromSqlite, backupDirectory, checksumFile, createSqliteBackup, JWT_SECRET, JWT_ISSUER, JWT_AUDIENCE, publicUser, generateJWT, getRequestUser, USERS, FILES, CUSTOMERS, PRODUCTS, ORDERS, ACTIVITY_LOGS, MATERIALS, LEGACY_MATERIAL_PRICES_SYP_CANONICAL, LEGACY_MATERIAL_PRICES_SYP, normalizeLegacyMaterialPrices, INVENTORY, INVENTORY_TRANSACTIONS, normalizeInventoryState, REMNANTS, SUPPLIER_QUOTES, SUPPLIERS, SUPPLY_ORDERS, DEMO_LOW_PRICE_MATERIALS, DEMO_LOW_PRICE_INVENTORY, ensureDemoLowPriceMaterials, MACHINES, EXPENSES, NUMBERING_SETTINGS, getNextNumber, INVOICE_HISTORY, NOTIFICATIONS, DELETED_ITEMS, ORDER_STATUSES, normalizeOrderStatuses, createNotification, notifyOverdueOrders, WORKFLOW_NEXT_REMINDERS, INVOICES, SETTINGS, publicSettings, getPartnerSharePercentAt, mergeSmtpSettings, freezeOrderCurrencySnapshot, sendProductionJobEmailNotification, BACKUPS, PRODUCTION_JOBS, PERSISTED_COLLECTIONS, LOCAL_PERSISTED_COLLECTIONS, idNum, refreshWarehouseCache, loadPersistedState, persistTimer, persistInFlight, persistAgainAfter, persistStateNow, persistMutationWithFastDurability, schedulePersist, RESETTABLE_BUSINESS_COLLECTIONS, resetBusinessData, sypToUsd };
