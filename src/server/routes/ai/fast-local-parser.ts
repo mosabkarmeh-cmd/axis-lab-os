@@ -1,9 +1,10 @@
 import type { Request, Response } from "express";
+import type { FastLocalPayload } from "./fast-local-types.ts";
 import * as core from "../../server-core.ts";
 import { normalizeArabicAndDialect } from "./local-chat.ts";
 const { CUSTOMERS, SETTINGS } = core;
 
-export function handleFastLocalParserAction(action: unknown, payload: any, req: Request, res: Response): boolean {
+export function handleFastLocalParserAction(action: unknown, payload: FastLocalPayload, req: Request, res: Response): boolean {
   switch (String(action)) {
             case "quick-order-parser": {
               const { rawText = "" } = payload || {};
