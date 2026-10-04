@@ -97,7 +97,8 @@ export function createNotificationRuntime(deps: NotificationRuntimeDependencies)
         const candidate = asRecord(rawCustomer);
         return candidate.id === order.customerId;
       });
-      const customerName = customer ? String(customer.name || "") : "";
+      const customerRecord = asRecord(customer);
+      const customerName = String(customerRecord.name || "");
       const orderNumber = String(order.orderNumber || "");
       const status = String(order.status || "");
 
