@@ -3,13 +3,17 @@ import * as core from "../../server-core.ts";
 
 const {
   PRODUCTS,
+  DELETED_ITEMS,
   ACTIVITY_LOGS,
+  createNotification,
   nextEntityId,
   nextActivityLogId,
+  getRequestUser,
 } = core;
 
 export function registerLegacyProductRoutes(app: express.Express) {
-app.get("/api/products", (req, res) => {
+// API - Get Products
+  app.get("/api/products", (req, res) => {
     const { search } = req.query;
     if (search) {
       const searchStr = String(search).toLowerCase();
@@ -86,4 +90,41 @@ app.get("/api/products", (req, res) => {
 
   // API - Delete Product
   app.delete("/api/products/:id", (req, res) => {
+    const user = getRequestUser(req);
+    const index = PRODUCTS.findIndex(p => p.id === req.params.id);
+    if (index === -1) {
+      res.status(404).json({ error: "المنتج غير موجود" });
+      return;
+    }
+    const removed = PRODUCTS.splice(index, 1)[0];
+
+    // Push to Recycle Bin
+    DELETED_ITEMS.push({
+      id: "del_" + Date.now() + "_" + Math.floor(Math.random() * 100),
+      entityType: "Product",
+      entityId: removed.id,
+      name: removed.name,
+      deletedAt: new Date().toISOString(),
+      deletedBy: user ? user.fullName : "المدير العام",
+      originalData: removed
+    });
+
+    ACTIVITY_LOGS.unshift({
+      id: nextActivityLogId(),
+      userId: "u-1",
+      action: "DELETE_PRODUCT",
+      entityType: "Product",
+      entityId: removed.id,
+      createdAt: new Date().toISOString()
+    });
+
+    createNotification(
+      "حذف منتج مؤقتاً",
+      `تم نقل المنتج "${removed.name}" إلى سلة المحذوفات ويمكن استعادته من لوحة التحكم.`,
+      "system"
+    );
+
+    res.json(removed);
+  });
+}
 }
