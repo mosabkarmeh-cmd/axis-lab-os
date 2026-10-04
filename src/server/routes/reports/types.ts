@@ -84,6 +84,8 @@ export interface ReportSettings {
   };
 }
 
-export function asRecordArray<T extends Record<string, unknown>>(value: unknown): T[] {
-  return Array.isArray(value) ? value.filter((item): item is T => typeof item === "object" && item !== null) : [];
+export function asRecordArray<T>(value: unknown): T[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is T => item !== null && typeof item === "object")
+    : [];
 }
