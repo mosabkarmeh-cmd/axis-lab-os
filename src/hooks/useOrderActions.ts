@@ -16,7 +16,7 @@ export function useOrderActions(o: OrderActionsOptions) {
     const target = o.orders.find(order => order.id === orderId);
     if (status === "delivered" && target && target.remaining > 0.01) { o.setDeliveryBlockedOrder(target); return; }
     try {
-      const res = await fetch(`/api/orders/${orderId}/status`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status, notes: notesText, changedById: o.currentUser?.id || "u-1" }) });
+      const res = await fetch(`/api/orders/${orderId}/status`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status, notes: notesText, changedById: o.currentUser?.id }) });
       if (res.ok) { o.addTerminalLog("DB", `Order ${orderId} status transitioned to: ${status}`); await o.fetchOrders(); await o.fetchLogs(); return; }
       const error = await res.json().catch(() => ({}));
       if (error.remainingUSD !== undefined && target) o.setDeliveryBlockedOrder(target); else window.alert(`خطأ أثناء تحديث حالة الطلب: ${error.error || "خطأ غير معروف"}`);
@@ -37,7 +37,7 @@ export function useOrderActions(o: OrderActionsOptions) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...params,
-          changedById: o.currentUser?.id || "u-1"
+          changedById: o.currentUser?.id
         })
       });
 
@@ -111,7 +111,7 @@ export function useOrderActions(o: OrderActionsOptions) {
       const res = await fetch(`/api/orders/${orderId}/assign-workers`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...assignment, changedById: o.currentUser?.id || "u-1" })
+        body: JSON.stringify({ ...assignment, changedById: o.currentUser?.id })
       });
       if (res.ok) {
         const updated = await res.json();
