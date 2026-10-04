@@ -127,7 +127,6 @@ export function handleFastLocalOperationsAction(action: unknown, payload: FastLo
               break;
             }
     
-;
     default:
       return false;
   }
