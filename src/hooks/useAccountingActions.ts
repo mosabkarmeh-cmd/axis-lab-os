@@ -39,7 +39,7 @@ export function useAccountingActions({
   fetchLogs,
   addTerminalLog,
 }: AccountingActionsOptions) {
-  const changedById = currentUserId || "u-1";
+  const changedById = currentUserId;
   const isSubmittingPaymentRef = useRef(false);
   const paymentIdempotencyKeyRef = useRef<string | null>(null);
 
