@@ -26,11 +26,11 @@ function sanitizeForEmployee(value: unknown): unknown {
   return result;
 }
 
-function orderForResponse(req: express.Request, order: unknown): unknown {
+export function orderForResponse(req: express.Request, order: unknown): unknown {
   return getRequestUser(req)?.role === "employee" ? sanitizeForEmployee(order) : order;
 }
 
-function ordersForResponse(req: express.Request, orders: unknown[]): unknown[] {
+export function ordersForResponse(req: express.Request, orders: unknown[]): unknown[] {
   return getRequestUser(req)?.role === "employee"
     ? orders.map(order => sanitizeForEmployee(order))
     : orders;
