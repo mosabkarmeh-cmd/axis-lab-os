@@ -134,7 +134,7 @@ function syncNormalizedFinancialEntities(database: Parameters<typeof syncFinanci
 }
 
 // Memory database states
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET || "";
 const JWT_ISSUER = JWT_ISSUER_DEFAULT;
 const JWT_AUDIENCE = JWT_AUDIENCE_DEFAULT;
 
