@@ -17,15 +17,19 @@ export interface StatePersistenceDependencies {
   recordBenchmark: (target: Map<string, { count: number; totalMs: number; maxMs: number; samples: number[] }>, name: string, startedAt: number) => number;
   persistenceBenchmarks: Map<string, { count: number; totalMs: number; maxMs: number; samples: number[] }>;
   persistQueueStats: { scheduled: number; coalesced: number; completed: number; failed: number };
+  normalizedLocalCollections: readonly string[];
+  normalizedFinancialCollections: readonly string[];
 }
+
+type PersistedCollection = unknown[] | Record<string, unknown>;
 export function createStatePersistence(collections: StatePersistenceCollections, deps: StatePersistenceDependencies) {
-const PERSISTED_COLLECTIONS: Record<string, unknown> = {
+const PERSISTED_COLLECTIONS: Record<string, PersistedCollection> = {
   USERS: collections.USERS, FILES: collections.FILES, ORDERS: collections.ORDERS, ACTIVITY_LOGS: collections.ACTIVITY_LOGS, EXPENSES: collections.EXPENSES,
   NUMBERING_SETTINGS: collections.NUMBERING_SETTINGS, INVOICE_HISTORY: collections.INVOICE_HISTORY, NOTIFICATIONS: collections.NOTIFICATIONS, DELETED_ITEMS: collections.DELETED_ITEMS, ORDER_STATUSES: collections.ORDER_STATUSES,
   INVOICES: collections.INVOICES, SETTINGS: collections.SETTINGS, BACKUPS: collections.BACKUPS, PRODUCTION_JOBS: collections.PRODUCTION_JOBS,
 };
 
-const LOCAL_PERSISTED_COLLECTIONS: Record<string, unknown> = {
+const LOCAL_PERSISTED_COLLECTIONS: Record<string, PersistedCollection> = {
   ...PERSISTED_COLLECTIONS,
   CUSTOMERS: collections.CUSTOMERS, PRODUCTS: collections.PRODUCTS, MATERIALS: collections.MATERIALS, INVENTORY: collections.INVENTORY, INVENTORY_TRANSACTIONS: collections.INVENTORY_TRANSACTIONS,
   REMNANTS: collections.REMNANTS, SUPPLIERS: collections.SUPPLIERS, SUPPLY_ORDERS: collections.SUPPLY_ORDERS, SUPPLIER_QUOTES: collections.SUPPLIER_QUOTES, MACHINES: collections.MACHINES,
@@ -42,7 +46,7 @@ async function loadPersistedState(): Promise<number> {
       const snapshotValues = new Map(values.map(([key, rawValue]) => [String(key), String(rawValue)]));
       for (const [key, rawValue] of values) {
         const target = LOCAL_PERSISTED_COLLECTIONS[String(key)];
-        if (!target || NORMALIZED_LOCAL_COLLECTIONS.includes(String(key) as typeof NORMALIZED_LOCAL_COLLECTIONS[number]) || NORMALIZED_FINANCIAL_COLLECTIONS.includes(String(key) as typeof NORMALIZED_FINANCIAL_COLLECTIONS[number])) continue;
+        if (!target || deps.normalizedLocalCollections.includes(String(key) as typeof deps.normalizedLocalCollections[number]) || deps.normalizedFinancialCollections.includes(String(key) as typeof deps.normalizedFinancialCollections[number])) continue;
         const value = JSON.parse(String(rawValue));
         if (Array.isArray(target) && Array.isArray(value)) {
           target.length = 0;
@@ -53,13 +57,14 @@ async function loadPersistedState(): Promise<number> {
         restored++;
       }
       for (const [key, target] of Object.entries(LOCAL_PERSISTED_COLLECTIONS)) {
-        if (key !== "USERS" && !snapshotKeys.has(key) && Array.isArray(target) && !NORMALIZED_LOCAL_COLLECTIONS.includes(key as typeof NORMALIZED_LOCAL_COLLECTIONS[number]) && !NORMALIZED_FINANCIAL_COLLECTIONS.includes(key as typeof NORMALIZED_FINANCIAL_COLLECTIONS[number])) {
+        if (key !== "USERS" && !snapshotKeys.has(key) && Array.isArray(target) && !deps.normalizedLocalCollections.includes(key as typeof deps.normalizedLocalCollections[number]) && !deps.normalizedFinancialCollections.includes(key as typeof deps.normalizedFinancialCollections[number])) {
           target.length = 0;
         }
       }
       let migrated = false;
-      for (const collection of NORMALIZED_LOCAL_COLLECTIONS) {
+      for (const collection of deps.normalizedLocalCollections) {
         const target = LOCAL_PERSISTED_COLLECTIONS[collection];
+        if (!Array.isArray(target)) throw new Error(`Normalized collection ${collection} must be an array`);
         const entityRows = sqlite.exec("SELECT payload FROM local_entities WHERE collection = ? ORDER BY entity_id", [collection]);
         const entityValues = entityRows.length ? entityRows[0].values : [];
         if (snapshotKeys.has(collection)) {
@@ -166,7 +171,7 @@ async function persistStateNow() {
         sqlite.run("BEGIN TRANSACTION");
         try {
           for (const [key, value] of Object.entries(LOCAL_PERSISTED_COLLECTIONS)) {
-            if (NORMALIZED_LOCAL_COLLECTIONS.includes(key as typeof NORMALIZED_LOCAL_COLLECTIONS[number]) || NORMALIZED_FINANCIAL_COLLECTIONS.includes(key as typeof NORMALIZED_FINANCIAL_COLLECTIONS[number])) continue;
+            if (deps.normalizedLocalCollections.includes(key as typeof deps.normalizedLocalCollections[number]) || deps.normalizedFinancialCollections.includes(key as typeof deps.normalizedFinancialCollections[number])) continue;
             sqlite.run("INSERT INTO app_state (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at", [key, JSON.stringify(value), now]);
           }
           deps.syncNormalizedLocalEntities(sqlite);
