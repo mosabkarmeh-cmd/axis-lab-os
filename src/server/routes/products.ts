@@ -8,6 +8,11 @@ const router = express.Router();
 
 const getRequestUser = getVerifiedRequestUser;
 
+function sanitizeProduct<T extends Record<string, unknown>>(product: T, req: express.Request): T {
+  if (getRequestUser(req)?.role !== "employee") return product;
+  return { ...product, price: 0 } as T;
+}
+
 const errorMessage = (err: unknown) => err instanceof Error ? err.message : String(err);
 
 // 1. Get all products
@@ -23,7 +28,7 @@ router.get("/", async (req, res) => {
       description: p.description || "",
       stock: p.stock
     }));
-    res.json(mapped);
+    res.json(mapped.map(product => sanitizeProduct(product, req)));
   } catch (err: unknown) {
     console.error("Error fetching products:", err);
     res.status(500).json({ error: "Failed to fetch products: " + errorMessage(err) });
@@ -57,7 +62,7 @@ router.post("/", async (req, res) => {
       id: "p-" + inserted[0].id,
       ...values
     };
-    res.json(result);
+    res.json(sanitizeProduct(result, req));
   } catch (err: unknown) {
     console.error("Error adding product:", err);
     res.status(500).json({ error: "Failed to add product: " + errorMessage(err) });
@@ -88,7 +93,7 @@ router.put("/:id", async (req, res) => {
     };
 
     await db.update(products).set(values).where(eq(products.id, rawId));
-    res.json({ id: req.params.id, ...values });
+    res.json(sanitizeProduct({ id: req.params.id, ...values }, req));
   } catch (err: unknown) {
     console.error("Error updating product:", err);
     res.status(500).json({ error: "Failed to update product: " + errorMessage(err) });
