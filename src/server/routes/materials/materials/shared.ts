@@ -1,5 +1,5 @@
 import express from "express";
-import * as core from "../../server-core.ts";
+import * as core from "../../../server-core.ts";
 
 export function getActorId(req: express.Request): string {
   return core.getRequestUser(req)?.id || "system";
