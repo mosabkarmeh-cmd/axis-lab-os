@@ -127,16 +127,7 @@ export function handleFastLocalOperationsAction(action: unknown, payload: FastLo
               break;
             }
     
-            default: {
-              res.status(400).json({ error: "الإجراء غير معروف" });
-              break;
-            }
-          }
-        } catch (error: unknown) {
-          console.error("Fast local AI Error:", error);
-          res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
-        }
-      });
+;
     default:
       return false;
   }
