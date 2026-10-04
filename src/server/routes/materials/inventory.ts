@@ -1,6 +1,6 @@
 import express from "express";
-import { db } from "../../db/index.ts";
-import { inventory as inventoryTable, inventoryTransactions as inventoryTransactionsTable } from "../../db/schema.ts";
+import { db } from "../../../db/index.ts";
+import { inventory as inventoryTable, inventoryTransactions as inventoryTransactionsTable } from "../../../db/schema.ts";
 import { eq } from "drizzle-orm";
 import * as core from "../server-core.ts";
 
@@ -15,13 +15,13 @@ const {
   nextActivityLogId,
   idNum,
   persistStateNow,
+  getRequestUser,
 } = core;
 
 function getActorId(req: express.Request): string {
   return getRequestUser(req)?.id || "system";
 }
 
-const { getRequestUser } = core;
 
 export function registerInventoryRoutes(app: express.Express) {
 app.get("/api/inventory/transactions", (req, res) => {
