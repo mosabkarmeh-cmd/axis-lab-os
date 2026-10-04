@@ -9,7 +9,7 @@ const {
 } = core;
 
 // Helper: Comprehensive Normalization for Arabic Dialects, Typos & Workshop Slang
-  const normalizeArabicAndDialect = (str: string): string => {
+export const normalizeArabicAndDialect = (str: string): string => {
     if (!str) return "";
     let s = str.toLowerCase().trim();
 
