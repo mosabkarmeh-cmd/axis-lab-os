@@ -9,7 +9,7 @@ export function handleFastLocalLookupAction(action: unknown, payload: FastLocalP
               const query = (payload?.query || "").trim().toLowerCase();
               if (!query) {
                 res.json([]);
-                return;
+                return true;
               }
     
               // Fuzzy search on name, company, phone
@@ -64,7 +64,7 @@ export function handleFastLocalLookupAction(action: unknown, payload: FastLocalP
               const query = (payload?.query || "").trim().toLowerCase();
               if (!query) {
                 res.json([]);
-                return;
+                return true;
               }
     
               const matched = PRODUCTS.filter(p => 
@@ -82,7 +82,7 @@ export function handleFastLocalLookupAction(action: unknown, payload: FastLocalP
               const productName = (payload?.productName || "").trim().toLowerCase();
               if (!productName) {
                 res.json({ success: false, message: "لم يتم تحديد اسم المنتج" });
-                return;
+                return true;
               }
     
               // Smart classification heuristics
