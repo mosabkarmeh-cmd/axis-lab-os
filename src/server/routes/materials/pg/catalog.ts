@@ -1,10 +1,16 @@
-import type { Router } from "express";
+import express, { type Router } from "express";
 import { db } from "../../../../db/index.ts";
 import { materials, inventory } from "../../../../db/schema.ts";
 import { eq } from "drizzle-orm";
 import * as core from "../../../server-core.ts";
 
 const { getRequestUser } = core;
+
+function sanitizeMaterialResponse<T extends Record<string, unknown>>(material: T, req: express.Request): T {
+  if (getRequestUser(req)?.role !== "employee") return material;
+  return { ...material, pricePerUnit: 0 } as T;
+}
+
 const errorMessage = (err: unknown) => err instanceof Error ? err.message : String(err);
 
 const LEGACY_USD_TO_SYP: Record<number, number> = {
@@ -88,7 +94,7 @@ router.get("/materials", async (req, res) => {
       notes: m.notes || "",
       status: m.status || "active"
     }));
-    res.json(mapped);
+    res.json(mapped.map(material => sanitizeMaterialResponse(material, req)));
   } catch (err: unknown) {
     console.error("Error fetching materials:", err);
     res.status(500).json({ error: "Failed to fetch materials: " + errorMessage(err) });
@@ -141,7 +147,7 @@ router.post("/materials", async (req, res) => {
       location: "مستودع أ"
     });
 
-    res.json(result);
+    res.json(sanitizeMaterialResponse(result, req));
   } catch (err: unknown) {
     console.error("Error adding material:", err);
     res.status(500).json({ error: "Failed to add material: " + errorMessage(err) });
@@ -180,7 +186,7 @@ router.put("/materials/:id", async (req, res) => {
     };
 
     await db.update(materials).set(values).where(eq(materials.id, rawId));
-    res.json({ id: req.params.id, ...values });
+    res.json(sanitizeMaterialResponse({ id: req.params.id, ...values }, req));
   } catch (err: unknown) {
     console.error("Error updating material:", err);
     res.status(500).json({ error: "Failed to update material: " + errorMessage(err) });
