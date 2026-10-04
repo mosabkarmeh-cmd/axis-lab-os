@@ -1,6 +1,6 @@
 import type { Router } from "express";
-import { db } from "../../../db/index.ts";
-import { materials, inventory } from "../../../db/schema.ts";
+import { db } from "../../../../db/index.ts";
+import { materials, inventory } from "../../../../db/schema.ts";
 import { eq } from "drizzle-orm";
 import { getVerifiedRequestUser } from "../../auth.ts";
 
