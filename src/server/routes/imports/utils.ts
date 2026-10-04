@@ -1,5 +1,5 @@
 import type express from "express";
-import * as core from "../server-core.ts";
+import * as core from "../../server-core.ts";
 
 const { getRequestUser } = core;
 
