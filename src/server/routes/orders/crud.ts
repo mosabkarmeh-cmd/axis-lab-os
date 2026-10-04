@@ -6,6 +6,7 @@ const {
   ORDERS,
   CUSTOMERS,
   INVOICES,
+  ACTIVITY_LOGS,
   nextEntityId,
   nextActivityLogId,
   persistMutationWithFastDurability,
