@@ -1,39 +1,44 @@
 import * as core from "../../../server-core.ts";
 import type { AiStats } from "./types.ts";
-import { normalizeArabicAndDialect } from "./normalization.ts";
 
-const { CUSTOMERS, ORDERS, MATERIALS, REMNANTS, EXPENSES } = core;
+const { MATERIALS, REMNANTS } = core;
 
-export function getInventoryChatResponse(msgNorm: string, stats: AiStats): string | null {
+export function getInventoryChatResponse(
+  msgNorm: string,
+  stats: AiStats,
+): string | null {
+  const inventoryKeywords = [
+    "مخزن",
+    "مخزون",
+    "خامات",
+    "مواد",
+    "مستودع",
+    "بقايا",
+    "بواقي",
+    "لوح",
+    "الواح",
+  ];
 
-    if (
-      msgNorm.includes("مخزن") || 
-      msgNorm.includes("مخزون") || 
-      msgNorm.includes("خامات") || 
-      msgNorm.includes("مواد") || 
-      msgNorm.includes("مستودع") || 
-      msgNorm.includes("بقايا") || 
-      msgNorm.includes("بواقي") || 
-      msgNorm.includes("لوح") || 
-      msgNorm.includes("الواح")
-    ) {
-      const leftoversList = REMNANTS.filter(r => r.quantity > 0).slice(0, 5);
+  if (!inventoryKeywords.some(keyword => msgNorm.includes(keyword))) {
+    return null;
+  }
 
-      return `📦 **تقرير إدارة المستودع، الخامات، وبقايا الألواح** (تحديث فوري):
+  const leftovers = REMNANTS.filter(remnant => remnant.quantity > 0).slice(0, 5);
 
-• **حالة الخامات والمواد الأولية**:
-  ${lowStockMaterials.length > 0 
-    ? `⚠️ **تحذير خامات منخفضة**: المواد التالية قاربت على النفاد وتحتاج لشراء فوري: **${lowStockMaterials.join(" - ")}**` 
-    : "✓ **حالة المخزون ممتازة**: جميع الخامات والمواد الأساسية متوفرة بكميات كافية وفوق حد الأمان."}
+  return `📦 **تقرير إدارة المستودع والخامات والبقايا**:
 
-• **أمثلة على بقايا المواد (Remnants) المتوفرة للاستغلال**:
-  ${leftoversList.map(r => {
-    const matName = MATERIALS.find(m => m.id === r.materialId)?.name || "خامة";
-    return `- **${matName}**: أبعاد \`${r.width}x${r.height} مم\` - الكمية: \`${r.quantity}\` (${r.status === 'ready' ? 'جاهز للاستخدام' : 'مستهلك جزئياً'})`;
-  }).join('\n') || "لا توجد بقايا ألواح مسجلة حالياً."}
+• **الخامات منخفضة المخزون**:
+  ${stats.lowStockMaterials.length > 0
+    ? `⚠️ المواد التالية تحتاج متابعة: **${stats.lowStockMaterials.join(" - ")}**`
+    : "✓ حالة المخزون ضمن الحدود الحالية."}
 
-💡 **نصيحة تقليل الهدر**:
-- يُفضل دائماً البحث في قائمة "بقايا الألواح المتاحة" لتنفيذ تصاميم العملاء الصغيرة قبل استهلاك لوح جديد كامل لتوفير التكلفة وزيادة الربحية.`;
-    }
-  return null;
+• **أمثلة على البقايا المتوفرة**:
+  ${leftovers.map(remnant => {
+    const materialName =
+      MATERIALS.find(material => material.id === remnant.materialId)?.name ||
+      "خامة";
+    return `- **${materialName}**: أبعاد \`${remnant.width}x${remnant.height} مم\` - الكمية: \`${remnant.quantity}\``;
+  }).join("\n") || "لا توجد بقايا ألواح مسجلة حالياً."}
+
+💡 **نصيحة**: استخدم البقايا القابلة للاستفادة في الأعمال الصغيرة قبل فتح لوح جديد لتقليل الهدر.`;
 }
