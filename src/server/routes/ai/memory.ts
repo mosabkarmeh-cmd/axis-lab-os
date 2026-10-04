@@ -15,6 +15,7 @@ export function registerAiMemoryRoutes(app: express.Express) {
 // API - Dynamic DeepBrain Learned Memory layers (Simulating 6 layers of workshop self-learning)
   app.get("/api/ai/memory", (req, res) => {
     try {
+      const isEmployee = core.getRequestUser(req)?.role === "employee";
       // 1. FLASH MEMORY (Live operations right now)
       const flashMem = [
         {
@@ -49,7 +50,7 @@ export function registerAiMemoryRoutes(app: express.Express) {
         },
         {
           id: "st-2",
-          fact: `إجمالي المبالغ والذمم المالية المستحقة على العملاء والتي لم تدفع بعد تبلغ $${ORDERS.reduce((sum, o) => sum + (o.totalPrice - (o.paidAmount || 0)), 0).toFixed(2)}.`,
+          fact: isEmployee ? "البيانات المالية محجوبة عن حساب الموظف." : `إجمالي المبالغ والذمم المالية المستحقة على العملاء والتي لم تدفع بعد تبلغ ${ORDERS.reduce((sum, o) => sum + (o.totalPrice - (o.paidAmount || 0)), 0).toFixed(2)}.`,
           type: "finance",
           importance: 8.8,
           time: "منذ 4 ساعات"
@@ -69,7 +70,7 @@ export function registerAiMemoryRoutes(app: express.Express) {
         {
           id: "lt-1",
           fact: topCustomer && topCustomer.spent > 0 
-            ? `العميل "${topCustomer.name}" هو الأكثر إنفاقاً وأهمية للورشة بإجمالي طلبات بقيمة $${topCustomer.spent.toFixed(2)}.`
+            ? isEmployee ? "تم رصد العملاء ذوي النشاط التشغيلي المرتفع دون إظهار بياناتهم المالية." : `العميل "${topCustomer.name}" هو الأكثر إنفاقاً وأهمية للورشة بإجمالي طلبات بقيمة ${topCustomer.spent.toFixed(2)}.`
             : "لم يتم رصد عميل فائق الأهمية بعد (بانتظار تجميع المزيد من الفواتير المكتملة).",
           type: "customer_insight",
           importance: 9.2,
@@ -89,7 +90,7 @@ export function registerAiMemoryRoutes(app: express.Express) {
       const consolidatedMem = [
         {
           id: "con-1",
-          fact: `متوسط قيمة الفاتورة/الطلب الواحد في الورشة يبلغ حالياً $${avgOrderVal.toFixed(2)}. يساعد هذا المؤشر في التنبؤ بالإيرادات الشهرية بدقة 94%.`,
+          fact: isEmployee ? "مؤشر متوسط قيمة الطلب محجوب عن حساب الموظف." : `متوسط قيمة الفاتورة/الطلب الواحد في الورشة يبلغ حالياً ${avgOrderVal.toFixed(2)}. يساعد هذا المؤشر في التنبؤ بالإيرادات الشهرية.`,
           type: "process_analytics",
           importance: 8.7,
           time: "موحد"
