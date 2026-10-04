@@ -127,7 +127,7 @@ async function loadPersistedState(): Promise<number> {
     for (const row of rows) {
       const target = PERSISTED_COLLECTIONS[row.key];
       if (!target) continue;
-      const value = row.value as any;
+      const value = row.value;
       if (Array.isArray(target) && Array.isArray(value)) {
         target.length = 0;
         target.push(...value);
@@ -186,8 +186,8 @@ async function persistStateNow() {
       for (const [key, value] of Object.entries(PERSISTED_COLLECTIONS)) {
         await db
           .insert(appState)
-          .values({ key, value: value as any })
-          .onConflictDoUpdate({ target: appState.key, set: { value: value as any, updatedAt: new Date() } });
+          .values({ key, value })
+          .onConflictDoUpdate({ target: appState.key, set: { value, updatedAt: new Date() } });
       }
     }
     deps.recordBenchmark(deps.persistenceBenchmarks, deps.useSqlite ? "persist_state_sqlite" : "persist_state_postgres", persistStartedAt);
