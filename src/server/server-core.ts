@@ -296,22 +296,6 @@ const INVENTORY_TRANSACTIONS = [
   { id: "tx-3", materialId: "m-2", type: "adjustment", quantity: 2, beforeQty: 16, afterQty: 18, referenceType: "adjustment", referenceId: "adj-202", reason: "جرد تسوية دورية", createdById: "u-1", createdAt: new Date(Date.now() - 3600000 * 12).toISOString() }
 ];
 
-function normalizeInventoryState() {
-  let changed = false;
-  for (const inventory of INVENTORY) {
-    const quantity = Math.max(0, Number(inventory.quantity) || 0);
-    const reservedQuantity = Math.min(quantity, Math.max(0, Number(inventory.reservedQuantity) || 0));
-    const availableQuantity = quantity - reservedQuantity;
-    if (inventory.quantity !== quantity || inventory.reservedQuantity !== reservedQuantity || inventory.availableQuantity !== availableQuantity) {
-      inventory.quantity = quantity;
-      inventory.reservedQuantity = reservedQuantity;
-      inventory.availableQuantity = availableQuantity;
-      changed = true;
-    }
-  }
-  return changed;
-}
-
 const REMNANTS = [
   { id: "rem-1", materialId: "m-1", width: 400, height: 600, area: 240000, quantity: 2, status: "available", location: "صندوق البقايا أكريليك" },
   { id: "rem-2", materialId: "m-2", width: 300, height: 300, area: 90000, quantity: 1, status: "available", location: "صندوق البقايا أكريليك" },
