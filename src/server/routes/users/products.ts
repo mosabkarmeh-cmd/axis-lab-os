@@ -127,4 +127,3 @@ export function registerLegacyProductRoutes(app: express.Express) {
     res.json(removed);
   });
 }
-}
