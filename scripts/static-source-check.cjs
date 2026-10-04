@@ -31,54 +31,40 @@ const actorClientFiles = walkFiles(path.join(root, "src")).filter(file =>
 for (const file of routeFiles.concat(runtimeFiles)) {
   const source = fs.readFileSync(file, "utf8");
   const rel = path.relative(root, file);
-
-  if (/["']u-1["']/.test(source)) {
-    fail.push(\`\${rel}: hardcoded actor id u-1\`);
-  }
-  if (/\\bconst\\s+\\w+\\s*:\\s*any\\b|\\b(?:let|var)\\s+\\w+\\s*:\\s*any\\b|\\)\\s*:\\s*any\\b/.test(source)) {
-    fail.push(\`\${rel}: explicit any annotation in backend\`);
+  if (/['"]u-1['"]/.test(source)) fail.push(rel + ": hardcoded actor id u-1");
+  if (/\bconst\s+\w+\s*:\s*any\b|\b(?:let|var)\s+\w+\s*:\s*any\b|\)\s*:\s*any\b/.test(source)) {
+    fail.push(rel + ": explicit any annotation in backend");
   }
 }
 
 for (const file of actorClientFiles) {
   const source = fs.readFileSync(file, "utf8");
   const rel = path.relative(root, file);
-  if (/["']u-1["']/.test(source)) {
-    fail.push(\`\${rel}: hardcoded actor id u-1\`);
-  }
+  if (/['"]u-1['"]/.test(source)) fail.push(rel + ": hardcoded actor id u-1");
 }
 
 for (const file of walkFiles(path.join(root, "src")).concat(walkFiles(path.join(root, "desktop")))) {
   const source = fs.readFileSync(file, "utf8");
   const rel = path.relative(root, file);
-  if (/executeJavaScript\\s*\\(/.test(source)) {
-    fail.push(\`\${rel}: forbidden webContents.executeJavaScript usage\`);
-  }
+  if (/executeJavaScript\s*\(/.test(source)) fail.push(rel + ": forbidden webContents.executeJavaScript usage");
 }
 
 const orderSources = walkFiles(path.join(root, "src/server/routes/orders"))
   .filter(file => file.endsWith(".ts"))
   .map(file => fs.readFileSync(file, "utf8"))
-  .join("\\n");
-
+  .join("\n");
 for (const field of ["matCost", "finalPrice"]) {
-  if (!orderSources.includes(field)) {
-    fail.push(\`orders route tree missing employee financial boundary marker for \${field}\`);
-  }
+  if (!orderSources.includes(field)) fail.push("orders route tree missing employee financial boundary marker for " + field);
 }
 
 const response = read("src/server/routes/orders/response.ts");
 for (const field of ["matCost", "finalPrice", "totalPrice", "paidAmount", "remaining"]) {
-  if (!response.includes(\`"\${field}"\`)) {
-    fail.push(\`orders/response.ts missing hidden field \${field}\`);
-  }
+  if (!response.includes("\"" + field + "\"")) fail.push("orders/response.ts missing hidden field " + field);
 }
 
 const productionShared = read("src/server/routes/production/jobs/shared.ts");
 for (const field of ["materialCostUSD", "technicianCostUSD", "totalDirectCostUSD"]) {
-  if (!productionShared.includes(field)) {
-    fail.push(\`production response boundary missing \${field}\`);
-  }
+  if (!productionShared.includes(field)) fail.push("production response boundary missing " + field);
 }
 
 const aiChat = read("src/server/routes/ai/chat.ts");
@@ -88,8 +74,7 @@ if (!aiPricing.includes("role") || !aiPricing.includes("403")) fail.push("AI pri
 
 if (fail.length) {
   console.error("[STATIC-SOURCE-AUDIT] FAIL");
-  for (const item of fail) console.error(" - " + item);
+  fail.forEach(item => console.error(" - " + item));
   process.exit(1);
 }
-
 console.log("[STATIC-SOURCE-AUDIT] PASS");
