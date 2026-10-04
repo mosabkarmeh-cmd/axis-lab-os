@@ -7,7 +7,6 @@ import * as core from "../server-core.ts";
 import { registerUserRoutes } from "./users.ts";
 import { registerOrderRoutes } from "./orders.ts";
 import { registerAuthRoutes } from "./auth.ts";
-import { registerLegacyMasterDataRoutes } from "./master-data-legacy.ts";
 import { registerLegacyMaterialsInventoryRoutes } from "./materials-inventory-legacy.ts";
 import { registerSupplyRoutes } from "./supply.ts";
 import { registerAccountingRoutes } from "./accounting.ts";
@@ -113,10 +112,6 @@ export async function registerRoutes(app: express.Express) {
   registerSystemRoutes(app);
 
   registerUserRoutes(app);
-
-  if (!USE_POSTGRES) {
-    registerLegacyMasterDataRoutes(app);
-  }
 
   if (!USE_POSTGRES) {
     registerLegacyMaterialsInventoryRoutes(app);
