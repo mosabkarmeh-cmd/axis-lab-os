@@ -1,12 +1,12 @@
 import express from "express";
 import * as core from "../../../server-core.ts";
+import { orderForResponse } from "../response.ts";
 
 const {
   ORDERS,
   ACTIVITY_LOGS,
   nextActivityLogId,
   persistStateNow,
-  orderForResponse,
   getRequestUser,
   schedulePersist,
 } = core;
