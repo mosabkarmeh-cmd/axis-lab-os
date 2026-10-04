@@ -1,6 +1,6 @@
 import express from "express";
 import { Type } from "@google/genai";
-import * as core from "../../server-core.ts";
+import * as core from "../../../server-core.ts";
 import {
   isEmployee,
   sanitizeMaterialForEmployee,
