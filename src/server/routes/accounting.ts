@@ -1,6 +1,6 @@
 import express from "express";
 import * as core from "../server-core.ts";
-import { applyPayment, withAtomicFinancialMutation } from "./orders.ts";
+import { applyPayment, withAtomicFinancialMutation } from "./orders/financial.ts";
 
 type InvoiceItem = { quantity?: number; unitPrice?: number; total?: number; description?: string; [key: string]: unknown };
 type InvoiceLike = { id: string; orderId?: string; items?: InvoiceItem[]; totalPrice?: number; subtotal?: number; [key: string]: unknown };
