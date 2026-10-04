@@ -320,6 +320,272 @@ const MATERIALS = [
   { id: "m-5", name: "جلد طبيعي مرن 2 ملم", category: "الجلود", subCategory: "leather", thickness: 2, color: "tan", width: 1000, height: 1000, unit: "piece", pricePerUnit: 4725, minimumStock: 5, supplierId: "s-3", notes: "جلد بقر طبيعي مدبوغ نباتياً", status: "active", qualityStatus: "inspected" }
 ];
 
+const INVENTORY = [
+  { id: "inv-1", materialId: "m-1", quantity: 45, reservedQuantity: 12, availableQuantity: 33, location: "مستودع أ - رف 1" },
+  { id: "inv-2", materialId: "m-2", quantity: 18, reservedQuantity: 5, availableQuantity: 13, location: "مستودع أ - رف 2" },
+  { id: "inv-3", materialId: "m-3", quantity: 30, reservedQuantity: 0, availableQuantity: 30, location: "مستودع ب - رف 1" },
+  { id: "inv-4", materialId: "m-4", quantity: 12, reservedQuantity: 5, availableQuantity: 7, location: "مستودع ب - رف 2" },
+  { id: "inv-5", materialId: "m-5", quantity: 8, reservedQuantity: 2, availableQuantity: 6, location: "مستودع أ - رف 5" }
+];
+
+const INVENTORY_TRANSACTIONS = [
+  { id: "tx-1", materialId: "m-1", type: "purchase", quantity: 20, beforeQty: 25, afterQty: 45, referenceType: "purchase_order", referenceId: "po-101", reason: "توريد دفعة جديدة من المورد", createdById: "u-1", createdAt: new Date(Date.now() - 3600000 * 24).toISOString() },
+  { id: "tx-2", materialId: "m-1", type: "consumption", quantity: -5, beforeQty: 50, afterQty: 45, referenceType: "order", referenceId: "ord-1", reason: "قص لوحة أحرف مضيئة", createdById: "u-2", createdAt: new Date(Date.now() - 3600000 * 3).toISOString() },
+  { id: "tx-3", materialId: "m-2", type: "adjustment", quantity: 2, beforeQty: 16, afterQty: 18, referenceType: "adjustment", referenceId: "adj-202", reason: "جرد تسوية دورية", createdById: "u-1", createdAt: new Date(Date.now() - 3600000 * 12).toISOString() }
+];
+
+function normalizeInventoryState() {
+  let changed = false;
+  for (const inventory of INVENTORY) {
+    const quantity = Math.max(0, Number(inventory.quantity) || 0);
+    const reservedQuantity = Math.min(quantity, Math.max(0, Number(inventory.reservedQuantity) || 0));
+    const availableQuantity = quantity - reservedQuantity;
+    if (inventory.quantity !== quantity || inventory.reservedQuantity !== reservedQuantity || inventory.availableQuantity !== availableQuantity) {
+      inventory.quantity = quantity;
+      inventory.reservedQuantity = reservedQuantity;
+      inventory.availableQuantity = availableQuantity;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+const REMNANTS = [
+  { id: "rem-1", materialId: "m-1", width: 400, height: 600, area: 240000, quantity: 2, status: "available", location: "صندوق البقايا أكريليك" },
+  { id: "rem-2", materialId: "m-2", width: 300, height: 300, area: 90000, quantity: 1, status: "available", location: "صندوق البقايا أكريليك" },
+  { id: "rem-3", materialId: "m-3", width: 150, height: 400, area: 60000, quantity: 3, status: "available", location: "رف الأخشاب الصغيرة" }
+];
+
+const SUPPLIER_QUOTES: Array<{
+  id: string;
+  materialId: string;
+  supplierId: string;
+  supplierName: string;
+  pricePerUnit: number;
+  minOrderQuantity: number;
+  deliveryDays: number;
+  paymentTerms: string;
+  qualityRating: number;
+  notes: string;
+  updatedAt: string;
+}> = [
+  {
+    id: "sq-101",
+    materialId: "m-1",
+    supplierId: "s-1",
+    supplierName: "الشركة الوطنية للاكريليك",
+    pricePerUnit: 25.0,
+    minOrderQuantity: 10,
+    deliveryDays: 2,
+    paymentTerms: "آجل 30 يوم",
+    qualityRating: 4.8,
+    notes: "المورد الحالي - توصيل مجاني للمستودع وضمان حماية ورقية ممتازة للأكواب والأحرف.",
+    updatedAt: "2026-07-20T10:00:00.000Z"
+  },
+  {
+    id: "sq-102",
+    materialId: "m-1",
+    supplierId: "s-2",
+    supplierName: "شركة البلاستيك الدولية - الأردن",
+    pricePerUnit: 22.8,
+    minOrderQuantity: 25,
+    deliveryDays: 4,
+    paymentTerms: "نقدي عند الطلب (خصم 5%)",
+    qualityRating: 4.5,
+    notes: "عرض منافس بأسعار الجملة - توفير $2.20 للوح عند طلب كميات فوق 25 لوح.",
+    updatedAt: "2026-07-22T14:30:00.000Z"
+  },
+  {
+    id: "sq-103",
+    materialId: "m-1",
+    supplierId: "s-3",
+    supplierName: "مستورد الشام للخامات الطارئة",
+    pricePerUnit: 26.5,
+    minOrderQuantity: 3,
+    deliveryDays: 1,
+    paymentTerms: "دفع نقدي عند الاستلام",
+    qualityRating: 4.9,
+    notes: "توريد سريع جداً في نفس اليوم مع تسليم باب الورشة وتأمين خامات طارئة.",
+    updatedAt: "2026-07-25T09:15:00.000Z"
+  },
+  {
+    id: "sq-201",
+    materialId: "m-2",
+    supplierId: "s-1",
+    supplierName: "الشركة الوطنية للاكريليك",
+    pricePerUnit: 45.0,
+    minOrderQuantity: 5,
+    deliveryDays: 2,
+    paymentTerms: "آجل 30 يوم",
+    qualityRating: 4.7,
+    notes: "درجة ممتازة مقاومة للتكسر والتغييم، مناسبة للحروف البارزة اللامعة.",
+    updatedAt: "2026-07-18T11:00:00.000Z"
+  },
+  {
+    id: "sq-202",
+    materialId: "m-2",
+    supplierId: "s-2",
+    supplierName: "عالم الأكريليك والبلاستيك",
+    pricePerUnit: 41.5,
+    minOrderQuantity: 15,
+    deliveryDays: 3,
+    paymentTerms: "دفع نصف المبلغ بالدفعة والأخر عند الاستلام",
+    qualityRating: 4.6,
+    notes: "توفير $3.50 لكل لوح للطلبات فوق 15 لوح مع شهادة ضمان للمقاومة للحرارة.",
+    updatedAt: "2026-07-21T16:00:00.000Z"
+  },
+  {
+    id: "sq-301",
+    materialId: "m-3",
+    supplierId: "s-2",
+    supplierName: "محلات الوفاء للمواد الخشبية",
+    pricePerUnit: 20.0,
+    minOrderQuantity: 10,
+    deliveryDays: 2,
+    paymentTerms: "نقدي عند التسليم",
+    qualityRating: 4.8,
+    notes: "خشب مصقول وجهين وبدون عقد، نتائج قاطعة ونظيفة على آلات CO2.",
+    updatedAt: "2026-07-19T08:30:00.000Z"
+  },
+  {
+    id: "sq-302",
+    materialId: "m-3",
+    supplierId: "s-1",
+    supplierName: "شركة الشرق الأوسط للأخشاب والكبس",
+    pricePerUnit: 18.2,
+    minOrderQuantity: 20,
+    deliveryDays: 5,
+    paymentTerms: "آجل 15 يوم",
+    qualityRating: 4.4,
+    notes: "سعر جملة منافس جداً، يحتاج 5 أيام توريد من المستودع المركزي.",
+    updatedAt: "2026-07-23T13:45:00.000Z"
+  },
+  {
+    id: "sq-401",
+    materialId: "m-4",
+    supplierId: "s-2",
+    supplierName: "محلات الوفاء للمواد الخشبية",
+    pricePerUnit: 12.0,
+    minOrderQuantity: 20,
+    deliveryDays: 1,
+    paymentTerms: "نقدي",
+    qualityRating: 4.3,
+    notes: "MDF روماني ممتاز مع تحمّل عالي للحفر بالليزر والطلاء.",
+    updatedAt: "2026-07-24T10:20:00.000Z"
+  },
+  {
+    id: "sq-402",
+    materialId: "m-4",
+    supplierId: "s-3",
+    supplierName: "مستودعات الخليج للألواح المصنعة",
+    pricePerUnit: 10.5,
+    minOrderQuantity: 50,
+    deliveryDays: 3,
+    paymentTerms: "آجل 30 يوم",
+    qualityRating: 4.6,
+    notes: "عرض الجملة لـ 50 لوح فأكثر، توفير مميز لطلبات الإنتاج الضخم.",
+    updatedAt: "2026-07-26T15:10:00.000Z"
+  },
+  {
+    id: "sq-501",
+    materialId: "m-5",
+    supplierId: "s-3",
+    supplierName: "دباغة الشرق للجلود",
+    pricePerUnit: 35.0,
+    minOrderQuantity: 5,
+    deliveryDays: 2,
+    paymentTerms: "نقدي عند التسليم",
+    qualityRating: 4.9,
+    notes: "جلد بقر طبيعي مدبوغ نباتياً خالي من المواد الكيميائية الضارة لليزر.",
+    updatedAt: "2026-07-22T12:00:00.000Z"
+  },
+  {
+    id: "sq-502",
+    materialId: "m-5",
+    supplierId: "s-1",
+    supplierName: "معرض الأردن للجلود والخامات",
+    pricePerUnit: 32.0,
+    minOrderQuantity: 10,
+    deliveryDays: 4,
+    paymentTerms: "آجل 14 يوم",
+    qualityRating: 4.5,
+    notes: "جلد ممتاز متعدد الألوان، يحتاج حجز مسبق قبل 4 أيام.",
+    updatedAt: "2026-07-25T17:00:00.000Z"
+  }
+];
+
+const SUPPLIERS = [
+  { id: "s-1", name: "الشركة الوطنية للاكريليك", phone: "+962795554433", email: "sales@national-acrylic.com", address: "عمان، ماركا الشمالية", notes: "المورد الرئيسي للألواح والقص بأسعار تفضيلية" },
+  { id: "s-2", name: "محلات الوفاء للمواد الخشبية", phone: "+962787776655", email: "info@alwafaa-wood.com", address: "سحاب، المنطقة الصناعية", notes: "توفر خشب زان وMDF بسماكات مختلفة" },
+  { id: "s-3", name: "دباغة الشرق للجلود", phone: "+962791112233", email: "east-leather@contact.jo", address: "الزرقاء، الأردن", notes: "جلود بقر طبيعية ممتازة لآلات الليزر" }
+];
+
+const SUPPLY_ORDERS = [
+  {
+    id: "so-1",
+    supplierId: "s-1",
+    materialId: "m-1",
+    quantity: 50,
+    unitPrice: 24.5,
+    totalPrice: 1225.0,
+    status: "pending", // pending, completed, cancelled
+    orderDate: "2026-07-15",
+    expectedDeliveryDate: "2026-07-23",
+    notes: "طلب استيراد ألواح أكريليك شفاف 3 مم طارئة لتغطية نقص المخزون"
+  },
+  {
+    id: "so-2",
+    supplierId: "s-1",
+    materialId: "m-2",
+    quantity: 20,
+    unitPrice: 43.0,
+    totalPrice: 860.0,
+    status: "completed",
+    orderDate: "2026-06-10",
+    expectedDeliveryDate: "2026-06-15",
+    actualDeliveryDate: "2026-06-14",
+    notes: "ألواح أكريليك أسود 5 ملم ممتازة"
+  },
+  {
+    id: "so-3",
+    supplierId: "s-2",
+    materialId: "m-3",
+    quantity: 40,
+    unitPrice: 19.0,
+    totalPrice: 760.0,
+    status: "completed",
+    orderDate: "2026-06-20",
+    expectedDeliveryDate: "2026-06-25",
+    actualDeliveryDate: "2026-06-24",
+    notes: "طلب خشب زان لقص الهدايا الوطنية"
+  },
+  {
+    id: "so-4",
+    supplierId: "s-2",
+    materialId: "m-4",
+    quantity: 60,
+    unitPrice: 11.5,
+    totalPrice: 690.0,
+    status: "pending",
+    orderDate: "2026-07-18",
+    expectedDeliveryDate: "2026-07-24",
+    notes: "طلب خشب MDF 6 مم عاجل لطلبيات الأسبوع القادم"
+  },
+  {
+    id: "so-5",
+    supplierId: "s-3",
+    materialId: "m-5",
+    quantity: 15,
+    unitPrice: 33.0,
+    totalPrice: 495.0,
+    status: "completed",
+    orderDate: "2026-05-15",
+    expectedDeliveryDate: "2026-05-20",
+    actualDeliveryDate: "2026-05-19",
+    notes: "توريد جلود طبيعية سميكة للمحفظات الفاخرة"
+  }
+];
+
 const MACHINES = [
   { id: "mac-1", name: "CO2 Laser Cutter 100W (جنوب)", type: "laser_co2", status: "idle", currentJobId: null, lastMaintenance: "2026-06-01", workingHours: 234.5 }
 ];
