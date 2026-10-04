@@ -13,6 +13,7 @@ import { refreshWarehouseCache as createWarehouseCacheRuntime } from "./runtime/
 import { createStatePersistence } from "./runtime/state-persistence.ts";
 import { createLocalSqliteRuntime, localSqlite, setLocalSqlite } from "./runtime/local-sqlite.ts";
 import { createProductionEmailRuntime } from "./runtime/production-email.ts";
+import { createNotificationRuntime } from "./runtime/notifications-runtime.ts";
 import { syncNormalizedLocalEntities as syncLocalEntities, assertFinancialStateInvariants as assertFinancialState, syncNormalizedFinancialEntities as syncFinancialEntities } from "./runtime/local-sqlite-sync.ts";
 
 import express from "express";
@@ -733,66 +734,6 @@ const ORDER_STATUSES: any[] = [
   { id: "in_progress", name: "قيد التنفيذ (قديم)", color: "#64748b", order: 99, isDefault: false }
 ];
 
-function normalizeOrderStatuses() {
-  const defaults = [
-    { id: "new", name: "جديد", color: "#818cf8", order: 1, isDefault: true },
-    { id: "design", name: "قيد التصميم", color: "#c084fc", order: 2, isDefault: true },
-    { id: "design_approved", name: "تم اعتماد التصميم", color: "#a78bfa", order: 3, isDefault: true },
-    { id: "cutting", name: "قيد القص", color: "#60a5fa", order: 4, isDefault: true },
-    { id: "cutting_complete", name: "انتهى القص", color: "#38bdf8", order: 5, isDefault: true },
-    { id: "assembly", name: "قيد التجميع", color: "#f59e0b", order: 6, isDefault: true },
-    { id: "assembly_complete", name: "انتهى التجميع", color: "#fbbf24", order: 7, isDefault: true },
-    { id: "packaging", name: "قيد التغليف", color: "#fb923c", order: 8, isDefault: true },
-    { id: "ready", name: "بانتظار التسليم", color: "#34d399", order: 9, isDefault: true },
-    { id: "delivered", name: "تم التسليم", color: "#a1a1aa", order: 10, isDefault: true },
-    { id: "cancelled", name: "ملغي", color: "#f87171", order: 11, isDefault: true },
-    { id: "in_progress", name: "قيد التنفيذ (قديم)", color: "#64748b", order: 99, isDefault: false }
-  ];
-  for (const defaultStatus of defaults) {
-    if (!ORDER_STATUSES.some((status: any) => status.id === defaultStatus.id)) ORDER_STATUSES.push(defaultStatus);
-  }
-}
-
-function createNotification(title: string, message: string, type: string, priority: string = "normal", link: string = "") {
-  const newNotif = {
-    id: "notif_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
-    title,
-    message,
-    type, // "inventory" | "order" | "production" | "financial" | "system"
-    priority, // "low" | "normal" | "high" | "critical"
-    isRead: false,
-    createdAt: new Date().toISOString(),
-    link
-  };
-  NOTIFICATIONS.unshift(newNotif);
-  return newNotif;
-}
-
-function notifyOverdueOrders() {
-  const now = Date.now();
-  for (const order of ORDERS) {
-    if (!order.deliveryDateExpected || ["delivered", "cancelled"].includes(order.status)) continue;
-    const dueAt = new Date(order.deliveryDateExpected).getTime();
-    if (!Number.isFinite(dueAt) || dueAt >= now) continue;
-    const alreadyNotified = NOTIFICATIONS.some((n: any) => n.type === "order" && n.orderId === order.id && n.code === "overdue");
-    if (alreadyNotified) continue;
-    const customer = CUSTOMERS.find((c: any) => c.id === order.customerId);
-    const notification = createNotification(`طلب متأخر #${order.orderNumber}`, `تجاوز الطلب موعد التسليم المتوقع${customer?.name ? ` للعميل ${customer.name}` : ""}. الحالة الحالية: ${order.status}`, "order", "high", "/orders");
-    (notification as any).orderId = order.id;
-    (notification as any).code = "overdue";
-  }
-}
-
-const WORKFLOW_NEXT_REMINDERS: Record<string, string> = {
-  new: "اعتمد التصميم قبل تحويل الطلب للتنفيذ.",
-  design: "بعد اكتمال التصميم، سجّل اعتماد التصميم.",
-  design_approved: "التصميم معتمد؛ ابدأ مهمة القص من لوحة الإنتاج.",
-  cutting_complete: "انتهى القص؛ ابدأ مرحلة التجميع.",
-  assembly_complete: "انتهى التجميع؛ ابدأ مرحلة التغليف.",
-  packaging: "بعد انتهاء التغليف، حوّل الطلب إلى بانتظار التسليم.",
-  ready: "تواصل مع العميل وسجّل التسليم بعد استيفاء الدفعة المتبقية."
-};
-
 const INVOICES: any[] = [
   { 
     id: "inv-1", 
@@ -1049,6 +990,18 @@ const productionEmailRuntime = createProductionEmailRuntime({
   nextActivityLogId,
 });
 const { sendProductionJobEmailNotification } = productionEmailRuntime;
+
+const notificationRuntime = createNotificationRuntime({
+  orderStatuses: ORDER_STATUSES,
+  notifications: NOTIFICATIONS,
+  orders: ORDERS,
+  customers: CUSTOMERS,
+});
+const {
+  normalizeOrderStatuses,
+  createNotification,
+  notifyOverdueOrders,
+} = notificationRuntime;
 
 // ==================== STATE PERSISTENCE ====================
 const statePersistence = createStatePersistence(
