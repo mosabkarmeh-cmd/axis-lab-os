@@ -90,7 +90,7 @@ export const EXPENSES: ExpenseRecord[] = [
   { id: "exp-4", category: "خامات ومواد", amount: 250.0, date: "2026-07-07", description: "شراء ألواح أكريليك من الشركة الوطنية", status: "paid", createdById: "u-1" }
 ];
 
-export const NUMBERING_SETTINGS: NumberingSetting[] = [] = [
+export const NUMBERING_SETTINGS: NumberingSetting[] = [
   { id: "num-1", entity: "invoice", prefix: "INV", suffix: "", digits: 6, separator: "-", nextNumber: 3 },
   { id: "num-2", entity: "order", prefix: "ORD", suffix: "", digits: 6, separator: "-", nextNumber: 3 },
   { id: "num-3", entity: "job", prefix: "JOB", suffix: "", digits: 6, separator: "-", nextNumber: 3 }
@@ -98,14 +98,14 @@ export const NUMBERING_SETTINGS: NumberingSetting[] = [] = [
 
 export const INVOICE_HISTORY: unknown[] = [];
 
-export const NOTIFICATIONS: NotificationSeed[] = [] = [
+export const NOTIFICATIONS: NotificationSeed[] = [
   { id: "notif_1", title: "تم تفعيل نظام ليزر CO2 بنجاح والاتصال بالماكينات", message: "تم تفعيل نظام ليزر CO2 بنجاح والاتصال بالماكينات بقناة الاتصال الآمنة.", type: "system", priority: "normal", isRead: false, createdAt: new Date(Date.now() - 3600000 * 0.1).toISOString(), link: "" },
   { id: "notif_2", title: "انخفاض خامة الأكريليك الشفاف (3 مم)", message: "انخفاض خامة الأكريليك الشفاف (3 مم) في المخزون عن الحد الأدنى المسموح به.", type: "inventory", priority: "high", isRead: false, createdAt: new Date(Date.now() - 3600000 * 1).toISOString(), link: "/inventory" },
   { id: "notif_3", title: "دفعة مالية جديدة بقيمة $150.00", message: "العميل شركة الأمل للدعاية أضاف دفعة مالية بقيمة $150.00 للطلب AX-2026-001.", type: "financial", priority: "normal", isRead: true, createdAt: new Date(Date.now() - 3600000 * 2).toISOString(), link: "/accounting" },
   { id: "notif_4", title: "اكتمال معالجة G-Code لطلب القص", message: "اكتمال معالجة ملف G-Code لطلب القص رقم AX-2026-002 بنجاح.", type: "production", priority: "normal", isRead: true, createdAt: new Date(Date.now() - 3600000 * 3).toISOString(), link: "/gcode" }
 ];
 
-export const DELETED_ITEMS: DeletedItemSeed[] = [] = [
+export const DELETED_ITEMS: DeletedItemSeed[] = [
   {
     id: "del-1",
     entityType: "Customer",
@@ -126,7 +126,7 @@ export const DELETED_ITEMS: DeletedItemSeed[] = [] = [
   }
 ];
 
-export const ORDER_STATUSES: OrderStatusSeed[] = [] = [
+export const ORDER_STATUSES: OrderStatusSeed[] = [
   { id: "new", name: "جديد", color: "#818cf8", order: 1, isDefault: true },
   { id: "design", name: "قيد التصميم", color: "#c084fc", order: 2, isDefault: true },
   { id: "design_approved", name: "تم اعتماد التصميم", color: "#a78bfa", order: 3, isDefault: true },
@@ -141,7 +141,7 @@ export const ORDER_STATUSES: OrderStatusSeed[] = [] = [
   { id: "in_progress", name: "قيد التنفيذ (قديم)", color: "#64748b", order: 99, isDefault: false }
 ];
 
-export const BACKUPS: BackupSeed[] = [] = [
+export const BACKUPS: BackupSeed[] = [
   { id: "b-1", name: "نسخة احتياطية تلقائية - قبل تحديث المحاسبة", createdAt: new Date(Date.now() - 3600000 * 24).toISOString(), status: "completed" },
   { id: "b-2", name: "نسخة احتياطية يدوية - إقفال الربع الثاني", createdAt: new Date(Date.now() - 3600000 * 48).toISOString(), status: "completed" }
 ];
