@@ -9,19 +9,19 @@ export function isEmployee(req: express.Request): boolean {
   return core.getRequestUser(req)?.role === "employee";
 }
 
-export function sanitizeMaterialForEmployee<T extends Record<string, unknown>>(material: T, req: express.Request): T {
+export function sanitizeMaterialForEmployee<T>(material: T, req: express.Request): T {
   if (!isEmployee(req)) return material;
-  const safe = { ...material };
+  const safe = { ...(material as Record<string, unknown>) };
   safe.pricePerUnit = 0;
   delete safe.supplier;
-  return safe;
+  return safe as T;
 }
 
-export function sanitizeSupplierQuote<T extends Record<string, unknown>>(quote: T, req: express.Request): T {
+export function sanitizeSupplierQuote<T>(quote: T, req: express.Request): T {
   if (!isEmployee(req)) return quote;
-  const safe = { ...quote };
+  const safe = { ...(quote as Record<string, unknown>) };
   delete safe.pricePerUnit;
-  return safe;
+  return safe as T;
 }
 
 export function sanitizeMaterialCollection<T extends Record<string, unknown>>(materials: T[], req: express.Request): T[] {
