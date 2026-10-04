@@ -1,7 +1,7 @@
 import express from "express";
 import { Type } from "@google/genai";
-import { db } from "../../db/index.ts";
-import { materials as materialsTable, supplierQuotes as supplierQuotesTable } from "../../db/schema.ts";
+import { db } from "../../../db/index.ts";
+import { materials as materialsTable, supplierQuotes as supplierQuotesTable } from "../../../db/schema.ts";
 import { eq } from "drizzle-orm";
 import * as core from "../server-core.ts";
 
