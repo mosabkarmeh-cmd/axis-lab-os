@@ -2,7 +2,7 @@ import express from "express";
 import { db } from "../../../db/index.ts";
 import { inventory as inventoryTable, inventoryTransactions as inventoryTransactionsTable } from "../../../db/schema.ts";
 import { eq } from "drizzle-orm";
-import * as core from "../server-core.ts";
+import * as core from "../../server-core.ts";
 
 const {
   USE_POSTGRES,
