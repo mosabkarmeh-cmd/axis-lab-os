@@ -74,7 +74,7 @@ export function registerReportRoutes(app: express.Express) {
       const historicalRate = Number(exp.exchangeRateAtCreation);
       return Math.round((Number(exp.amountUSD ?? exp.amount) || 0) * (historicalRate > 0 ? historicalRate : 135));
     };
-    const totalExpenses = sourceExpenses.reduce((sum, exp) => sum + (exp.amountUSD ?? exp.amount ?? 0), 0);
+    const totalExpenses = sourceExpenses.reduce((sum, exp) => sum + Number(exp.amountUSD ?? exp.amount ?? 0), 0);
     const totalExpensesSYP = sourceExpenses.reduce((sum, exp) => sum + expenseSYP(exp), 0);
     const netProfit = totalRevenue - totalExpenses;
     const netProfitSYP = totalRevenueSYP - totalExpensesSYP;
@@ -82,7 +82,7 @@ export function registerReportRoutes(app: express.Express) {
 
     const expenseCategories: Record<string, number> = {};
     sourceExpenses.forEach(e => {
-      expenseCategories[e.category] = (expenseCategories[e.category] || 0) + (e.amountUSD ?? e.amount);
+      expenseCategories[e.category] = (expenseCategories[e.category] || 0) + Number(e.amountUSD ?? e.amount ?? 0);
     });
     const expenseBreakdown = Object.entries(expenseCategories).map(([name, value]) => ({
       name,
