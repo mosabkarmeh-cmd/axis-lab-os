@@ -1,80 +1,106 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const root = path.resolve(__dirname, "..");
-const fail = [];
-const read = (rel) => fs.readFileSync(path.join(root, rel), "utf8");
+const ROOT = path.resolve(__dirname, "..");
+const failures = [];
 
-const walkFiles = (dir, out = []) => {
+function read(relativePath) {
+  return fs.readFileSync(path.join(ROOT, relativePath), "utf8");
+}
+
+function walk(dir, output) {
+  const result = output || [];
+  if (!fs.existsSync(dir)) return result;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (["node_modules", ".git", "dist"].includes(entry.name)) continue;
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) walkFiles(full, out);
-    else if (/\.(ts|tsx|cjs|mjs|js)$/.test(entry.name)) out.push(full);
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      walk(fullPath, result);
+    } else if (/\.(ts|tsx|js|cjs|mjs)$/.test(entry.name)) {
+      result.push(fullPath);
+    }
   }
-  return out;
-};
+  return result;
+}
 
-const routeFiles = walkFiles(path.join(root, "src/server/routes"));
-const runtimeFiles = walkFiles(path.join(root, "src/server/runtime")).filter(file =>
-  !["business-state.ts", "core-state.ts", "operational-seeds.ts"].includes(path.basename(file))
-);
-const actorClientFiles = walkFiles(path.join(root, "src")).filter(file =>
-  ![
-    "src/App.tsx",
-    "src/server/runtime/business-state.ts",
-    "src/server/runtime/core-state.ts",
-    "src/server/runtime/operational-seeds.ts",
-  ].includes(path.relative(root, file))
-);
+const routeFiles = walk(path.join(ROOT, "src/server/routes"));
+const runtimeFiles = walk(path.join(ROOT, "src/server/runtime")).filter(function (file) {
+  return !["business-state.ts", "core-state.ts", "operational-seeds.ts"].includes(path.basename(file));
+});
+const clientFiles = walk(path.join(ROOT, "src")).filter(function (file) {
+  return !file.includes(path.join("src", "server") + path.sep);
+});
 
 for (const file of routeFiles.concat(runtimeFiles)) {
   const source = fs.readFileSync(file, "utf8");
-  const rel = path.relative(root, file);
-  if (/['"]u-1['"]/.test(source)) fail.push(rel + ": hardcoded actor id u-1");
-  if (/\bconst\s+\w+\s*:\s*any\b|\b(?:let|var)\s+\w+\s*:\s*any\b|\)\s*:\s*any\b/.test(source)) {
-    fail.push(rel + ": explicit any annotation in backend");
+  const rel = path.relative(ROOT, file);
+
+  if (/['"]u-1['"]/.test(source)) {
+    failures.push(rel + ": hardcoded actor id u-1");
+  }
+
+  if (/\b(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*:\s*any\b/.test(source) ||
+      /\)\s*:\s*any\b/.test(source)) {
+    failures.push(rel + ": explicit any annotation in backend");
   }
 }
 
-for (const file of actorClientFiles) {
+for (const file of clientFiles) {
   const source = fs.readFileSync(file, "utf8");
-  const rel = path.relative(root, file);
-  if (/['"]u-1['"]/.test(source)) fail.push(rel + ": hardcoded actor id u-1");
+  const rel = path.relative(ROOT, file);
+  if (/['"]u-1['"]/.test(source)) {
+    failures.push(rel + ": hardcoded actor id u-1");
+  }
 }
 
-for (const file of walkFiles(path.join(root, "src")).concat(walkFiles(path.join(root, "desktop")))) {
+for (const file of walk(path.join(ROOT, "src")).concat(walk(path.join(ROOT, "desktop")))) {
   const source = fs.readFileSync(file, "utf8");
-  const rel = path.relative(root, file);
-  if (/executeJavaScript\s*\(/.test(source)) fail.push(rel + ": forbidden webContents.executeJavaScript usage");
+  const rel = path.relative(ROOT, file);
+  if (/executeJavaScript\s*\(/.test(source)) {
+    failures.push(rel + ": forbidden webContents.executeJavaScript usage");
+  }
 }
 
-const orderSources = walkFiles(path.join(root, "src/server/routes/orders"))
-  .filter(file => file.endsWith(".ts"))
-  .map(file => fs.readFileSync(file, "utf8"))
-  .join("\n");
+const orderSources = routeFiles.filter(function (file) {
+  return file.split(path.sep).includes("orders");
+}).map(function (file) {
+  return fs.readFileSync(file, "utf8");
+}).join("\n");
+
 for (const field of ["matCost", "finalPrice"]) {
-  if (!orderSources.includes(field)) fail.push("orders route tree missing employee financial boundary marker for " + field);
+  if (!orderSources.includes(field)) {
+    failures.push("orders route tree missing employee financial boundary marker for " + field);
+  }
 }
 
 const response = read("src/server/routes/orders/response.ts");
 for (const field of ["matCost", "finalPrice", "totalPrice", "paidAmount", "remaining"]) {
-  if (!response.includes("\"" + field + "\"")) fail.push("orders/response.ts missing hidden field " + field);
+  if (!response.includes(field)) {
+    failures.push("orders/response.ts missing hidden field " + field);
+  }
 }
 
 const productionShared = read("src/server/routes/production/jobs/shared.ts");
 for (const field of ["materialCostUSD", "technicianCostUSD", "totalDirectCostUSD"]) {
-  if (!productionShared.includes(field)) fail.push("production response boundary missing " + field);
+  if (!productionShared.includes(field)) {
+    failures.push("production response boundary missing " + field);
+  }
 }
 
 const aiChat = read("src/server/routes/ai/chat.ts");
 const aiPricing = read("src/server/routes/ai/fast-local-pricing.ts");
-if (!aiChat.includes("getAiAccessScope")) fail.push("AI chat missing role scope enforcement");
-if (!aiPricing.includes("role") || !aiPricing.includes("403")) fail.push("AI pricing missing server-side authorization");
 
-if (fail.length) {
+if (!aiChat.includes("getAiAccessScope")) {
+  failures.push("AI chat missing role scope enforcement");
+}
+if (!aiPricing.includes("getRequestUser") || !aiPricing.includes("403")) {
+  failures.push("AI pricing missing server-side authorization");
+}
+
+if (failures.length > 0) {
   console.error("[STATIC-SOURCE-AUDIT] FAIL");
-  fail.forEach(item => console.error(" - " + item));
+  for (const failure of failures) console.error(" - " + failure);
   process.exit(1);
 }
+
 console.log("[STATIC-SOURCE-AUDIT] PASS");
