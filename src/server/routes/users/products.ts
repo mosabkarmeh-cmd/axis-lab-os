@@ -1,6 +1,10 @@
 import express from "express";
 import * as core from "../../server-core.ts";
 
+function getActorId(req: express.Request): string {
+  return getRequestUser(req)?.id || "system";
+}
+
 const {
   PRODUCTS,
   DELETED_ITEMS,
@@ -50,7 +54,7 @@ export function registerLegacyProductRoutes(app: express.Express) {
 
     ACTIVITY_LOGS.unshift({
       id: nextActivityLogId(),
-      userId: "u-1",
+      userId: getActorId(req),
       action: "CREATE_PRODUCT",
       entityType: "Product",
       entityId: newProd.id,
