@@ -82,7 +82,7 @@ export function registerLegacyProductRoutes(app: express.Express) {
 
     ACTIVITY_LOGS.unshift({
       id: nextActivityLogId(),
-      userId: "u-1",
+      userId: getActorId(req),
       action: "UPDATE_PRODUCT",
       entityType: "Product",
       entityId: prod.id,
