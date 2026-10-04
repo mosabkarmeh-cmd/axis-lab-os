@@ -9,24 +9,28 @@ const {
   getRequestUser,
 } = core;
 
+function canViewCustomerPrivateData(req: express.Request): boolean {
+  return getRequestUser(req)?.role === "admin";
+}
+
+function sanitizeCustomer(customer: typeof CUSTOMERS[number], req: express.Request) {
+  if (canViewCustomerPrivateData(req)) return customer;
+  return {
+    id: customer.id,
+    name: customer.name,
+    company: customer.company || "",
+    category: customer.category || "شركة",
+    phone: "🔒 محجوب",
+    whatsapp: "🔒 محجوب",
+    email: "🔒 محجوب",
+    address: "🔒 محجوب",
+    notes: "🔒 محجوب",
+  };
+}
+
 export function registerLegacyCustomerRoutes(app: express.Express) {
 app.get("/api/customers", (req, res) => {
-    const user = getRequestUser(req);
-    if (user && user.role === "accountant") {
-      const sanitized = CUSTOMERS.map(c => ({
-        id: c.id,
-        name: c.name,
-        phone: "🔒 محجوب",
-        whatsapp: "🔒 محجوب",
-        email: "🔒 محجوب",
-        company: "",
-        address: "🔒 محجوب",
-        notes: "🔒 محجوب"
-      }));
-      res.json(sanitized);
-    } else {
-      res.json(CUSTOMERS);
-    }
+    res.json(CUSTOMERS.map(customer => sanitizeCustomer(customer, req)));
   });
 
   // API - Add Customer
@@ -56,7 +60,7 @@ app.get("/api/customers", (req, res) => {
 
     CUSTOMERS.push(newCust);
 
-    res.json(newCust);
+    res.json(sanitizeCustomer(newCust, req));
   });
 
   // API - Update Customer
@@ -91,7 +95,7 @@ app.get("/api/customers", (req, res) => {
     };
 
     CUSTOMERS[index] = updatedCust;
-    res.json(updatedCust);
+    res.json(sanitizeCustomer(updatedCust, req));
   });
 
   app.patch("/api/customers/:id", (req, res) => {
@@ -154,7 +158,7 @@ app.get("/api/customers", (req, res) => {
       "system"
     );
 
-    res.json(removed);
+    res.json(sanitizeCustomer(removed, req));
   });
 
   // API - Get Products
