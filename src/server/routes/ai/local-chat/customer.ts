@@ -1,43 +1,70 @@
 import * as core from "../../../server-core.ts";
-import { normalizeArabicAndDialect, type AiStats } from "../local-chat.ts";
+import type { AiStats } from "./types.ts";
+import { normalizeArabicAndDialect } from "./normalization.ts";
 
-const { CUSTOMERS, ORDERS, MATERIALS, REMNANTS, EXPENSES } = core;
-export function getCustomerChatResponse(message: string, stats: AiStats, rate: number): string | null {
+const { CUSTOMERS, ORDERS } = core;
 
-    const matchedCustomer = CUSTOMERS.find(c => {
-      const normName = normalizeArabicAndDialect(c.name);
-      return msgNorm.includes(normName) || normName.includes(msgNorm) || (c.phone && message.includes(c.phone));
-    });
+export function getCustomerChatResponse(
+  message: string,
+  stats: AiStats,
+  rate: number,
+): string | null {
+  const msgNorm = normalizeArabicAndDialect(message);
 
-    if (matchedCustomer) {
-      const custOrders = ORDERS.filter(o => o.customerId === matchedCustomer.id || o.customerName === matchedCustomer.name);
-      const custTotalInvoiced = custOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
-      const custTotalPaid = custOrders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
-      const custTotalDebt = Math.max(0, custTotalInvoiced - custTotalPaid);
+  const matchedCustomer = CUSTOMERS.find(customer => {
+    const normName = normalizeArabicAndDialect(customer.name);
+    return (
+      msgNorm.includes(normName) ||
+      normName.includes(msgNorm) ||
+      Boolean(customer.phone && message.includes(customer.phone))
+    );
+  });
 
-      if (stats.canViewFinancials === false || stats.canViewCustomerPrivateData === false) {
-        return `👤 **ملخص العميل: "${matchedCustomer.name}"**:
+  if (!matchedCustomer) return null;
 
-• **عدد الطلبات المسجلة**: ${custOrders.length}
-• **الحالة التشغيلية**: ${custOrders.filter(o => ["new", "in_progress", "cutting", "assembly"].includes(o.status || "")).length > 0 ? "لديه طلبات قيد التنفيذ أو المتابعة." : "لا توجد طلبات نشطة حالياً."}
+  const customerOrders = ORDERS.filter(
+    order =>
+      order.customerId === matchedCustomer.id ||
+      order.customerName === matchedCustomer.name,
+  );
+  const totalInvoiced = customerOrders.reduce(
+    (sum, order) => sum + (Number(order.totalPrice) || 0),
+    0,
+  );
+  const totalPaid = customerOrders.reduce(
+    (sum, order) => sum + (Number(order.paidAmount) || 0),
+    0,
+  );
+  const totalDebt = Math.max(0, totalInvoiced - totalPaid);
+
+  if (
+    stats.canViewFinancials === false ||
+    stats.canViewCustomerPrivateData === false
+  ) {
+    return `👤 **ملخص العميل: "${matchedCustomer.name}"**:
+
+• **عدد الطلبات المسجلة**: ${customerOrders.length} طلب
+• **الحالة التشغيلية**: ${customerOrders.some(order =>
+      ["new", "in_progress", "cutting", "assembly"].includes(order.status || ""),
+    ) ? "لديه طلبات قيد التنفيذ أو المتابعة." : "لا توجد طلبات نشطة حالياً."}
 • **آخر الطلبات**:
-${custOrders.slice(0, 5).map(o => `- طلب رقم \`${o.id}\` - الحالة: ${o.status === "completed" || o.status === "delivered" ? "مكتمل" : "قيد المعالجة"}`).join("\n") || "لا توجد طلبات سابقة مسجلة."}
+${customerOrders.slice(0, 5).map(order => `- طلب رقم \`${order.id}\` - الحالة: ${["completed", "delivered"].includes(order.status || "") ? "مكتمل" : "قيد المعالجة"}`).join("\n") || "لا توجد طلبات سابقة مسجلة."}
 
 🔒 البيانات المالية وبيانات الاتصال بالعميل محجوبة حسب صلاحية الحساب.`;
-      }
-      
-      return `📊 **كشف الحساب المالي والإنتاجي التفصيلي للعميل: "${matchedCustomer.name}"** (محلي ومدمج 100%):
+  }
 
-• **إجمالي الطلبيات المسجلة**: ${custOrders.length} طلبات
-• **إجمالي قيمة الأعمال والطلبات**: $${custTotalInvoiced.toLocaleString("en-US", { minimumFractionDigits: 2 })} (${Math.round(custTotalInvoiced * rate).toLocaleString()} ل.س)
-• **إجمالي المقبوض والمسدد فعلياً**: $${custTotalPaid.toLocaleString("en-US", { minimumFractionDigits: 2 })} (${Math.round(custTotalPaid * rate).toLocaleString()} ل.س)
-• **الرصيد المتبقي بذمته المعلقة**: **$${custTotalDebt.toLocaleString("en-US", { minimumFractionDigits: 2 })}** (${Math.round(custTotalDebt * rate).toLocaleString()} ل.س)
-• **حالة الحساب المالي**: ${custTotalDebt > 0 ? "🔴 ذمة مالية معلقة غير مسددة بالكامل." : "🟢 الحساب مسدد بالكامل، عميل متميز!"}
+  return `📊 **كشف الحساب المالي والإنتاجي التفصيلي للعميل: "${matchedCustomer.name}"**:
+
+• **إجمالي الطلبات المسجلة**: ${customerOrders.length} طلب
+• **إجمالي قيمة الأعمال والطلبات**: $${totalInvoiced.toLocaleString("en-US", { minimumFractionDigits: 2 })} (${Math.round(totalInvoiced * rate).toLocaleString()} ل.س)
+• **إجمالي المقبوض والمسدد فعلياً**: $${totalPaid.toLocaleString("en-US", { minimumFractionDigits: 2 })} (${Math.round(totalPaid * rate).toLocaleString()} ل.س)
+• **الرصيد المتبقي بذمته**: **$${totalDebt.toLocaleString("en-US", { minimumFractionDigits: 2 })}** (${Math.round(totalDebt * rate).toLocaleString()} ل.س)
+• **حالة الحساب المالي**: ${totalDebt > 0 ? "🔴 ذمة مالية معلقة غير مسددة بالكامل." : "🟢 الحساب مسدد بالكامل."}
 • **رقم الهاتف المسجل**: \`${matchedCustomer.phone || "غير مسجل"}\`
 • **العنوان الجغرافي**: \`${matchedCustomer.address || "غير مسجل"}\`
 
 📈 **آخر طلبات العميل**:
-${custOrders.slice(0, 5).map(o => `- طلب رقم \`${o.id}\` بقيمة **$${o.totalPrice}** - الحالة: ${o.status === 'completed' ? '✓ مكتمل' : '⏳ قيد المعالجة'}`).join('\n') || "لا توجد طلبات سابقة مسجلة."}`;
-    }
-  return null;
+${customerOrders.slice(0, 5).map(order =>
+    `- طلب رقم \`${order.id}\` بقيمة **$${Number(order.totalPrice || 0).toFixed(2)}** - الحالة: ${order.status === "completed" || order.status === "delivered" ? "✓ مكتمل" : "⏳ قيد المعالجة"}`,
+  ).join("\n") || "لا توجد طلبات سابقة مسجلة."}`;
 }
