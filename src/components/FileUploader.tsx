@@ -63,7 +63,6 @@ export function FileUploader({ entityType, entityId }: FileUploaderProps) {
     formData.append("file", file);
     formData.append("entityType", entityType);
     formData.append("entityId", entityId);
-    formData.append("uploadedBy", "u-1");
 
     try {
       setUploadProgress(50);
