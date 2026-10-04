@@ -1,6 +1,6 @@
 import express from "express";
 import * as core from "../../../server-core.ts";
-import { asInvoiceItem, getActorId } from "./shared.ts";
+import { asInvoiceItem, getActorId, type InvoiceItem } from "./shared.ts";
 
 const {
   INVOICES,
