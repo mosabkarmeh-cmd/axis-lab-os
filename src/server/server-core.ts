@@ -19,6 +19,7 @@ import { createSettingsRuntime } from "./runtime/settings-runtime.ts";
 import { EXPENSES, NUMBERING_SETTINGS, INVOICE_HISTORY, NOTIFICATIONS, DELETED_ITEMS, ORDER_STATUSES, BACKUPS, PRODUCTION_JOBS } from "./runtime/operational-seeds.ts";
 import { createMasterDataNormalizationRuntime, LEGACY_MATERIAL_PRICES_SYP_CANONICAL, LEGACY_MATERIAL_PRICES_SYP, DEMO_LOW_PRICE_MATERIALS, DEMO_LOW_PRICE_INVENTORY } from "./runtime/master-data-normalization.ts";
 import { createAuthRuntime, JWT_ISSUER_DEFAULT, JWT_AUDIENCE_DEFAULT, type UserRecord } from "./runtime/auth-runtime.ts";
+import { createNumberingRuntime } from "./runtime/numbering-runtime.ts";
 import { syncNormalizedLocalEntities as syncLocalEntities, assertFinancialStateInvariants as assertFinancialState, syncNormalizedFinancialEntities as syncFinancialEntities } from "./runtime/local-sqlite-sync.ts";
 
 import express from "express";
@@ -551,29 +552,6 @@ const MACHINES = [
   { id: "mac-1", name: "CO2 Laser Cutter 100W (جنوب)", type: "laser_co2", status: "idle", currentJobId: null, lastMaintenance: "2026-06-01", workingHours: 234.5 }
 ];
 
-function getNextNumber(entity: string): string {
-  const setting = NUMBERING_SETTINGS.find(s => s.entity === entity);
-  if (!setting) {
-    const defaultSetting = {
-      id: nextEntityId("num"),
-      entity,
-      prefix: entity.toUpperCase().slice(0, 3),
-      suffix: "",
-      digits: 6,
-      separator: "-",
-      nextNumber: 1
-    };
-    NUMBERING_SETTINGS.push(defaultSetting);
-    const num = `${defaultSetting.prefix}${defaultSetting.separator}${String(defaultSetting.nextNumber).padStart(defaultSetting.digits, '0')}`;
-    defaultSetting.nextNumber += 1;
-    return num;
-  }
-  const separator = setting.separator || "-";
-  const num = `${setting.prefix}${separator}${String(setting.nextNumber).padStart(setting.digits, '0')}${setting.suffix ? separator + setting.suffix : ""}`;
-  setting.nextNumber += 1;
-  return num;
-}
-
 const INVOICES: any[] = [
   { 
     id: "inv-1", 
@@ -738,6 +716,12 @@ const {
   normalizeInventoryState,
   ensureDemoLowPriceMaterials,
 } = masterDataNormalizationRuntime;
+
+const numberingRuntime = createNumberingRuntime({
+  settings: NUMBERING_SETTINGS,
+  nextEntityId,
+});
+const { getNextNumber } = numberingRuntime;
 
 // ==================== STATE PERSISTENCE ====================
 const statePersistence = createStatePersistence(
