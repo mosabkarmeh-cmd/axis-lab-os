@@ -15,6 +15,7 @@ import { createLocalSqliteRuntime, localSqlite, setLocalSqlite } from "./runtime
 import { createProductionEmailRuntime } from "./runtime/production-email.ts";
 import { createNotificationRuntime, WORKFLOW_NEXT_REMINDERS } from "./runtime/notifications-runtime.ts";
 import { createCurrencyRuntime } from "./runtime/currency-runtime.ts";
+import { createSettingsRuntime } from "./runtime/settings-runtime.ts";
 import { syncNormalizedLocalEntities as syncLocalEntities, assertFinancialStateInvariants as assertFinancialState, syncNormalizedFinancialEntities as syncFinancialEntities } from "./runtime/local-sqlite-sync.ts";
 
 import express from "express";
@@ -840,37 +841,6 @@ const SETTINGS = {
   }
 };
 
-function publicSettings() {
-  const { pass: _smtpPassword, ...safeSmtp } = SETTINGS.smtp;
-  return {
-    ...SETTINGS,
-    smtp: {
-      ...safeSmtp,
-      configured: Boolean(SETTINGS.smtp.user && SETTINGS.smtp.pass),
-      hasPassword: Boolean(SETTINGS.smtp.pass)
-    }
-  };
-}
-
-function getPartnerSharePercentAt(dateValue?: string | Date) {
-  const history = Array.isArray((SETTINGS as any).partnerShareHistory)
-    ? (SETTINGS as any).partnerShareHistory
-        .filter((entry: any) => Number.isFinite(Number(entry.percent)) && entry.effectiveFrom)
-        .sort((a: any, b: any) => new Date(a.effectiveFrom).getTime() - new Date(b.effectiveFrom).getTime())
-    : [];
-  const target = dateValue ? new Date(dateValue).getTime() : Date.now();
-  const match = history.filter((entry: any) => new Date(entry.effectiveFrom).getTime() <= target).pop();
-  const value = match ? Number(match.percent) : Number((SETTINGS as any).partnerSharePercent);
-  return Math.min(100, Math.max(0, Number.isFinite(value) ? value : 0));
-}
-
-function mergeSmtpSettings(input: any) {
-  if (!input || typeof input !== "object") return;
-  const { pass, ...safeInput } = input;
-  SETTINGS.smtp = { ...SETTINGS.smtp, ...safeInput };
-  if (typeof pass === "string" && pass.trim()) SETTINGS.smtp.pass = pass;
-}
-
 const BACKUPS: any[] = [
   { id: "b-1", name: "نسخة احتياطية تلقائية - قبل تحديث المحاسبة", createdAt: new Date(Date.now() - 3600000 * 24).toISOString(), status: "completed" },
   { id: "b-2", name: "نسخة احتياطية يدوية - إقفال الربع الثاني", createdAt: new Date(Date.now() - 3600000 * 48).toISOString(), status: "completed" }
@@ -958,6 +928,13 @@ const currencyRuntime = createCurrencyRuntime({
   invoices: INVOICES,
 });
 const { freezeOrderCurrencySnapshot } = currencyRuntime;
+
+const settingsRuntime = createSettingsRuntime(SETTINGS);
+const {
+  publicSettings,
+  getPartnerSharePercentAt,
+  mergeSmtpSettings,
+} = settingsRuntime;
 
 // ==================== STATE PERSISTENCE ====================
 const statePersistence = createStatePersistence(
