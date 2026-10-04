@@ -11,10 +11,15 @@ export function handleFastLocalPricingAction(
   res: Response,
 ): boolean {
   const user = core.getRequestUser(_req);
-  if (user?.role === "employee" && ["pricing-advisor", "instant-pricing-calc"].includes(String(action))) {
+  const actionName = String(action);
+  if (!user) {
+    res.status(401).json({ success: false, error: "يجب تسجيل الدخول لاستخدام أدوات التسعير" });
+    return true;
+  }
+  if (!["admin", "accountant"].includes(user.role) && ["pricing-advisor", "instant-pricing-calc"].includes(actionName)) {
     res.status(403).json({
       success: false,
-      error: "أدوات التسعير والتكلفة محجوبة عن حساب الموظف"
+      error: "أدوات التسعير والتكلفة محجوبة عن هذا الحساب"
     });
     return true;
   }
