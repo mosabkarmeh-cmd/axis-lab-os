@@ -67,7 +67,8 @@ export function registerFileRoutes(app: express.Express) {
         return res.status(400).json({ success: false, message: "لم يتم رفع أي ملف" });
       }
 
-      const { entityType, entityId, uploadedBy } = req.body;
+      const { entityType, entityId } = req.body;
+      const actorId = getRequestUser(req)?.id || "system";
       const newFile = {
         id: "f-" + Date.now(),
         name: file.filename,
@@ -77,7 +78,7 @@ export function registerFileRoutes(app: express.Express) {
         path: file.path,
         entityType: entityType || null,
         entityId: entityId || null,
-        uploadedById: uploadedBy || "u-1",
+        uploadedById: actorId,
         createdAt: new Date().toISOString()
       };
 
@@ -86,7 +87,7 @@ export function registerFileRoutes(app: express.Express) {
       // Log Activity
       ACTIVITY_LOGS.unshift({
         id: nextActivityLogId(),
-        userId: uploadedBy || "u-1",
+        userId: actorId,
         action: "UPLOAD_FILE",
         entityType: "File",
         entityId: newFile.id,
@@ -141,7 +142,7 @@ export function registerFileRoutes(app: express.Express) {
     // Log Activity
     ACTIVITY_LOGS.unshift({
       id: nextActivityLogId(),
-      userId: "u-1",
+      userId: getRequestUser(req)?.id || "system",
       action: "DELETE_FILE",
       entityType: "File",
       entityId: file.id,
