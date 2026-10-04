@@ -414,7 +414,7 @@ export default function AddOrderModal({
           totalPrice: totalPrice,
           taxPercent: taxPercentVal,
           discount: discountAmountVal,
-          createdById: currentUser?.id || "u-1",
+
           deliveryDateExpected: orderDeliveryDate
         })
       });
