@@ -186,7 +186,6 @@ export default function VectorCompilerUploader({
       formData.append("file", file);
       formData.append("entityType", "order");
       formData.append("entityId", selectedOrderId);
-      formData.append("uploadedBy", "u-1");
 
       const res = await fetch("/api/files/upload", {
         method: "POST",
