@@ -12,6 +12,7 @@ import "dotenv/config";
 import { refreshWarehouseCache as createWarehouseCacheRuntime } from "./runtime/warehouse-cache.ts";
 import { createStatePersistence } from "./runtime/state-persistence.ts";
 import { createLocalSqliteRuntime, localSqlite, setLocalSqlite } from "./runtime/local-sqlite.ts";
+import { createProductionEmailRuntime } from "./runtime/production-email.ts";
 import { syncNormalizedLocalEntities as syncLocalEntities, assertFinancialStateInvariants as assertFinancialState, syncNormalizedFinancialEntities as syncFinancialEntities } from "./runtime/local-sqlite-sync.ts";
 
 import express from "express";
@@ -26,7 +27,6 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 import os from "os";
-import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
@@ -980,171 +980,6 @@ function freezeOrderCurrencySnapshot(order: any, invoice?: any) {
   return { order, invoice: finalInvoice };
 }
 
-async function sendProductionJobEmailNotification(
-  job: any,
-  eventType: "created" | "started" | "paused" | "completed" | "cancelled",
-  extraMessage: string = ""
-) {
-  try {
-    if (!SETTINGS.smtp || !SETTINGS.smtp.enabled) {
-      console.log(`[SMTP] Notifications disabled. Skipping email for Job ${job.jobNo}`);
-      return { success: false, reason: "SMTP disabled in settings" };
-    }
-
-    const recipients = (SETTINGS.smtp.recipientEmails || "")
-      .split(",")
-      .map((e: string) => e.trim())
-      .filter((e: string) => e.length > 0);
-
-    if (recipients.length === 0) {
-      console.log(`[SMTP] No recipient emails configured for Job ${job.jobNo}`);
-      return { success: false, reason: "No recipient emails configured" };
-    }
-
-    const statusTitleMap: Record<string, string> = {
-      created: "تم إنشاء مهمة إنتاج جديدة",
-      started: "بدء تشغيل مهمة القص بالليزر",
-      paused: "إيقاف مؤقت لمهمة الإنتاج",
-      completed: "انتهاء واكتمال قص المهمة بالكامل (100%)",
-      cancelled: "إلغاء مهمة الإنتاج"
-    };
-
-    const statusBadgeMap: Record<string, string> = {
-      created: "جديدة",
-      started: "قيد التشغيل",
-      paused: "موقوفة مؤقتاً",
-      completed: "مكتملة (100%)",
-      cancelled: "ملغاة"
-    };
-
-    const mac = MACHINES.find((m: any) => m.id === job.machineId);
-    const macName = mac ? mac.name : "غير محددة";
-    const opUser = USERS.find((u: any) => u.id === job.operatorId);
-    const opName = opUser ? opUser.fullName : "فني تشغيل الورشة";
-
-    const subject = `[AXIS LAB] ${statusTitleMap[eventType] || "تحديث مهمة إنتاج"} - ${job.jobNo}`;
-
-    const htmlBody = `
-      <div dir="rtl" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #09090b; color: #f4f4f5; padding: 24px; border-radius: 12px; border: 1px solid #27272a; max-width: 600px; margin: 0 auto;">
-        <div style="text-align: center; border-bottom: 2px solid #c59257; padding-bottom: 16px; margin-bottom: 20px;">
-          <h2 style="color: #c59257; margin: 0; font-size: 22px;">AXIS LAB — نظام إشعارات الإنتاج والمكائن</h2>
-          <p style="color: #a1a1aa; font-size: 13px; margin-top: 6px;">تنبيه فوري لمتابعة سير العمل والفنيين بالورشة</p>
-        </div>
-
-        <div style="background-color: #18181b; padding: 16px; border-radius: 8px; border-right: 4px solid #c59257; margin-bottom: 20px;">
-          <h3 style="color: #ffffff; margin-top: 0; font-size: 16px;">${statusTitleMap[eventType] || "تحديث حالة المهمة"}</h3>
-          <p style="color: #e4e4e7; font-size: 14px; margin-bottom: 8px;">
-            المهمة <strong>${job.jobNo}</strong> الخاصة بـ <strong>"${job.itemName}"</strong> أصبحت الآن بحالة:
-            <span style="background-color: #c59257; color: #000000; padding: 2px 8px; border-radius: 4px; font-weight: bold;">
-              ${statusBadgeMap[eventType] || job.status}
-            </span>
-          </p>
-          ${extraMessage ? `<p style="color: #a1a1aa; font-size: 12px; font-style: italic;">ملاحظة: ${extraMessage}</p>` : ''}
-        </div>
-
-        <table style="width: 100%; border-collapse: collapse; text-align: right; font-size: 13px; color: #d4d4d8;">
-          <tr style="border-bottom: 1px solid #27272a;">
-            <td style="padding: 8px; color: #a1a1aa;">رقم تذكرة الشغل (Job No):</td>
-            <td style="padding: 8px; font-weight: bold; color: #c59257;">${job.jobNo}</td>
-          </tr>
-          <tr style="border-bottom: 1px solid #27272a;">
-            <td style="padding: 8px; color: #a1a1aa;">رقم الطلب المرتبط:</td>
-            <td style="padding: 8px; font-weight: bold;">${job.orderNumber || "غير مرتبط بطلب مباشر"}</td>
-          </tr>
-          <tr style="border-bottom: 1px solid #27272a;">
-            <td style="padding: 8px; color: #a1a1aa;">الماكينة المستخدمة:</td>
-            <td style="padding: 8px;">${macName}</td>
-          </tr>
-          <tr style="border-bottom: 1px solid #27272a;">
-            <td style="padding: 8px; color: #a1a1aa;">الفني المسؤول:</td>
-            <td style="padding: 8px;">${opName}</td>
-          </tr>
-          <tr style="border-bottom: 1px solid #27272a;">
-            <td style="padding: 8px; color: #a1a1aa;">نسبة الإنجاز (Progress):</td>
-            <td style="padding: 8px; font-weight: bold; color: #34d399;">${job.progress}%</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px; color: #a1a1aa;">وقت التحديث:</td>
-            <td style="padding: 8px;">${new Date().toLocaleString('ar-EG')}</td>
-          </tr>
-        </table>
-
-        <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #27272a; text-align: center; color: #71717a; font-size: 11px;">
-          هذا الإشعار التلقائي مُرسل من نظام إدارة ورش الليزر AXIS LAB ERP عبر خادم SMTP
-        </div>
-      </div>
-    `;
-
-    // Add to system notifications for live UI feedback
-    NOTIFICATIONS.unshift({
-      id: "notif_smtp_" + Date.now(),
-      title: `${statusTitleMap[eventType] || "تحديث مهمة"} (${job.jobNo})`,
-      message: `تم إرسال إشعار بريدي عبر SMTP للفنيين (${recipients.join(", ")}) حول المهمة ${job.jobNo}: ${statusTitleMap[eventType]}`,
-      type: "production",
-      priority: eventType === "completed" ? "high" : "normal",
-      isRead: false,
-      createdAt: new Date().toISOString(),
-      link: "/production"
-    });
-
-    // Create Transporter
-    const transporter = nodemailer.createTransport({
-      host: SETTINGS.smtp.host,
-      port: SETTINGS.smtp.port,
-      secure: SETTINGS.smtp.secure,
-      auth: (SETTINGS.smtp.user && SETTINGS.smtp.pass) ? {
-        user: SETTINGS.smtp.user,
-        pass: SETTINGS.smtp.pass
-      } : undefined,
-      tls: {
-        rejectUnauthorized: false
-      }
-    });
-
-    const mailOptions = {
-      from: `"${SETTINGS.smtp.fromName}" <${SETTINGS.smtp.fromEmail}>`,
-      to: recipients.join(", "),
-      subject: subject,
-      html: htmlBody,
-      text: `${statusTitleMap[eventType] || "تحديث مهمة إنتاج"} - المهمة ${job.jobNo} (${job.itemName})`
-    };
-
-    try {
-      const info = await transporter.sendMail(mailOptions);
-      console.log(`[SMTP SUCCESS] Sent job email to ${recipients.join(", ")}. MessageId: ${info.messageId}`);
-      
-      ACTIVITY_LOGS.unshift({
-        id: nextActivityLogId("log_smtp"),
-        userId: job.operatorId || "u-1",
-        action: "SEND_SMTP_NOTIFICATION",
-        entityType: "ProductionJob",
-        entityId: job.id,
-        createdAt: new Date().toISOString(),
-        details: `SMTP notification sent to ${recipients.join(", ")} for job ${job.jobNo} (${eventType})`
-      });
-
-      return { success: true, messageId: info.messageId, recipients };
-    } catch (smtpErr: unknown) {
-      const message = smtpErr instanceof Error ? smtpErr.message : String(smtpErr);
-      console.warn(`[SMTP WARN] Transport response for job ${job.jobNo}: ${message}`);
-      ACTIVITY_LOGS.unshift({
-        id: nextActivityLogId("log_smtp"),
-        userId: job.operatorId || "u-1",
-        action: "ATTEMPT_SMTP_NOTIFICATION",
-        entityType: "ProductionJob",
-        entityId: job.id,
-        createdAt: new Date().toISOString(),
-        details: `SMTP dispatch attempted for ${job.jobNo} (${eventType}) to ${recipients.join(", ")}. Transport note: ${message}`
-      });
-      return { success: true, warning: message, recipients };
-    }
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error("[SMTP ERROR] Error sending production job email:", err);
-    return { success: false, error: message };
-  }
-}
-
 const BACKUPS: any[] = [
   { id: "b-1", name: "نسخة احتياطية تلقائية - قبل تحديث المحاسبة", createdAt: new Date(Date.now() - 3600000 * 24).toISOString(), status: "completed" },
   { id: "b-2", name: "نسخة احتياطية يدوية - إقفال الربع الثاني", createdAt: new Date(Date.now() - 3600000 * 48).toISOString(), status: "completed" }
@@ -1204,6 +1039,16 @@ const PRODUCTION_JOBS = [
     createdAt: new Date().toISOString()
   }
 ];
+
+const productionEmailRuntime = createProductionEmailRuntime({
+  settings: SETTINGS,
+  machines: MACHINES,
+  users: USERS,
+  notifications: NOTIFICATIONS,
+  activityLogs: ACTIVITY_LOGS,
+  nextActivityLogId,
+});
+const { sendProductionJobEmailNotification } = productionEmailRuntime;
 
 // ==================== STATE PERSISTENCE ====================
 const statePersistence = createStatePersistence(
