@@ -14,6 +14,7 @@ import { createStatePersistence } from "./runtime/state-persistence.ts";
 import { createLocalSqliteRuntime, localSqlite, setLocalSqlite } from "./runtime/local-sqlite.ts";
 import { createProductionEmailRuntime } from "./runtime/production-email.ts";
 import { createNotificationRuntime, WORKFLOW_NEXT_REMINDERS } from "./runtime/notifications-runtime.ts";
+import { createCurrencyRuntime } from "./runtime/currency-runtime.ts";
 import { syncNormalizedLocalEntities as syncLocalEntities, assertFinancialStateInvariants as assertFinancialState, syncNormalizedFinancialEntities as syncFinancialEntities } from "./runtime/local-sqlite-sync.ts";
 
 import express from "express";
@@ -32,7 +33,6 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { materialPriceUSD } from "../lib/materials.ts";
-import { sypToUsd } from "../lib/currency.ts";
 
 
 
@@ -871,56 +871,6 @@ function mergeSmtpSettings(input: any) {
   if (typeof pass === "string" && pass.trim()) SETTINGS.smtp.pass = pass;
 }
 
-/**
- * Freeze the exchange-rate snapshot exactly once when an order is fully paid and delivered.
- * Operational order values remain SYP; USD values are immutable final-invoice presentation values.
- */
-function freezeOrderCurrencySnapshot(order: any, invoice?: any) {
-  if (order.currencyFinalizedAt && order.exchangeRateAtFinalization) {
-    return { order, invoice: invoice || INVOICES.find((candidate: any) => candidate.orderId === order.id) };
-  }
-  const historicalRate = Number(order.exchangeRateAtFinalization || order.exchangeRateAtCreation || invoice?.exchangeRateAtIssue);
-  const rate = historicalRate > 0 ? historicalRate : (Number(SETTINGS.exchangeRate) > 0 ? Number(SETTINGS.exchangeRate) : 135);
-  const finalizedAt = new Date().toISOString();
-  const totalSYP = Math.round(Number(order.totalPrice) || 0);
-  const paidSYP = Math.round(Number(order.paidAmount) || 0);
-  const remainingSYP = Math.max(0, totalSYP - paidSYP);
-  const finalInvoice = invoice || INVOICES.find((candidate: any) => candidate.orderId === order.id);
-
-  order.currency = "SYP";
-  order.exchangeRateAtFinalization = rate;
-  order.currencyFinalizedAt = finalizedAt;
-  order.finalTotalSYP = totalSYP;
-  order.finalPaidSYP = paidSYP;
-  order.finalRemainingSYP = remainingSYP;
-  order.finalTotalUSD = Number(sypToUsd(totalSYP, rate).toFixed(2));
-  order.finalPaidUSD = Number(sypToUsd(paidSYP, rate).toFixed(2));
-  order.finalRemainingUSD = Number(sypToUsd(remainingSYP, rate).toFixed(2));
-
-  if (finalInvoice) {
-    finalInvoice.currency = "USD";
-    finalInvoice.exchangeRateAtFinalization = rate;
-    finalInvoice.currencyFinalizedAt = finalizedAt;
-    finalInvoice.totalPriceSYP = totalSYP;
-    finalInvoice.paidAmountSYP = paidSYP;
-    finalInvoice.remainingSYP = remainingSYP;
-    finalInvoice.totalPriceUSD = order.finalTotalUSD;
-    finalInvoice.paidAmountUSD = order.finalPaidUSD;
-    finalInvoice.remainingUSD = order.finalRemainingUSD;
-    finalInvoice.items = (finalInvoice.items || []).map((item: any) => {
-      const issueRate = Number(finalInvoice.exchangeRateAtIssue) > 0 ? Number(finalInvoice.exchangeRateAtIssue) : rate;
-      const unitPriceSYP = Math.round(Number(item.unitPriceSYP ?? (Number(item.unitPrice || 0) * issueRate)));
-      const totalSYP = Math.round(Number(item.totalSYP ?? (Number(item.total || 0) * issueRate)));
-      return { ...item, unitPriceSYP, totalSYP, unitPrice: Number(sypToUsd(unitPriceSYP, rate).toFixed(2)), total: Number(sypToUsd(totalSYP, rate).toFixed(2)) };
-    });
-    // Existing invoice fields are USD and remain stable after finalization.
-    finalInvoice.totalPrice = order.finalTotalUSD;
-    finalInvoice.paidAmount = order.finalPaidUSD;
-    finalInvoice.remaining = order.finalRemainingUSD;
-  }
-  return { order, invoice: finalInvoice };
-}
-
 const BACKUPS: any[] = [
   { id: "b-1", name: "نسخة احتياطية تلقائية - قبل تحديث المحاسبة", createdAt: new Date(Date.now() - 3600000 * 24).toISOString(), status: "completed" },
   { id: "b-2", name: "نسخة احتياطية يدوية - إقفال الربع الثاني", createdAt: new Date(Date.now() - 3600000 * 48).toISOString(), status: "completed" }
@@ -1002,6 +952,12 @@ const {
   createNotification,
   notifyOverdueOrders,
 } = notificationRuntime;
+
+const currencyRuntime = createCurrencyRuntime({
+  settings: SETTINGS,
+  invoices: INVOICES,
+});
+const { freezeOrderCurrencySnapshot } = currencyRuntime;
 
 // ==================== STATE PERSISTENCE ====================
 const statePersistence = createStatePersistence(
