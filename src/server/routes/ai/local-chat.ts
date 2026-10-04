@@ -53,6 +53,8 @@ export type AiStats = {
     machinesCount: number;
     activeJobsCount: number;
     lowStockMaterials: string[];
+    canViewFinancials?: boolean;
+    canViewCustomerPrivateData?: boolean;
 };
 
 export const getLocalChatResponse = (message: string, stats: AiStats, userExchangeRate?: number) => {
@@ -82,6 +84,17 @@ export const getLocalChatResponse = (message: string, stats: AiStats, userExchan
       const custTotalInvoiced = custOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
       const custTotalPaid = custOrders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
       const custTotalDebt = Math.max(0, custTotalInvoiced - custTotalPaid);
+
+      if (!stats.canViewFinancials || !stats.canViewCustomerPrivateData) {
+        return `👤 **ملخص العميل: "${matchedCustomer.name}"**:
+
+• **عدد الطلبات المسجلة**: ${custOrders.length}
+• **الحالة التشغيلية**: ${custOrders.filter(o => ["new", "in_progress", "cutting", "assembly"].includes(o.status || "")).length > 0 ? "لديه طلبات قيد التنفيذ أو المتابعة." : "لا توجد طلبات نشطة حالياً."}
+• **آخر الطلبات**:
+${custOrders.slice(0, 5).map(o => `- طلب رقم \`${o.id}\` - الحالة: ${o.status === "completed" || o.status === "delivered" ? "مكتمل" : "قيد المعالجة"}`).join("\n") || "لا توجد طلبات سابقة مسجلة."}
+
+🔒 البيانات المالية وبيانات الاتصال بالعميل محجوبة حسب صلاحية الحساب.`;
+      }
       
       return `📊 **كشف الحساب المالي والإنتاجي التفصيلي للعميل: "${matchedCustomer.name}"** (محلي ومدمج 100%):
 
@@ -98,6 +111,20 @@ ${custOrders.slice(0, 5).map(o => `- طلب رقم \`${o.id}\` بقيمة **$${o
     }
 
     // 2. Financial Analysis & Accounts (مبيعات / أرباح / مصروفات)
+    if (!stats.canViewFinancials && (
+      msgNorm.includes("مبيعات") ||
+      msgNorm.includes("ارباح") ||
+      msgNorm.includes("مصروف") ||
+      msgNorm.includes("ميزانيه") ||
+      msgNorm.includes("فلوس") ||
+      msgNorm.includes("مالي") ||
+      msgNorm.includes("ايراد") ||
+      msgNorm.includes("ديون") ||
+      msgNorm.includes("ذمم") ||
+      msgNorm.includes("حسابات")
+    )) {
+      return "🔒 هذا الجزء من بيانات النظام المالي محجوب عن حساب الموظف. يمكنك استخدام مساعد الورشة للأسئلة التشغيلية والليزر والمخزون.";
+    }
     if (
       msgNorm.includes("مبيعات") || 
       msgNorm.includes("ارباح") || 
@@ -249,6 +276,15 @@ ${custOrders.slice(0, 5).map(o => `- طلب رقم \`${o.id}\` بقيمة **$${o
     }
 
     // 7. General Forecast & Prediction (توقعات وتنبؤات ذكية)
+    if (!stats.canViewFinancials && (
+      msgNorm.includes("توقع") ||
+      msgNorm.includes("تنبؤ") ||
+      msgNorm.includes("الشهر") ||
+      msgNorm.includes("القادم") ||
+      msgNorm.includes("تحليل")
+    )) {
+      return "🔒 التنبؤات المالية مؤمنة لحسابات الإدارة والحسابات فقط.";
+    }
     if (
       msgNorm.includes("توقع") || 
       msgNorm.includes("تنبؤ") || 
