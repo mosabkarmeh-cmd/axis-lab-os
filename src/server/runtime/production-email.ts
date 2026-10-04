@@ -202,7 +202,7 @@ export function createProductionEmailRuntime(deps: ProductionEmailRuntimeDepende
         console.warn(`[SMTP WARN] Transport response for job ${job.jobNo}: ${message}`);
         deps.activityLogs.unshift({
           id: deps.nextActivityLogId("log_smtp"),
-          userId: job.operatorId || "u-1",
+          userId: job.operatorId || "system",
           action: "ATTEMPT_SMTP_NOTIFICATION",
           entityType: "ProductionJob",
           entityId: job.id,
