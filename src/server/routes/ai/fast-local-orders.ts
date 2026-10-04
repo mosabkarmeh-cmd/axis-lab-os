@@ -1,8 +1,9 @@
 import type { Request, Response } from "express";
+import type { FastLocalPayload } from "./fast-local-types.ts";
 import * as core from "../../server-core.ts";
 const { ORDERS, CUSTOMERS, MATERIALS, INVENTORY } = core;
 
-export function handleFastLocalOrderAction(action: unknown, payload: any, req: Request, res: Response): boolean {
+export function handleFastLocalOrderAction(action: unknown, payload: FastLocalPayload, req: Request, res: Response): boolean {
   switch (String(action)) {
             case "order-hints": {
               const customerId = payload?.customerId;
