@@ -4,10 +4,10 @@ export type ProductionEmailEvent = "created" | "started" | "paused" | "completed
 
 export interface ProductionEmailJob {
   id: string;
-  jobNo: string;
-  itemName: string;
-  status: string;
-  progress: number;
+  jobNo?: string;
+  itemName?: string;
+  status?: string;
+  progress?: number;
   orderNumber?: string | null;
   machineId?: string | null;
   operatorId?: string | null;
