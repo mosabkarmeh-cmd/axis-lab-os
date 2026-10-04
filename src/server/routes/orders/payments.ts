@@ -23,7 +23,7 @@ export function registerOrderPaymentRoutes(app: express.Express) {
   // in persistStateNow. If the durable commit fails, restore every affected
   // collection so the API cannot report a payment that was not persisted.
     app.post("/api/orders/:id/payments", async (req, res) => {
-    const { amount, currency = "USD", notes, paymentMethod, changedById, paymentId } = req.body;
+    const { amount, currency = "USD", notes, paymentMethod, paymentId } = req.body;
     const order = ORDERS.find(o => o.id === req.params.id);
     if (!order) {
       res.status(404).json({ error: "الطلب غير موجود" });
@@ -32,7 +32,7 @@ export function registerOrderPaymentRoutes(app: express.Express) {
     const matchingInv2 = INVOICES.find(inv => inv.orderId === order.id) || null;
     let result;
     try {
-      result = await withAtomicFinancialMutation(() => applyPayment({ order, inv: matchingInv2, amount, currency, notes, paymentMethod, changedById, paymentId }));
+      result = await withAtomicFinancialMutation(() => applyPayment({ order, inv: matchingInv2, amount, currency, notes, paymentMethod, paymentId, actorId: getActorId(req) }));
     } catch (error) {
       console.error("[FINANCE] Atomic order payment failed:", error);
       res.status(500).json({ error: "تعذر حفظ الدفعة بشكل ذري؛ لم يتم تغيير البيانات." });
@@ -47,7 +47,7 @@ export function registerOrderPaymentRoutes(app: express.Express) {
   // API - Delete Payment Installment
   app.delete("/api/orders/:orderId/payments/:paymentId", (req, res) => {
     const { orderId, paymentId } = req.params;
-    const { changedById } = req.body || {};
+
     const order = ORDERS.find(o => o.id === orderId);
     if (!order) {
       res.status(404).json({ error: "الطلب غير موجود" });
