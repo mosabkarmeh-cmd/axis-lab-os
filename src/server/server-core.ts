@@ -26,25 +26,16 @@ import { syncNormalizedLocalEntities as syncLocalEntities, assertFinancialStateI
 
 import express from "express";
 import path from "path";
-import fs from "fs";
 import https from "https";
 import multer from "multer";
-import ExcelJS from "exceljs";
-import PDFDocument from "pdfkit";
-import cookieParser from "cookie-parser";
 import cors from "cors";
-import rateLimit from "express-rate-limit";
 import os from "os";
 import bcrypt from "bcryptjs";
-import { materialPriceUSD } from "../lib/materials.ts";
 
 
 
 
 
-import { db } from "../db/index.ts";
-import { appState, customers as customersTable, products as productsTable, materials as materialsTable, inventory as inventoryTable, inventoryTransactions as inventoryTransactionsTable, remnants as remnantsTable, suppliers as suppliersTable, supplyOrders as supplyOrdersTable, supplierQuotes as supplierQuotesTable, machines as machinesTable } from "../db/schema.ts";
-import { eq, desc } from "drizzle-orm";
 
 const DB_MODE = process.env.DB_MODE || "auto";
 const USE_POSTGRES = DB_MODE === "postgres" || (DB_MODE === "auto" && Boolean(process.env.SQL_HOST && process.env.SQL_DB_NAME));
