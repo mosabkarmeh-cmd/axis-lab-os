@@ -15,7 +15,7 @@ export function getCustomerChatResponse(message: string, stats: AiStats, rate: n
       const custTotalPaid = custOrders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
       const custTotalDebt = Math.max(0, custTotalInvoiced - custTotalPaid);
 
-      if (!stats.canViewFinancials || !stats.canViewCustomerPrivateData) {
+      if (stats.canViewFinancials === false || stats.canViewCustomerPrivateData === false) {
         return `👤 **ملخص العميل: "${matchedCustomer.name}"**:
 
 • **عدد الطلبات المسجلة**: ${custOrders.length}
