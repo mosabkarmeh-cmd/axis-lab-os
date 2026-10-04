@@ -15,7 +15,12 @@ export function registerAiMemoryRoutes(app: express.Express) {
 // API - Dynamic DeepBrain Learned Memory layers (Simulating 6 layers of workshop self-learning)
   app.get("/api/ai/memory", (req, res) => {
     try {
-      const isEmployee = core.getRequestUser(req)?.role === "employee";
+      const user = core.getRequestUser(req);
+      if (!user) {
+        res.status(401).json({ success: false, message: "يجب تسجيل الدخول" });
+        return;
+      }
+      const isEmployee = user.role === "employee";
       // 1. FLASH MEMORY (Live operations right now)
       const flashMem = [
         {
