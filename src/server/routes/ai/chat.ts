@@ -17,6 +17,10 @@ export function registerAiChatRoutes(app: express.Express) {
   app.post("/api/ai/chat", async (req, res) => {
     const { message, history } = req.body;
     const access = getAiAccessScope(req);
+    if (!access.role) {
+      res.status(401).json({ error: "يجب تسجيل الدخول لاستخدام مساعد AXIS AI" });
+      return;
+    }
 
     if (!message) {
       res.status(400).json({ error: "يرجى كتابة رسالة للتحدث مع الذكاء الاصطناعي" });
