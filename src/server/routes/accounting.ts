@@ -524,7 +524,7 @@ export function registerAccountingRoutes(app: express.Express) {
       const historicalRate = Number(exp.exchangeRateAtCreation);
       return Math.round((Number(exp.amountUSD ?? exp.amount) || 0) * (historicalRate > 0 ? historicalRate : 135));
     };
-    const totalExpenses = sourceExpenses.reduce((sum, exp) => sum + (exp.amountUSD ?? exp.amount ?? 0), 0);
+    const totalExpenses = sourceExpenses.reduce((sum, exp) => sum + Number(exp.amountUSD ?? exp.amount ?? 0), 0);
     const totalExpensesSYP = sourceExpenses.reduce((sum, exp) => sum + expenseSYP(exp), 0);
     const netProfit = totalRevenue - totalExpenses;
     const netProfitSYP = totalRevenueSYP - totalExpensesSYP;
@@ -532,7 +532,7 @@ export function registerAccountingRoutes(app: express.Express) {
     // Group expenses by category
     const expenseCategories: Record<string, number> = {};
     sourceExpenses.forEach(e => {
-      expenseCategories[e.category] = (expenseCategories[e.category] || 0) + (e.amountUSD ?? e.amount);
+      expenseCategories[e.category] = (expenseCategories[e.category] || 0) + Number(e.amountUSD ?? e.amount ?? 0);
     });
 
     const categoryBreakdown = Object.entries(expenseCategories).map(([name, value]) => ({
@@ -564,7 +564,7 @@ export function registerAccountingRoutes(app: express.Express) {
       const monthKey = monthKeyFor(exp.date);
       if (!monthKey) return;
       if (!monthlyData[monthKey]) monthlyData[monthKey] = { revenue: 0, revenueSYP: 0, expenses: 0, expensesSYP: 0 };
-      monthlyData[monthKey].expenses += (exp.amountUSD ?? exp.amount);
+      monthlyData[monthKey].expenses += Number(exp.amountUSD ?? exp.amount ?? 0);
       monthlyData[monthKey].expensesSYP += expenseSYP(exp);
     });
 
