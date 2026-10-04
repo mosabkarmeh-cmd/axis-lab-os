@@ -1511,7 +1511,7 @@ function idNum(prefixedId: unknown, prefix: string): number | null {
 }
 
 async function refreshWarehouseCache() {
-  return createWarehouseCacheRuntime({
+  return createWarehouseCacheRuntime(USE_POSTGRES, {
     MACHINES,
     CUSTOMERS,
     PRODUCTS,
