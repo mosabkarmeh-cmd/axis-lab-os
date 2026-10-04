@@ -12,7 +12,12 @@ const {
   nextEntityId,
   nextActivityLogId,
   idNum,
+  getRequestUser,
 } = core;
+
+function getActorId(req: express.Request): string {
+  return getRequestUser(req)?.id || "system";
+}
 
 export function registerRemnantRoutes(app: express.Express) {
 app.get("/api/remnants", (req, res) => {
