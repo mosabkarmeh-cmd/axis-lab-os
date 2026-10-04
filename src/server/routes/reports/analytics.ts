@@ -74,11 +74,6 @@ export function registerAnalyticsReportRoute(app: express.Express) {
     const topProducts = buildProductDemand(orders);
     const trueProfitSYP = financial.totalRevenueSYP - financial.totalExpensesSYP - operations.directCostSYP;
 
-    operations.trueProfitSYP = trueProfitSYP;
-    operations.trueProfitUSD = sypToUsd(trueProfitSYP, currentRate);
-    operations.topProducts = topProducts;
-    operations.monthlyOrderTrends = monthlyOrderTrends;
-
     const response = {
       success: true,
       analytics: {
@@ -117,14 +112,14 @@ export function registerAnalyticsReportRoute(app: express.Express) {
           materialCostSYP: operations.materialCostSYP,
           laborCostSYP: operations.laborCostSYP,
           productionHours: operations.productionHours,
-          trueProfitSYP: operations.trueProfitSYP,
-          trueProfitUSD: operations.trueProfitUSD,
+          trueProfitSYP,
+          trueProfitUSD: sypToUsd(trueProfitSYP, currentRate),
           overdueOrders: operations.overdueOrders,
           completedOrders,
           completionRate: operations.completionRate,
           workflowFunnel: operations.workflowFunnel,
-          topProducts: operations.topProducts,
-          monthlyOrderTrends: operations.monthlyOrderTrends,
+          topProducts,
+          monthlyOrderTrends,
         },
         machines: machinesReport,
         inventory: inventoryReport,
