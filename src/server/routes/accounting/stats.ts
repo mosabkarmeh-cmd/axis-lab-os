@@ -1,6 +1,8 @@
 import express from "express";
 import * as core from "../../server-core.ts";
 
+type InvoiceLike = { id: string; orderId?: string; [key: string]: unknown };
+
 const {
   INVOICES,
   ORDERS,
