@@ -3,7 +3,7 @@ import * as core from "../../../server-core.ts";
 import { applyPayment, withAtomicFinancialMutation } from "../../orders/financial.ts";
 import { getActorId } from "./shared.ts";
 
-const { INVOICES, ORDERS, CUSTOMERS, EXPENSES, NUMBERING_SETTINGS, ACTIVITY_LOGS, SETTINGS, nextEntityId, nextActivityLogId, getNextNumber, persistMutationWithFastDurability } = core;
+const { INVOICES } = core;
 
 export function registerInvoicePaymentRoutes(app: express.Express) {
   app.post("/api/accounting/invoices/:id/payments", async (req, res) => {
