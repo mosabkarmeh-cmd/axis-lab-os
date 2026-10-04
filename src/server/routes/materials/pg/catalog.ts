@@ -2,9 +2,9 @@ import type { Router } from "express";
 import { db } from "../../../../db/index.ts";
 import { materials, inventory } from "../../../../db/schema.ts";
 import { eq } from "drizzle-orm";
-import { getVerifiedRequestUser } from "../../auth.ts";
+import * as core from "../../../server-core.ts";
 
-const getRequestUser = getVerifiedRequestUser;
+const { getRequestUser } = core;
 const errorMessage = (err: unknown) => err instanceof Error ? err.message : String(err);
 
 const LEGACY_USD_TO_SYP: Record<number, number> = {
