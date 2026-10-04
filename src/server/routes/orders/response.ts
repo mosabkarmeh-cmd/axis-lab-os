@@ -3,6 +3,14 @@ import * as core from "../../server-core.ts";
 
 const { getRequestUser } = core;
 
+const EMPLOYEE_HIDDEN_FIELDS = new Set([
+  "matCost", "finalPrice", "profit", "profitPercent", "costPrice", "unitCost",
+  "unitPrice", "unitPriceSYP", "totalPrice", "totalPriceSYP", "total", "totalSYP",
+  "subtotal", "discount", "tax", "taxPercent", "paidAmount", "remaining",
+  "remainingSYP", "amount", "amountSYP", "amountUSD",
+]);
+
+
 export function getActorId(req: express.Request): string {
   return getRequestUser(req)?.id || "system";
 }
