@@ -26,8 +26,8 @@ export interface WarehouseCacheCollections {
   SUPPLIER_QUOTES: Array<Record<string, unknown>>;
 }
 
-export async function refreshWarehouseCache(collections: WarehouseCacheCollections): Promise<void> {
-  if (!USE_POSTGRES) return;
+export async function refreshWarehouseCache(enabled: boolean, collections: WarehouseCacheCollections): Promise<void> {
+  if (!enabled) return;
   try {
     const [custRows, prodRows, matRows, invRows, txRows, remRows, supRows, soRows, sqRows, machRows] = await Promise.all([
       db.select().from(customersTable).orderBy(customersTable.id),
