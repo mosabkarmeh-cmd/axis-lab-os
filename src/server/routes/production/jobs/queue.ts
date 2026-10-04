@@ -1,11 +1,12 @@
 import express from "express";
-import * as core from "../../server-core.ts";
+import * as core from "../../../server-core.ts";
 import {
   getActorId,
   machines,
   productionJobs,
   sanitizeProductionJob,
   sanitizeProductionJobs,
+  type ProductionJobView,
 } from "./shared.ts";
 
 const {
