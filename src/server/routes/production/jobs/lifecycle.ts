@@ -15,6 +15,17 @@ import {
   sanitizeProductionJob,
 } from "./shared.ts";
 
+type RemnantRecord = {
+  id: string;
+  materialId: string;
+  width: number;
+  height: number;
+  area: number;
+  quantity: number;
+  status: string;
+  location: string;
+};
+
 const {
   INVENTORY,
   INVENTORY_TRANSACTIONS,
@@ -336,7 +347,7 @@ export function registerProductionJobLifecycleRoutes(app: express.Express) {
       }
     }
 
-    let addedRemnant: Record<string, unknown> | null = null;
+    let addedRemnant: RemnantRecord | null = null;
     if (remnantWidth && remnantHeight) {
       const materialDbId = idNum(job.materialId, "m-");
 
