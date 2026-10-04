@@ -1,14 +1,13 @@
 import express from "express";
 import * as core from "../../../server-core.ts";
+import { getActorId, orderForResponse } from "../response.ts";
 
 const {
   ORDERS,
   USERS,
   ACTIVITY_LOGS,
   nextActivityLogId,
-  getActorId,
   persistStateNow,
-  orderForResponse,
 } = core;
 
 export function registerOrderWorkerAssignmentRoute(app: express.Express) {
