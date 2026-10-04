@@ -2,11 +2,11 @@ import express from "express";
 import { db } from "../../db/index.ts";
 import { customers } from "../../db/schema.ts";
 import { eq } from "drizzle-orm";
-import { getVerifiedRequestUser } from "../auth.ts";
+import * as core from "../server-core.ts";
 
 const router = express.Router();
 
-const getRequestUser = getVerifiedRequestUser;
+const { getRequestUser } = core;
 
 function sanitizeCustomer<T extends Record<string, unknown>>(customer: T, req: express.Request): T {
   if (getRequestUser(req)?.role === "admin") return customer;
