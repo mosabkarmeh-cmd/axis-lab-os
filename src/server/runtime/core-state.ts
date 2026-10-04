@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import type { UserRecord } from "./auth-runtime.ts";
+import { JWT_ISSUER_DEFAULT, JWT_AUDIENCE_DEFAULT, type UserRecord } from "./auth-runtime.ts";
 
 const JWT_SECRET = process.env.JWT_SECRET || "";
 const JWT_ISSUER = JWT_ISSUER_DEFAULT;
@@ -369,3 +369,23 @@ const SETTINGS = {
   }
 };
 
+
+export {
+  JWT_SECRET,
+  JWT_ISSUER,
+  JWT_AUDIENCE,
+  USERS,
+  FILES,
+  CUSTOMERS,
+  PRODUCTS,
+  ACTIVITY_LOGS,
+  MATERIALS,
+  INVENTORY,
+  INVENTORY_TRANSACTIONS,
+  REMNANTS,
+  SUPPLIER_QUOTES,
+  SUPPLIERS,
+  SUPPLY_ORDERS,
+  MACHINES,
+  SETTINGS,
+};
