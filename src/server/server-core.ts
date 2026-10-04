@@ -21,11 +21,11 @@ import { createMasterDataNormalizationRuntime, LEGACY_MATERIAL_PRICES_SYP_CANONI
 import { createAuthRuntime, JWT_ISSUER_DEFAULT, JWT_AUDIENCE_DEFAULT, type UserRecord } from "./runtime/auth-runtime.ts";
 import { createNumberingRuntime } from "./runtime/numbering-runtime.ts";
 import { activityLogSequence, nextActivityLogId, entityIdSequence, nextEntityId, orderCreateBenchmarks, persistenceBenchmarks, persistQueueStats, recordBenchmark, benchmarkSnapshot, type BenchmarkBucket } from "./runtime/metrics.ts";
+import { apiKey, ai } from "./runtime/ai-client.ts";
 import { syncNormalizedLocalEntities as syncLocalEntities, assertFinancialStateInvariants as assertFinancialState, syncNormalizedFinancialEntities as syncFinancialEntities } from "./runtime/local-sqlite-sync.ts";
 
 import express from "express";
 import path from "path";
-import { GoogleGenAI, Type } from "@google/genai";
 import fs from "fs";
 import https from "https";
 import multer from "multer";
@@ -45,17 +45,6 @@ import { materialPriceUSD } from "../lib/materials.ts";
 import { db } from "../db/index.ts";
 import { appState, customers as customersTable, products as productsTable, materials as materialsTable, inventory as inventoryTable, inventoryTransactions as inventoryTransactionsTable, remnants as remnantsTable, suppliers as suppliersTable, supplyOrders as supplyOrdersTable, supplierQuotes as supplierQuotesTable, machines as machinesTable } from "../db/schema.ts";
 import { eq, desc } from "drizzle-orm";
-
-// Initialize Gemini Client safely
-const apiKey = process.env.GEMINI_API_KEY || "dummy_key_for_startup";
-const ai = new GoogleGenAI({
-  apiKey: apiKey,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    }
-  }
-});
 
 const DB_MODE = process.env.DB_MODE || "auto";
 const USE_POSTGRES = DB_MODE === "postgres" || (DB_MODE === "auto" && Boolean(process.env.SQL_HOST && process.env.SQL_DB_NAME));
