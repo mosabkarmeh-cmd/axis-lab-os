@@ -107,7 +107,7 @@ export function useSupplyActions({
           quantity: finalQty,
           type: adjustType,
           reason: adjustReason || "تعديل مخزون يدوي",
-          userId: currentUser?.id || "u-1"
+          userId: currentUser?.id
         })
       });
 
