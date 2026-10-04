@@ -1,9 +1,10 @@
 import type { Request, Response } from "express";
+import type { FastLocalPayload } from "./fast-local-types.ts";
 import * as core from "../../server-core.ts";
 import { getLocalChatResponse } from "./local-chat.ts";
 const { ORDERS, CUSTOMERS, MATERIALS, INVENTORY, MACHINES, PRODUCTION_JOBS } = core;
 
-export function handleFastLocalLaserAction(action: unknown, payload: any, req: Request, res: Response): boolean {
+export function handleFastLocalLaserAction(action: unknown, payload: FastLocalPayload, req: Request, res: Response): boolean {
   switch (String(action)) {
             case "quick-laser-settings": {
               const { materialName = "", thicknessMm = 3 } = payload || {};
