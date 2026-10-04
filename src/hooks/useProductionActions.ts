@@ -139,7 +139,7 @@ export function useProductionActions({
       const res = await fetch(`/api/production/jobs/${jobId}/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ machineId, operatorId: currentUser?.id || "u-1" })
+        body: JSON.stringify({ machineId, operatorId: currentUser?.id })
       });
       const data = await res.json();
       if (data.success) {
