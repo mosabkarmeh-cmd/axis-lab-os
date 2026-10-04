@@ -3,16 +3,12 @@ import * as core from "../../../server-core.ts";
 
 const {
   ORDERS,
+  USERS,
   ACTIVITY_LOGS,
   nextActivityLogId,
   getActorId,
   persistStateNow,
   orderForResponse,
-  USERS,
-  USERS,
-  getRequestUser,
-  createNotification,
-  schedulePersist,
 } = core;
 
 export function registerOrderWorkerAssignmentRoute(app: express.Express) {
