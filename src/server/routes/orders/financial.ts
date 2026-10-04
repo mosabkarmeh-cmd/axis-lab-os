@@ -59,7 +59,7 @@ export function applyPayment(params: {
   changedById: string | undefined;
   paymentId: string | undefined;
 }): { ok: boolean; status: number; body: Record<string, unknown>; order: OrderRecord | null; invoice: InvoiceRecord | null } {
-  const { order, inv, currency, notes, paymentMethod, changedById, paymentId } = params;
+  const { order, inv, currency, notes, paymentMethod, paymentId } = params;
 
   if (order?.currencyFinalizedAt) {
     return { ok: false, status: 409, body: { error: "الطلب نهائي ومثبت مالياً؛ لا يمكن تسجيل دفعة جديدة بعد التسليم.", message: "الطلب نهائي ومثبت مالياً؛ لا يمكن تسجيل دفعة جديدة بعد التسليم." }, order: null, invoice: null };
@@ -124,7 +124,7 @@ export function applyPayment(params: {
     currency: "SYP",
     paymentMethod: paymentMethod || "cash",
     notes: notes || (order ? "دفعة مقبوضة للطلب" : "دفعة فاتورة"),
-    recordedBy: changedById || "system",
+    recordedBy: params.actorId || "system",
     createdAt: new Date().toISOString()
   };
 
@@ -189,7 +189,7 @@ export function applyPayment(params: {
 
   ACTIVITY_LOGS.unshift({
     id: nextActivityLogId(),
-    userId: changedById || "system",
+    userId: params.actorId || "system",
     action: order ? "RECORD_PAYMENT" : "RECORD_INVOICE_PAYMENT",
     entityType: order ? "Order" : "Invoice",
     entityId: order?.id || inv?.id,
