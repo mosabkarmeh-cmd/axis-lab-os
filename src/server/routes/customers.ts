@@ -163,7 +163,7 @@ router.put("/:id", async (req, res) => {
       id: "c-" + updated[0].id,
       ...values
     };
-    res.json(result);
+    res.json(sanitizeCustomer(result, req));
   } catch (err: unknown) {
     console.error("Error updating customer:", err);
     res.status(500).json({ error: "Failed to update customer: " + errorMessage(err) });
