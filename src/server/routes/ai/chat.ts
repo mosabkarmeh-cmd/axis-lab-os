@@ -103,7 +103,7 @@ Role Guidelines:
         parts: Array<{ text: string }>;
       }> = [];
 
-      if (access.role !== "employee" && Array.isArray(history)) {
+      if (access.canViewFinancials && Array.isArray(history)) {
         for (const turn of history) {
           if (!turn || typeof turn.text !== "string") continue;
           formattedContents.push({
