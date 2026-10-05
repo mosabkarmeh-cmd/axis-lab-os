@@ -43,6 +43,21 @@ jobs:
           }
           Write-Host "Release integrity: tag=$env:GITHUB_REF_NAME sha=$tagSha version=$packageVersion"
 
+          $requiredWorkflows = @(
+            'Windows CI',
+            'Electron GUI Smoke',
+            'Windows Unpacked QA'
+          )
+          foreach ($workflowName in $requiredWorkflows) {
+            $runsJson = gh run list --workflow $workflowName --commit $tagSha --limit 10 --json status,conclusion,headSha
+            $runs = @($runsJson | ConvertFrom-Json | Where-Object { $_.headSha -eq $tagSha })
+            $successful = $runs | Where-Object { $_.status -eq 'completed' -and $_.conclusion -eq 'success' }
+            if (-not $successful) {
+              throw "Required workflow '$workflowName' has no successful completed run for $tagSha"
+            }
+            Write-Host "Release CI gate: $workflowName PASS"
+          }
+
       - name: Validate TypeScript
         run: npm run lint
       - name: Decomposition audit
