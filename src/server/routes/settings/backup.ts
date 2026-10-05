@@ -13,6 +13,7 @@ const {
   flushLocalSqlite,
   USE_SQLITE,
   BACKUPS,
+  FILES,
   ACTIVITY_LOGS,
   nextActivityLogId,
   createSqliteBackup,
@@ -95,6 +96,10 @@ app.get("/api/backup", (req, res) => {
 
         if (verifiedBackup.packagePath) {
           await core.restoreUploadedFilesFromBackup(verifiedBackup.packagePath);
+          const restoredUploadDirectory = core.uploadDirectory();
+          for (const file of FILES) {
+            if (file.name) file.path = path.join(restoredUploadDirectory, path.basename(file.name));
+          }
         }
 
         if (safetyBackup) BACKUPS.unshift(safetyBackup);
