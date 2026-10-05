@@ -27,6 +27,37 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund --loglevel=error
 
+      - name: Verify release tag integrity
+        shell: pwsh
+        run: |
+          git fetch origin main --no-tags --depth=1
+          $tagSha = (git rev-parse HEAD).Trim()
+          $mainSha = (git rev-parse origin/main).Trim()
+          if ($tagSha -ne $mainSha) {
+            throw "Release tag $env:GITHUB_REF_NAME does not point to current main. Tag=$tagSha Main=$mainSha"
+          }
+          $packageVersion = (node -p "require('./package.json').version").Trim()
+          $tagVersion = $env:GITHUB_REF_NAME.Substring(1)
+          if ($packageVersion -ne $tagVersion) {
+            throw "Package version $packageVersion does not match release tag $env:GITHUB_REF_NAME"
+          }
+          Write-Host "Release integrity: tag=$env:GITHUB_REF_NAME sha=$tagSha version=$packageVersion"
+
+          $requiredWorkflows = @(
+            'Windows CI',
+            'Electron GUI Smoke',
+            'Windows Unpacked QA'
+          )
+          foreach ($workflowName in $requiredWorkflows) {
+            $runsJson = gh run list --workflow $workflowName --commit $tagSha --limit 10 --json status,conclusion,headSha
+            $runs = @($runsJson | ConvertFrom-Json | Where-Object { $_.headSha -eq $tagSha })
+            $successful = $runs | Where-Object { $_.status -eq 'completed' -and $_.conclusion -eq 'success' }
+            if (-not $successful) {
+              throw "Required workflow '$workflowName' has no successful completed run for $tagSha"
+            }
+            Write-Host "Release CI gate: $workflowName PASS"
+          }
+
       - name: Validate TypeScript
         run: npm run lint
       - name: Decomposition audit
