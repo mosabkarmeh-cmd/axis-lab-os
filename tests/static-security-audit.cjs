@@ -23,6 +23,7 @@ const system = read('src/server/routes/system.ts');
 const quotation = read('src/server/routes/quotation.ts');
 const aiAdvisor = read('src/server/routes/ai/advisor.ts');
 const aiPricing = read('src/server/routes/ai/fast-local-pricing.ts');
+const aiChat = read('src/server/routes/ai/chat.ts');
 const orderResponse = read('src/server/routes/orders/response.ts');
 const productionShared = read('src/server/routes/production/jobs/shared.ts');
 if (!index.includes('app.use("/api", (req, res, next)')) fail.push('operational API auth boundary missing');
@@ -31,6 +32,7 @@ if (!system.includes('user.role !== "admin"') || !system.includes('سجل الن
 if (!quotation.includes('requireQuotationAccess') || !quotation.includes('!["admin", "accountant"].includes(user.role)')) fail.push('quotation pricing access guard missing');
 if (!aiAdvisor.includes('getAiAccessScope') || !aiAdvisor.includes('access.canUsePricingTools')) fail.push('AI order advisor pricing access guard missing');
 if (!aiPricing.includes('getRequestUser') || !aiPricing.includes('403')) fail.push('fast-local pricing access guard missing');
+if (!aiChat.includes('if (access.canViewFinancials && Array.isArray(history))')) fail.push('AI chat exposes conversation history to non-financial roles');
 if (!orderResponse.includes('new Set(["employee", "viewer"])')) fail.push('order financial boundary does not include viewer');
 if (!productionShared.includes('user?.role === "employee" || user?.role === "viewer"')) fail.push('production financial boundary does not include viewer');
 
