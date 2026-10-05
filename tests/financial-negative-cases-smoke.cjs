@@ -37,7 +37,7 @@ const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 
   const orderPayment = await req(`/api/orders/${orderId}/payments`, {
     method: 'POST',
-    body: JSON.stringify({ amount: 50, currency: 'USD', paymentId: 'negative-order-payment' })
+    body: JSON.stringify({ amount: 50, currency: 'SYP', paymentId: 'negative-order-payment' })
   });
   assert(orderPayment.r.ok, `order payment failed: ${JSON.stringify(orderPayment.body)}`);
 
