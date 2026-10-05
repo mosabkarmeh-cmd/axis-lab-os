@@ -226,6 +226,38 @@ function assert(condition, message) {
     const accounting = await employeeRequest("/api/accounting/invoices");
     assert(accounting.response.status === 403, `employee accounting access was not blocked: ${accounting.response.status}`);
 
+    const settingsWrite = await employeeRequest("/api/settings", {
+      method: "PUT",
+      body: JSON.stringify({ pricing: { defaultProfitMargin: 999 } }),
+    });
+    assert(settingsWrite.response.status === 403, `employee settings write was not blocked: ${settingsWrite.response.status}`);
+
+    const exchangeRateWrite = await employeeRequest("/api/exchange-rate", {
+      method: "PUT",
+      body: JSON.stringify({ exchangeRate: 999999 }),
+    });
+    assert(exchangeRateWrite.response.status === 403, `employee exchange-rate write was not blocked: ${exchangeRateWrite.response.status}`);
+
+    const smtpTest = await employeeRequest("/api/settings/test-smtp", {
+      method: "POST",
+      body: JSON.stringify({ testEmail: "employee-boundary@axislab.test" }),
+    });
+    assert(smtpTest.response.status === 403, `employee SMTP test was not blocked: ${smtpTest.response.status}`);
+
+    const backupList = await employeeRequest("/api/backup");
+    assert(backupList.response.status === 403, `employee backup list was not blocked: ${backupList.response.status}`);
+
+    const backupCreate = await employeeRequest("/api/backup", { method: "POST", body: JSON.stringify({}) });
+    assert(backupCreate.response.status === 403, `employee backup create was not blocked: ${backupCreate.response.status}`);
+
+    const settingsRead = await employeeRequest("/api/settings");
+    assert(settingsRead.response.ok && settingsRead.body.settings?.company, "employee cannot read safe company settings");
+    assert(!settingsRead.body.settings?.pricing, "employee received pricing settings");
+    assert(!settingsRead.body.settings?.backup, "employee received backup settings");
+    assert(!settingsRead.body.settings?.smtp, "employee received SMTP settings");
+    assert(!Object.prototype.hasOwnProperty.call(settingsRead.body.settings || {}, "partnerSharePercent"),
+      "employee received partner share settings");
+
     const reports = await employeeRequest("/api/reports/analytics");
     assert(reports.response.status === 403, `employee reports access was not blocked: ${reports.response.status}`);
 
