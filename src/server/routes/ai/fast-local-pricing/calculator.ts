@@ -48,9 +48,7 @@ const {
                 wasteOverridePercent,
               });
               const {
-                estimatedPiecesPerSheet,
                 sheetUtilizationPercent,
-                autoWastePercent,
                 calculatedWastePercent,
                 wasteFactor,
                 rawMaterialCost,
