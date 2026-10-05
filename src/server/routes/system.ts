@@ -89,7 +89,12 @@ export function registerSystemRoutes(app: express.Express) {
     }
   });
 
-  app.get("/api/logs", (_req, res) => {
+  app.get("/api/logs", (req, res) => {
+    const user = getRequestUser(req);
+    if (!user || user.role !== "admin") {
+      res.status(403).json({ success: false, message: "سجل النشاط الداخلي متاح لمدير النظام فقط" });
+      return;
+    }
     res.json(ACTIVITY_LOGS);
   });
 }
