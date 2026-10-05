@@ -741,7 +741,8 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
   const lowStockCount = materialStats?.lowStock ?? materials.filter(m => m.inventory ? m.inventory.availableQuantity < m.minimumStock : m.minimumStock > 0).length;
   const laserMachines = machines.filter(m => m.type === 'laser_co2' || m.type === 'fiber_laser');
   const runningLasersCount = laserMachines.filter(m => m.status === 'running').length;
-  const todayDateStr = "2026-07-10";
+  const nowForDashboard = new Date();
+  const todayDateStr = `${nowForDashboard.getFullYear()}-${String(nowForDashboard.getMonth() + 1).padStart(2, "0")}-${String(nowForDashboard.getDate()).padStart(2, "0")}`;
   const todayLaserJobs = productionJobs.filter(job => {
     const isToday = job.createdAt && job.createdAt.slice(0, 10) === todayDateStr;
     const isLaser = job.machineName ? (job.machineName.toLowerCase().includes('laser') || job.machineName.toLowerCase().includes('co2')) : true;
