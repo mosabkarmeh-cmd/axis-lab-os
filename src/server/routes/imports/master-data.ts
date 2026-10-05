@@ -281,10 +281,13 @@ app.post("/api/import/customers", async (req, res) => {
         const matRow = insertedMat[0];
 
         const stock = Number(it.stock) || 0;
-        await db.insert(inventoryTable).values({
-          materialId: matRow.id, quantity: stock, reservedQuantity: 0,
-          availableQuantity: stock, location: it.location ? String(it.location) : "المستودع الرئيسي",
-        });
+        const insertedInventory = await db.insert(inventoryTable).values({
+          materialId: matRow.id,
+          quantity: stock,
+          reservedQuantity: 0,
+          availableQuantity: stock,
+          location: it.location ? String(it.location) : "المستودع الرئيسي",
+        }).returning();
 
         const newMat = {
           id: "m-" + matRow.id, name: matRow.name, category: matRow.category, subCategory: matRow.subCategory,
@@ -294,10 +297,17 @@ app.post("/api/import/customers", async (req, res) => {
           notes: matRow.notes || "", status: matRow.status, qualityStatus: matRow.qualityStatus || "inspected",
         };
         MATERIALS.push(newMat);
-        INVENTORY.push({
-          id: "inv-pending", materialId: newMat.id, quantity: stock, reservedQuantity: 0,
-          availableQuantity: stock, location: it.location ? String(it.location) : "المستودع الرئيسي",
-        });
+        const inventoryRow = insertedInventory[0];
+        if (inventoryRow) {
+          INVENTORY.push({
+            id: "inv-" + inventoryRow.id,
+            materialId: newMat.id,
+            quantity: inventoryRow.quantity,
+            reservedQuantity: inventoryRow.reservedQuantity,
+            availableQuantity: inventoryRow.availableQuantity,
+            location: inventoryRow.location || "المستودع الرئيسي",
+          });
+        }
         imported.push(newMat);
       } catch (err: unknown) {
         console.error("Error importing material row:", err);
