@@ -21,7 +21,7 @@ export function handleFastLocalLookupAction(action: unknown, payload: FastLocalP
     
               // Annotate with quick learning analytics from orders history
               const user = core.getRequestUser(req);
-              const canViewCustomerPrivateData = user?.role === "admin" || user?.role === "accountant";
+              const canViewCustomerPrivateData = user?.role === "admin";
               const results = matched.map(c => {
                 const customerOrders = ORDERS.filter(o => o.customerId === c.id);
                 const totalPaid = customerOrders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
