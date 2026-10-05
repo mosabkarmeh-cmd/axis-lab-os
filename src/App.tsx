@@ -1456,7 +1456,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     const prog = calculateOrderProgress(targetOrder, productionJobs);
 
     const totalRequiredPieces = prog.itemsBreakdown.reduce((sum: number, item: OrderProgressItem) => sum + Math.max(0, Number(item.quantity) || 0), 0);
-    const totalCompletedPieces = prog.itemsBreakdown.reduce((sum: number, item: any) => sum + Math.min(Math.max(0, Number(item.completedQuantity) || 0), Math.max(0, Number(item.quantity) || 0)), 0);
+    const totalCompletedPieces = prog.itemsBreakdown.reduce((sum: number, item: OrderProgressItem) => sum + Math.min(Math.max(0, Number(item.completedQuantity) || 0), Math.max(0, Number(item.quantity) || 0)), 0);
     const totalRemainingPieces = Math.max(0, totalRequiredPieces - totalCompletedPieces);
     const completedItemsCount = prog.itemsBreakdown.filter((item: OrderProgressItem) => item.isCompleted).length;
 
