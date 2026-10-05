@@ -36,3 +36,5 @@ jobs:
         run: npm run test:source
       - name: Static security audit
         run: npm run test:security-static
+      - name: Employee financial boundary smoke
+        run: npm run test:employee-boundary
