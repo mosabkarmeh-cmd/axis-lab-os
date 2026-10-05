@@ -78,16 +78,17 @@ async function stop() {
 }
 
 function request(route, options = {}) {
-  return fetch(`http://127.0.0.1:${port}${route}`, {
-    ...options,
-    headers: {
-      authorization: `Bearer ${jwt.sign(
+  const headers = {
+    authorization: `Bearer ${jwt.sign(
         { sub: "u-1", email: "admin@axislab.com", fullName: "Backup Admin", role: "admin" },
         secret,
         { algorithm: "HS256", expiresIn: "10m", issuer: "axislab-api", audience: "axislab-web" },
       )}`,
-      ...(options.headers || {}),
-    },
+    };
+  if (typeof options.body === "string") headers["content-type"] = "application/json";
+  return fetch(`http://127.0.0.1:${port}${route}`, {
+    ...options,
+    headers: { ...headers, ...(options.headers || {}) },
   });
 }
 
