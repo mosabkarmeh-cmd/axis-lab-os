@@ -169,12 +169,8 @@ For changes to currency, financial snapshots, inventory, production consumption,
 | `desktop/main.cjs` | Electron main process and auto-update integration |
 | `electron-builder.yml` | Current User Windows packaging configuration |
 | `electron-builder.all-users.yml` | All Users Windows packaging configuration |
-| `grill-me-audit.md` | Hard Grill Me audit evidence and release findings |
+| `grill-me-audit.md` | Hard Grill Me audit record and release findings |
 
 ## Troubleshooting
 
 If a test cannot reach `/api/health`, check that no previous test process is still using the selected port and rerun the test; every test chooses an isolated temporary port. If a local database is corrupt, stop the application and use the documented backup/recovery workflow rather than deleting the only copy. If GitHub shows a 404 for this repository, verify that the browser session is authenticated because the repository is private.
-
-## Release evidence
-
-The repository contains `stress-results.html`, a locally viewable summary of the latest stress results, and `grill-me-audit.md`, the detailed audit record. These files are documentation artifacts; the authoritative source for reproducible verification remains the commands and tests in this README.
