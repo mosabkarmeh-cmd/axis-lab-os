@@ -7,6 +7,7 @@ import {
   sanitizeProductionJob,
   sanitizeProductionJobs,
   type ProductionJobView,
+  persistProductionState,
 } from "./shared.ts";
 
 const {
@@ -42,7 +43,7 @@ export function registerProductionJobQueueRoutes(app: express.Express) {
     res.json({ success: true, jobs: sanitizeProductionJobs(list, req) });
   });
 
-  app.post("/api/production/jobs", (req, res) => {
+  app.post("/api/production/jobs", async (req, res) => {
     const {
       orderId,
       orderNumber,
@@ -135,11 +136,12 @@ export function registerProductionJobQueueRoutes(app: express.Express) {
       createdAt: new Date().toISOString(),
     });
 
+    await persistProductionState();
     sendProductionJobEmailNotification(newJob, "created");
     res.status(201).json({ success: true, job: sanitizeProductionJob(newJob, req) });
   });
 
-  app.post("/api/production/jobs/reorder", (req, res) => {
+  app.post("/api/production/jobs/reorder", async (req, res) => {
     const { orderedIds } = req.body;
     if (!Array.isArray(orderedIds)) {
       res.status(400).json({ success: false, message: "Invalid orderedIds array" });
@@ -160,11 +162,12 @@ export function registerProductionJobQueueRoutes(app: express.Express) {
     jobMap.forEach(job => reordered.push(job));
     productionJobs.length = 0;
     productionJobs.push(...reordered);
+    await persistProductionState();
 
     res.json({ success: true, jobs: sanitizeProductionJobs(productionJobs, req) });
   });
 
-  app.post("/api/production/jobs/auto-assign", (req, res) => {
+  app.post("/api/production/jobs/auto-assign", async (req, res) => {
     const { jobIds, autoStart } = req.body;
 
     let targetJobs = productionJobs.filter(job => job.status === "pending");
@@ -257,6 +260,8 @@ export function registerProductionJobQueueRoutes(app: express.Express) {
       });
     }
 
+    await persistProductionState();
+
     ACTIVITY_LOGS.unshift({
       id: nextActivityLogId(),
       userId: getActorId(req),
@@ -265,6 +270,8 @@ export function registerProductionJobQueueRoutes(app: express.Express) {
       entityId: "batch",
       createdAt: new Date().toISOString(),
     });
+
+    await persistProductionState();
 
     res.json({
       success: true,
