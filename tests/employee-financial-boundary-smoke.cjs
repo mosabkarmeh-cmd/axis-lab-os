@@ -250,6 +250,27 @@ function assert(condition, message) {
     const backupCreate = await employeeRequest("/api/backup", { method: "POST", body: JSON.stringify({}) });
     assert(backupCreate.response.status === 403, `employee backup create was not blocked: ${backupCreate.response.status}`);
 
+    const recycleBin = await employeeRequest("/api/recycle-bin");
+    assert(recycleBin.response.status === 403, `employee recycle-bin access was not blocked: ${recycleBin.response.status}`);
+
+    const recycleRestore = await employeeRequest("/api/recycle-bin/restore/nonexistent", { method: "POST" });
+    assert(recycleRestore.response.status === 403, `employee recycle-bin restore was not blocked: ${recycleRestore.response.status}`);
+
+    const permanentDelete = await employeeRequest("/api/recycle-bin/permanent/nonexistent", { method: "DELETE" });
+    assert(permanentDelete.response.status === 403, `employee permanent delete was not blocked: ${permanentDelete.response.status}`);
+
+    const createStatus = await employeeRequest("/api/order-statuses", {
+      method: "POST",
+      body: JSON.stringify({ name: "Employee forbidden status" }),
+    });
+    assert(createStatus.response.status === 403, `employee order-status creation was not blocked: ${createStatus.response.status}`);
+
+    const updateStatus = await employeeRequest("/api/order-statuses/new", {
+      method: "PUT",
+      body: JSON.stringify({ name: "Employee forbidden rename" }),
+    });
+    assert(updateStatus.response.status === 403, `employee order-status update was not blocked: ${updateStatus.response.status}`);
+
     const settingsRead = await employeeRequest("/api/settings");
     assert(settingsRead.response.ok && settingsRead.body.settings?.company, "employee cannot read safe company settings");
     assert(!settingsRead.body.settings?.pricing, "employee received pricing settings");
