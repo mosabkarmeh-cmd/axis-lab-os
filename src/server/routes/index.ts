@@ -111,6 +111,17 @@ export async function registerRoutes(app: express.Express) {
 
   registerSystemRoutes(app);
 
+  // All operational APIs registered below require an authenticated session.
+  // Auth routes and the public health endpoint are registered before this boundary.
+  app.use("/api", (req, res, next) => {
+    const user = getRequestUser(req);
+    if (!user) {
+      res.status(401).json({ success: false, message: "يجب تسجيل الدخول للوصول إلى واجهات النظام" });
+      return;
+    }
+    next();
+  });
+
   registerUserRoutes(app);
 
   if (!USE_POSTGRES) {
