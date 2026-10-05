@@ -13,6 +13,7 @@ import {
   machines,
   productionJobs,
   sanitizeProductionJob,
+  persistProductionState,
 } from "./shared.ts";
 
 const {
@@ -49,11 +50,12 @@ app.post("/api/production/jobs/:id/pause", async (req, res) => {
       }
     }
 
+    await persistProductionState();
     sendProductionJobEmailNotification(job, "paused", "تم توقيف المهمة مؤقتاً بواسطة فني الماكينة");
     res.json({ success: true, job: sanitizeProductionJob(job, req) });
   });
 
-  app.post("/api/production/jobs/:id/progress", (req, res) => {
+  app.post("/api/production/jobs/:id/progress", async (req, res) => {
     const { id } = req.params;
     const { progress, elapsedTimeSec } = req.body;
     const job = productionJobs.find(item => item.id === id);
@@ -70,6 +72,7 @@ app.post("/api/production/jobs/:id/pause", async (req, res) => {
 
     job.progress = Math.min(100, Math.max(0, Number(progress)));
     job.elapsedTimeSec = Number(elapsedTimeSec) || job.elapsedTimeSec;
+    await persistProductionState();
     res.json({ success: true, job: sanitizeProductionJob(job, req) });
   });
 }
