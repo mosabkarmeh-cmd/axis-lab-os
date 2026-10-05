@@ -57,9 +57,13 @@ export interface BackupSeed {
   name: string;
   createdAt: string;
   status: string;
+  kind?: "auto" | "manual" | "safety";
   filePath?: string;
   size?: number;
   sha256?: string;
+  formatVersion?: number;
+  schemaVersion?: number;
+  includesUploads?: boolean;
   [key: string]: unknown;
 }
 
