@@ -13,6 +13,11 @@ if (auth.includes('document.cookie = `axislab_token=${data.token}')) fail.push('
 if (/initialPassword\s*=\s*['"]12345['"]/.test(desktop)) fail.push('default bootstrap password remains hardcoded');
 if (install.includes('admin@axislab.com / admin123') || install.includes('employee@axislab.com / employee123')) fail.push('installer docs expose obsolete default credentials');
 const index = read('src/server/routes/index.ts');
+const authBoundaryIndex = index.indexOf('app.use("/api", (req, res, next) =>');
+const postgresMountIndex = index.indexOf('if (USE_POSTGRES) {');
+if (authBoundaryIndex < 0 || postgresMountIndex < 0 || postgresMountIndex < authBoundaryIndex) {
+  fail.push('PostgreSQL routers are mounted before the central authentication boundary');
+}
 if (!index.includes('registerUserRoutes(app, { includeLegacyCustomerProductRoutes: !USE_POSTGRES })')) fail.push('legacy customer/product handlers are not mode-gated');
 const system = read('src/server/routes/system.ts');
 const quotation = read('src/server/routes/quotation.ts');
