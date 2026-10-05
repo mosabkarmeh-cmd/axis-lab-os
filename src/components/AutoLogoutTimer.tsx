@@ -3,11 +3,11 @@ import { motion, AnimatePresence } from "motion/react";
 import { ShieldAlert, LogOut, Clock, Activity } from "lucide-react";
 
 interface AutoLogoutTimerProps {
-  token: string | null;
+  sessionActive: boolean;
   onLogout: () => void;
 }
 
-export default function AutoLogoutTimer({ token, onLogout }: AutoLogoutTimerProps) {
+export default function AutoLogoutTimer({ sessionActive, onLogout }: AutoLogoutTimerProps) {
   const [showWarning, setShowWarning] = useState(false);
   const [timeLeft, setTimeLeft] = useState(60); // 60 seconds warning
   const lastActiveTimeRef = useRef<number>(Date.now());
@@ -28,7 +28,7 @@ export default function AutoLogoutTimer({ token, onLogout }: AutoLogoutTimerProp
   };
 
   useEffect(() => {
-    if (!token) {
+    if (!sessionActive) {
       setShowWarning(false);
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -77,7 +77,7 @@ export default function AutoLogoutTimer({ token, onLogout }: AutoLogoutTimerProp
         window.removeEventListener(event, handleActivity);
       });
     };
-  }, [token]);
+  }, [sessionActive]);
 
   // Extend the session manually
   const handleExtendSession = () => {
