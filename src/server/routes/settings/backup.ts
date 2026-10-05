@@ -1,7 +1,6 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
-import multer from "multer";
 import initSqlJs from "sql.js";
 import * as core from "../../server-core.ts";
 
@@ -17,7 +16,6 @@ const {
   ACTIVITY_LOGS,
   nextActivityLogId,
   createSqliteBackup,
-  checksumFile,
   persistStateNow,
   schedulePersist,
 } = core;
@@ -64,7 +62,7 @@ app.get("/api/backup", (req, res) => {
       schedulePersist();
       res.json({ success: true, backup: publicBackup(newBackup) });
     } catch (error: unknown) {
-      res.status(500).json({ success: false, message: `فشل إنشاء النسخة الاحتياطية: ${error instanceof Error ? error instanceof Error ? error.message : String(error) : String(error)}` });
+      res.status(500).json({ success: false, message: `فشل إنشاء النسخة الاحتياطية: ${error instanceof Error ? error.message : String(error)}` });
     }
   });
 
@@ -129,7 +127,7 @@ app.get("/api/backup", (req, res) => {
         throw restoreError;
       }
     } catch (error: unknown) {
-      res.status(500).json({ success: false, message: `فشل استعادة النسخة الاحتياطية: ${error instanceof Error ? error instanceof Error ? error.message : String(error) : String(error)}` });
+      res.status(500).json({ success: false, message: `فشل استعادة النسخة الاحتياطية: ${error instanceof Error ? error.message : String(error)}` });
     }
   });
 
