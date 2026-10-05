@@ -1,6 +1,7 @@
 import express from "express";
 import { Type } from "@google/genai";
 import * as core from "../../server-core.ts";
+import { getAiAccessScope } from "./access.ts";
 
 type AiItem = {
   name?: string;
@@ -20,6 +21,16 @@ const { ai } = core;
 export function registerAiAdvisorRoutes(app: express.Express) {
 // API - AI Laser Order Advisor and Parameter Estimator
   app.post("/api/ai/order-advisor", async (req, res) => {
+    const access = getAiAccessScope(req);
+    if (!access.role) {
+      res.status(401).json({ error: "يجب تسجيل الدخول لاستخدام مستشار الطلبات الذكي" });
+      return;
+    }
+    if (!access.canUsePricingTools) {
+      res.status(403).json({ error: "أدوات التسعير والتحليل المالي محجوبة عن هذا الحساب" });
+      return;
+    }
+
     const { items, notes } = req.body;
     if (!items || !Array.isArray(items) || items.length === 0) {
       res.status(400).json({ error: "الرجاء إضافة عناصر للطلب لتحليلها بالذكاء الاصطناعي" });
