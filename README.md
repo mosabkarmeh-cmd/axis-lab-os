@@ -137,7 +137,7 @@ npm run desktop:package:win:current
 npm run desktop:package:win:all
 ```
 
-The **Current User** configuration installs without administrator scope. The **All Users** configuration installs for the machine and may require administrator permission. The Windows QA workflow builds both variants and installs and launches both on a Windows runner.
+The **Current User** configuration installs without administrator scope. The **All Users** configuration installs for the machine and may require administrator permission. The canonical Windows CI workflow builds both variants and installs and launches both on a Windows runner. It is also manually dispatchable.
 
 Before creating a release, run `npm run lint`, `npm run test:smoke`, and `npm run test:stress`, then verify the relevant GitHub Actions workflow is green. Do not publish an installer from a failing or dirty working tree.
 
@@ -159,7 +159,7 @@ For changes to currency, financial snapshots, inventory, production consumption,
 
 | Path | Purpose |
 |---|---|
-| `server.ts` | Express API, SQLite persistence, currency snapshots, locking, and domain operations |
+| `server.ts` | Thin Node entrypoint for the canonical server runtime |
 | `src/App.tsx` | Main authenticated application shell and navigation |
 | `src/components/AccountingView.tsx` | Invoices, payments, accounting totals, and historical financial displays |
 | `src/components/ReportsView.tsx` | Sales, profit, inventory, and monthly analytics views |
@@ -169,7 +169,11 @@ For changes to currency, financial snapshots, inventory, production consumption,
 | `desktop/main.cjs` | Electron main process and auto-update integration |
 | `electron-builder.yml` | Current User Windows packaging configuration |
 | `electron-builder.all-users.yml` | All Users Windows packaging configuration |
-| `grill-me-audit.md` | Hard Grill Me audit record and release findings |
+| `src/server/app.ts` | Canonical Express application composition, middleware, persistence bootstrap, and server lifecycle |
+| `src/server/server-core.ts` | Shared server runtime/state contract consumed by route modules |
+| `docs/deployment.md` | Production deployment and PostgreSQL operating procedure |
+| `docs/releases/` | Historical release notes (documentation only) |
+| `docs/audits/` | Audit evidence and historical engineering reviews |
 
 ## Troubleshooting
 
