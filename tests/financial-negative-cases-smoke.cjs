@@ -28,6 +28,39 @@ const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
   assert(pay.r.ok, 'valid payment failed');
   const duplicate = await req(`/api/accounting/invoices/${id}/payments`, { method: 'POST', body: JSON.stringify({ amount: 50, currency: 'USD', paymentId: 'negative-idempotent' }) });
   assert(duplicate.r.status === 409, `duplicate payment accepted: ${duplicate.r.status}`);
+  const order = await req('/api/orders', { method: 'POST', body: JSON.stringify({
+    customerId, totalPrice: 100, paidAmount: 0,
+    items: [{ productName: 'Order payment deletion test', quantity: 1, unitPrice: 100 }]
+  }) });
+  assert(order.r.ok && order.body.id, 'order payment deletion fixture failed');
+  const orderId = order.body.id;
+
+  const orderPayment = await req(`/api/orders/${orderId}/payments`, {
+    method: 'POST',
+    body: JSON.stringify({ amount: 50, currency: 'USD', paymentId: 'negative-order-payment' })
+  });
+  assert(orderPayment.r.ok, `order payment failed: ${JSON.stringify(orderPayment.body)}`);
+
+  const invoiceListBeforeDelete = await req('/api/accounting/invoices');
+  const linkedBefore = (invoiceListBeforeDelete.body.invoices || []).find(invoice => invoice.orderId === orderId);
+  assert(linkedBefore && Array.isArray(linkedBefore.payments) && linkedBefore.payments.some(payment => payment.id === 'negative-order-payment'),
+    'linked invoice did not receive order payment');
+
+  const deletedPayment = await req(`/api/orders/${orderId}/payments/negative-order-payment`, { method: 'DELETE' });
+  assert(deletedPayment.r.ok, `order payment deletion failed: ${JSON.stringify(deletedPayment.body)}`);
+
+  const orderListAfterDelete = await req('/api/orders');
+  const linkedOrderAfter = (orderListAfterDelete.body || []).find(item => item.id === orderId);
+  assert(linkedOrderAfter && Number(linkedOrderAfter.paidAmount) === 0 && Number(linkedOrderAfter.remaining) === 100,
+    `order balance did not restore after payment deletion: ${JSON.stringify(linkedOrderAfter)}`);
+
+  const invoiceListAfterDelete = await req('/api/accounting/invoices');
+  const linkedAfter = (invoiceListAfterDelete.body.invoices || []).find(invoice => invoice.orderId === orderId);
+  assert(linkedAfter && (!linkedAfter.payments || !linkedAfter.payments.some(payment => payment.id === 'negative-order-payment')),
+    'linked invoice retained deleted order payment');
+  assert(Number(linkedAfter.paidAmountSYP || 0) === 0 && Number(linkedAfter.remainingSYP) === 100,
+    `invoice SYP balance did not restore after payment deletion: ${JSON.stringify(linkedAfter)}`);
+
   const cancelPaid = await req(`/api/accounting/invoices/${id}/status`, { method: 'POST', body: JSON.stringify({ status: 'cancelled' }) });
   assert(cancelPaid.r.ok, 'invoice cancellation failed');
   const credit = await req(`/api/accounting/invoices/${id}/credit-note`, { method: 'POST', body: JSON.stringify({}) });
