@@ -48,7 +48,7 @@ if (backups.some(backup => backup.id === "auto-old")) throw new Error("retention
 if (!backups.some(backup => backup.id === "manual-keep")) throw new Error("retention removed a manual backup");
 if (!deleted.includes("/tmp/auto-old")) throw new Error("retention did not delete stale backup package");
 
-scheduler.stop();
+await scheduler.stop();
 
 scheduler.pruneAutoBackups().then(() => {
   console.log("backup-scheduler-smoke: PASS");
