@@ -12,7 +12,7 @@
     "start": "node dist/server.cjs",
     "clean": "node scripts/clean.cjs",
     "lint": "tsc --noEmit",
-    "test:smoke": "npm run build && npx tsx tests/currency-conversion-smoke.ts && node tests/api-security-smoke.cjs && node tests/first-run-password-smoke.cjs && node tests/rbac-viewer-smoke.cjs && node tests/rbac-workflow-integration-smoke.cjs && node tests/financial-negative-cases-smoke.cjs && node tests/sqlite-migration-smoke.cjs && node tests/sqlite-crash-recovery-smoke.cjs && node tests/sqlite-persisted-payload-corruption-smoke.cjs && node tests/sqlite-backup-files-smoke.cjs && node tests/sqlite-concurrency-stability-smoke.cjs && node tests/production-completion-smoke.cjs && node tests/report-monthly-smoke.cjs && node tests/inventory-guards-smoke.cjs && node tests/workflow-material-supply-smoke.cjs && node tests/payment-gcode-regression-smoke.cjs",
+    "test:smoke": "npm run build && npx tsx tests/currency-conversion-smoke.ts && node tests/api-security-smoke.cjs && node tests/first-run-password-smoke.cjs && node tests/rbac-viewer-smoke.cjs && node tests/rbac-workflow-integration-smoke.cjs && node tests/financial-negative-cases-smoke.cjs && node tests/sqlite-migration-smoke.cjs && node tests/sqlite-crash-recovery-smoke.cjs && node tests/sqlite-persisted-payload-corruption-smoke.cjs && node tests/sqlite-backup-files-smoke.cjs && npm run test:backup-scheduler && node tests/sqlite-concurrency-stability-smoke.cjs && node tests/production-completion-smoke.cjs && node tests/report-monthly-smoke.cjs && node tests/inventory-guards-smoke.cjs && node tests/workflow-material-supply-smoke.cjs && node tests/payment-gcode-regression-smoke.cjs",
     "test:rbac-workflow": "npm run build && node tests/rbac-viewer-smoke.cjs && node tests/rbac-workflow-integration-smoke.cjs",
     "db:generate": "drizzle-kit generate --config=src/db/drizzle.config.ts",
     "db:migrate": "drizzle-kit migrate --config=src/db/drizzle.config.ts",
@@ -38,7 +38,8 @@
     "test:source": "node scripts/static-source-check.cjs",
     "test:desktop-security": "node tests/desktop-security-smoke.cjs",
     "test:employee-boundary": "npm run build && node tests/employee-financial-boundary-smoke.cjs",
-    "test:backup-files": "npm run build && node tests/sqlite-backup-files-smoke.cjs"
+    "test:backup-files": "npm run build && node tests/sqlite-backup-files-smoke.cjs",
+    "test:backup-scheduler": "npx tsx tests/backup-scheduler-smoke.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
