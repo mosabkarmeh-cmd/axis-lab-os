@@ -13,14 +13,26 @@ const {
   DELETED_ITEMS,
   LOCAL_DATA_FILE,
   persistMutationWithFastDurability,
+  uploadDirectory: getUploadDirectory,
 } = core;
 
 export function registerFileRoutes(app: express.Express) {
 // ==================== FILES & DOCUMENTS API ====================
-  const UPLOAD_DIR = process.env.AXIS_FILES_DIR || path.join(path.dirname(LOCAL_DATA_FILE), "uploads");
+  const UPLOAD_DIR = getUploadDirectory();
   if (!fs.existsSync(UPLOAD_DIR)) {
     fs.mkdirSync(UPLOAD_DIR, { recursive: true });
   }
+  const TRASH_DIR = path.join(UPLOAD_DIR, ".trash");
+
+  const isPathInsideUploadDir = (candidatePath: string) => {
+    const root = path.resolve(UPLOAD_DIR) + path.sep;
+    return path.resolve(candidatePath).startsWith(root);
+  };
+
+  const publicFile = (file: Record<string, unknown>) => {
+    const { path: _privatePath, ...safeFile } = file;
+    return safeFile;
+  };
 
   const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -94,9 +106,18 @@ export function registerFileRoutes(app: express.Express) {
         createdAt: new Date().toISOString()
       });
 
-      await persistMutationWithFastDurability();
+      try {
+        await persistMutationWithFastDurability();
+      } catch (persistError) {
+        const logIndex = ACTIVITY_LOGS.findIndex(log => log.entityType === "File" && log.entityId === newFile.id && log.action === "UPLOAD_FILE");
+        if (logIndex >= 0) ACTIVITY_LOGS.splice(logIndex, 1);
+        const fileIndex = FILES.findIndex(item => item.id === newFile.id);
+        if (fileIndex >= 0) FILES.splice(fileIndex, 1);
+        try { if (isPathInsideUploadDir(newFile.path) && fs.existsSync(newFile.path)) fs.unlinkSync(newFile.path); } catch {}
+        throw persistError;
+      }
       res.locals.axisPersistScheduled = true;
-      res.status(201).json({ success: true, file: newFile });
+      res.status(201).json({ success: true, file: publicFile(newFile) });
     } catch (error: unknown) {
       res.status(500).json({ success: false, message: error instanceof Error ? error.message : String(error) });
     }
@@ -105,7 +126,9 @@ export function registerFileRoutes(app: express.Express) {
   // Get files of an entity
   app.get("/api/files/entity/:entityType/:entityId", (req, res) => {
     const { entityType, entityId } = req.params;
-    const filtered = FILES.filter(f => f.entityType === entityType && f.entityId === entityId);
+    const filtered = FILES
+      .filter(f => f.entityType === entityType && f.entityId === entityId)
+      .map(publicFile);
     res.json({ success: true, files: filtered });
   });
 
@@ -116,7 +139,7 @@ export function registerFileRoutes(app: express.Express) {
       return res.status(404).json({ success: false, message: "الملف غير موجود" });
     }
 
-    if (file.path && fs.existsSync(file.path)) {
+    if (file.path && isPathInsideUploadDir(file.path) && fs.existsSync(file.path)) {
       res.download(file.path, file.originalName);
     } else {
       res.status(404).json({ success: false, message: "ملف النظام الفعلي غير موجود على القرص" });
@@ -131,28 +154,53 @@ export function registerFileRoutes(app: express.Express) {
     }
 
     const file = FILES[idx];
-    FILES.splice(idx, 1);
+    const originalPath = file.path;
+    let trashPath: string | null = null;
 
-    if (file.path && fs.existsSync(file.path)) {
-      try {
-        fs.unlinkSync(file.path);
-      } catch (err) {
-        console.error("Error deleting file on disk", err);
+    if (originalPath) {
+      if (!isPathInsideUploadDir(originalPath)) {
+        return res.status(409).json({ success: false, message: "مسار الملف غير صالح داخل مجلد الملفات." });
+      }
+      if (fs.existsSync(originalPath)) {
+        fs.mkdirSync(TRASH_DIR, { recursive: true });
+        trashPath = path.join(TRASH_DIR, `${file.id}-${path.basename(originalPath)}`);
+        fs.renameSync(originalPath, trashPath);
       }
     }
 
-    // Log Activity
-    ACTIVITY_LOGS.unshift({
+    FILES.splice(idx, 1);
+    const actorId = getRequestUser(req)?.id || "system";
+    const activityLog = {
       id: nextActivityLogId(),
-      userId: getRequestUser(req)?.id || "system",
+      userId: actorId,
       action: "DELETE_FILE",
       entityType: "File",
       entityId: file.id,
       createdAt: new Date().toISOString()
-    });
+    };
+    ACTIVITY_LOGS.unshift(activityLog);
 
-    await persistMutationWithFastDurability();
+    try {
+      await persistMutationWithFastDurability();
+    } catch (persistError) {
+      FILES.splice(idx, 0, file);
+      const logIndex = ACTIVITY_LOGS.findIndex(log => log.id === activityLog.id);
+      if (logIndex >= 0) ACTIVITY_LOGS.splice(logIndex, 1);
+      if (trashPath && fs.existsSync(trashPath)) {
+        try { fs.renameSync(trashPath, originalPath); } catch (restoreError) {
+          console.error("Error restoring deleted file after persistence failure", restoreError);
+        }
+      }
+      throw persistError;
+    }
+
+    if (trashPath && fs.existsSync(trashPath)) {
+      try { fs.unlinkSync(trashPath); } catch (err) {
+        console.error("Error removing trashed file after successful persistence", err);
+      }
+    }
+
     res.locals.axisPersistScheduled = true;
-    res.json({ success: true, file });
+    res.json({ success: true, file: publicFile(file) });
   });
 }
