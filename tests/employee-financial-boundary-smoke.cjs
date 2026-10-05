@@ -132,10 +132,19 @@ function assert(condition, message) {
     assert(Number(material.pricePerUnit) === 0, `employee received material price: ${JSON.stringify(material)}`);
     assert(!Object.prototype.hasOwnProperty.call(material, "supplier") || material.supplier === null, "employee received supplier data");
 
+    const customerCreate = await request("/api/customers", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "Employee boundary customer",
+        phone: "+15550000001",
+      }),
+    });
+    assert(customerCreate.response.ok && customerCreate.body.id, `customer fixture failed: ${JSON.stringify(customerCreate.body)}`);
+
     const orderCreate = await request("/api/orders", {
       method: "POST",
       body: JSON.stringify({
-        customerId: "c-1",
+        customerId: customerCreate.body.id,
         items: [{
           productName: "Employee boundary order",
           quantity: 1,
