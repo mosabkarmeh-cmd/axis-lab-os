@@ -122,7 +122,7 @@ export async function registerRoutes(app: express.Express) {
     next();
   });
 
-  registerUserRoutes(app);
+  registerUserRoutes(app, { includeLegacyCustomerProductRoutes: !USE_POSTGRES });
 
   if (!USE_POSTGRES) {
     registerLegacyMaterialsInventoryRoutes(app);
