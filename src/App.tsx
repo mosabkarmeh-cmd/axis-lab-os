@@ -168,7 +168,7 @@ export default function App() {
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(false);
   const [rememberMe, setRememberMe] = useState<boolean>(true);
   const [activePreset, setActivePreset] = useState<string>("admin");
-  const [inspectToken, setInspectToken] = useState<any>(null);
+  const [inspectToken, setInspectToken] = useState<{ header: Record<string, unknown>; payload: Record<string, unknown>; signature: string } | null>(null);
   const [firstRunPasswordCurrent, setFirstRunPasswordCurrent] = useState<string | null>(null);
   const [isFirstRunPasswordLoading, setIsFirstRunPasswordLoading] = useState(false);
   const networkSyncInFlightRef = useRef(false);
@@ -664,7 +664,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
       } else {
         window.showAlert?.("حدث خطأ أثناء المشاركة: " + data.message, "فشل المشاركة");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       window.showAlert?.("فشل الاتصال بالخادم لمشاركة الطلب", "خطأ في الاتصال");
     } finally {
@@ -2136,7 +2136,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     setEditOrderItems(prev => prev.filter((_, idx) => idx !== index));
   };
 
-  const updateEditOrderDraftItem = (index: number, key: 'name' | 'qty' | 'price' | 'notes', val: any) => {
+  const updateEditOrderDraftItem = (index: number, key: 'name' | 'qty' | 'price' | 'notes', val: string | number) => {
     setEditOrderItems(prev => prev.map((item, idx) => {
       if (idx === index) {
         return { ...item, [key]: val };
