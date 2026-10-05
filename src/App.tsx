@@ -147,6 +147,74 @@ import AutoLogoutTimer from "./components/AutoLogoutTimer";
 import CurrencyConverterModal from "./components/CurrencyConverterModal";
 import FirstRunPasswordModal from "./components/FirstRunPasswordModal";
 
+type SessionInspector = {
+  header: Record<string, unknown>;
+  payload: Record<string, unknown>;
+  signature: string;
+};
+
+type CompanySettings = {
+  name?: string;
+  email?: string;
+  whatsapp?: string;
+  phone?: string;
+  instagram?: string;
+  logo?: string;
+};
+
+type MaterialExportRecord = {
+  id: string;
+  name?: string;
+  category?: string;
+  thickness?: string | number;
+  color?: string;
+  qualityStatus?: "inspected" | "defective" | "in_preparation" | string;
+  pricePerUnit?: number;
+  width?: number | string;
+  height?: number | string;
+  unit?: string;
+  minimumStock?: number;
+  inventory?: {
+    quantity?: number;
+    reservedQuantity?: number;
+    location?: string;
+  };
+};
+
+type ProgressInputItem = OrderItem & {
+  name?: string;
+  material?: string;
+  materialCategory?: string;
+  completedQuantity?: number;
+  isCompleted?: boolean;
+  status?: string;
+};
+
+type ProgressJob = ProductionJob & {
+  title?: string;
+  notes?: string;
+  completedQuantity?: number;
+  usedQuantity?: number;
+};
+
+type OrderProgressItem = {
+  id: string;
+  productName: string;
+  materialName: string;
+  quantity: number;
+  completedQuantity: number;
+  remainingQuantity: number;
+  percentage: number;
+  isCompleted: boolean;
+  unitPrice: number;
+  totalPrice: number;
+  notes: string;
+};
+
+type ProgressOrder = Order & {
+  orderItems?: ProgressInputItem[];
+};
+
 const USERS = [
   { id: "u-1", email: "admin@axislab.com", fullName: "المدير العام", role: "admin" },
   { id: "u-2", email: "employee@axislab.com", fullName: "فني تشغيل الليزر", role: "employee" },
@@ -168,7 +236,7 @@ export default function App() {
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(false);
   const [rememberMe, setRememberMe] = useState<boolean>(true);
   const [activePreset, setActivePreset] = useState<string>("admin");
-  const [inspectToken, setInspectToken] = useState<any>(null);
+  const [inspectToken, setInspectToken] = useState<SessionInspector | null>(null);
   const [firstRunPasswordCurrent, setFirstRunPasswordCurrent] = useState<string | null>(null);
   const [isFirstRunPasswordLoading, setIsFirstRunPasswordLoading] = useState(false);
   const networkSyncInFlightRef = useRef(false);
@@ -188,8 +256,8 @@ export default function App() {
 
   // Interactive Notification states
   const [isNotificationsOpen, setIsNotificationsOpen] = useState<boolean>(false);
-  const [recycleBinItems, setRecycleBinItems] = useState<any[]>([]);
-  const [orderStatuses, setOrderStatuses] = useState<any[]>([]);
+  const [recycleBinItems, setRecycleBinItems] = useState<Record<string, unknown>[]>([]);
+  const [orderStatuses, setOrderStatuses] = useState<Record<string, unknown>[]>([]);
 
   // Global Search Command Palette States
   const [isSearchPaletteOpen, setIsSearchPaletteOpen] = useState<boolean>(false);
@@ -460,12 +528,12 @@ export default function App() {
   const [calcAutoWaste, setCalcAutoWaste] = useState<boolean>(true);
   const [calcWasteOverridePercent, setCalcWasteOverridePercent] = useState<number>(10);
   const [calcTargetProfitMargin, setCalcTargetProfitMargin] = useState<number>(50);
-  const [calcResult, setCalcResult] = useState<any>(null);
+  const [calcResult, setCalcResult] = useState<Record<string, unknown> | null>(null);
   const [isCalculatingFast, setIsCalculatingFast] = useState<boolean>(false);
 
   // Order Parser State
   const [parserInputText, setParserInputText] = useState<string>("");
-  const [parserResult, setParserResult] = useState<any>(null);
+  const [parserResult, setParserResult] = useState<Record<string, unknown> | null>(null);
   const [isParsingFast, setIsParsingFast] = useState<boolean>(false);
 
   const [chatMessages, setChatMessages] = useState<Array<{ id: string; sender: 'user' | 'ai'; text: string; time: string }>>([
@@ -480,10 +548,10 @@ export default function App() {
   const [isSendingChatMessage, setIsSendingChatMessage] = useState<boolean>(false);
 
   // --- FAST LOCAL REAL-TIME AI INTERACTION STATES ---
-  const [fastLocalInventoryPredictions, setFastLocalInventoryPredictions] = useState<any[]>([]);
+  const [fastLocalInventoryPredictions, setFastLocalInventoryPredictions] = useState<Record<string, unknown>[]>([]);
   const [fastLocalProductionScheduling, setFastLocalProductionScheduling] = useState<{
     success: boolean;
-    recommendedScheduling: any[];
+    recommendedScheduling: Record<string, unknown>[];
     adviceMessage: string;
   } | null>(null);
   const [fastLocalDashboardTrends, setFastLocalDashboardTrends] = useState<{
@@ -559,7 +627,7 @@ export default function App() {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'cash' | 'transfer' | 'card'>("cash");
   const [deliveryBlockedOrder, setDeliveryBlockedOrder] = useState<Order | null>(null);
   const [isProcessingQuickFullPay, setIsProcessingQuickFullPay] = useState<boolean>(false);
-  const [selectedPaymentReceipt, setSelectedPaymentReceipt] = useState<{ receipt: any; order: Order } | null>(null);
+  const [selectedPaymentReceipt, setSelectedPaymentReceipt] = useState<{ receipt: unknown; order: Order } | null>(null);
   const [orderGcodeResult, setOrderGcodeResult] = useState<GCodeResult | null>(null);
   const [isCompilingOrderGcode, setIsCompilingOrderGcode] = useState<boolean>(false);
   const [printTicketOrder, setPrintTicketOrder] = useState<Order | null>(null);
@@ -578,7 +646,7 @@ export default function App() {
   const [shareEmailSuccess, setShareEmailSuccess] = useState<boolean>(false);
   const [sharePdfCopied, setSharePdfCopied] = useState<boolean>(false);
   const [shareMsgCopied, setShareMsgCopied] = useState<boolean>(false);
-  const [companySettings, setCompanySettings] = useState<any>(null);
+  const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
 
   useEffect(() => {
     fetch("/api/settings")
@@ -664,7 +732,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
       } else {
         window.showAlert?.("حدث خطأ أثناء المشاركة: " + data.message, "فشل المشاركة");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       window.showAlert?.("فشل الاتصال بالخادم لمشاركة الطلب", "خطأ في الاتصال");
     } finally {
@@ -684,9 +752,9 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
   };
 
   // File management expansion modals
-  const [selectedProductFiles, setSelectedProductFiles] = useState<any | null>(null);
-  const [selectedCustomerFiles, setSelectedCustomerFiles] = useState<any | null>(null);
-  const [selectedMaterialFiles, setSelectedMaterialFiles] = useState<any | null>(null);
+  const [selectedProductFiles, setSelectedProductFiles] = useState<object | null>(null);
+  const [selectedCustomerFiles, setSelectedCustomerFiles] = useState<object | null>(null);
+  const [selectedMaterialFiles, setSelectedMaterialFiles] = useState<object | null>(null);
 
   // Order editing state
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
@@ -723,7 +791,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
   const [findSuitableMatId, setFindSuitableMatId] = useState<string>("");
   const [findSuitableW, setFindSuitableW] = useState<string>("");
   const [findSuitableH, setFindSuitableH] = useState<string>("");
-  const [suitableRemnantResult, setSuitableRemnantResult] = useState<any | null>(null);
+  const [suitableRemnantResult, setSuitableRemnantResult] = useState<Record<string, unknown> | null>(null);
 
   // Laser G-Code Compiler tab states
   const [gcodeTabMode, setGcodeTabMode] = useState<'vector' | 'prompt'>("vector");
@@ -926,7 +994,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     if (data && data.success) setOrderStatuses(data.statuses);
   };
 
-  const sortMaterialsBySavedOrder = (mats: any[]) => {
+  const sortMaterialsBySavedOrder = (mats: Array<{ id: string }>) => {
     try {
       const savedOrderRaw = localStorage.getItem("axislab_materials_order_ids");
       if (savedOrderRaw) {
@@ -1145,7 +1213,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
   const { handleLogout } = useLogoutAction({ setSessionActive, setCurrentUser, addTerminalLog });
 
   // Helper to calculate technical order completion progress based on each part/item and material breakdown (حسب تفاصيل كل مادة وعدد القطع والتكرارات)
-  const calculateOrderProgress = (ord: any, jobsList: any[] = productionJobs) => {
+  const calculateOrderProgress = (ord: ProgressOrder | null, jobsList: ProgressJob[] = productionJobs) => {
     if (!ord) {
       return { 
         percentage: 0, 
@@ -1163,7 +1231,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
       };
     }
 
-    const items = ord.items || ord.orderItems || [];
+    const items = (ord.items || ord.orderItems || []) as ProgressInputItem[];
     const linkedJobs = (jobsList || []).filter(j => 
       (j.orderId && j.orderId === ord.id) || 
       (j.orderNumber && j.orderNumber === ord.orderNumber)
@@ -1181,10 +1249,10 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
         totalUnits: number;
         completedUnits: number;
         itemsCount: number;
-        items: any[];
+        items: OrderProgressItem[];
       }> = {};
 
-      const itemsBreakdown = items.map((it: any, idx: number) => {
+      const itemsBreakdown = items.map((it: ProgressInputItem, idx: number) => {
         const q = Math.max(1, Number(it.quantity) || 1);
         const matName = extractMaterialName(it);
         
@@ -1310,15 +1378,15 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
       let totalProgressWeighted = 0;
 
       linkedJobs.forEach(j => {
-        const qty = Number(j.quantity) || Number((j as any).usedQuantity) || 1;
+        const qty = Number(j.quantity) || Number(j.usedQuantity) || 1;
         totalUnits += qty;
         
         if (j.status === 'completed') {
           completedUnits += qty;
           totalProgressWeighted += 100 * qty;
         } else if (j.status === 'running' || j.status === 'paused') {
-          const compQty = (j as any).completedQuantity !== undefined 
-            ? Number((j as any).completedQuantity) 
+          const compQty = j.completedQuantity !== undefined 
+            ? Number(j.completedQuantity) 
             : Math.round(((j.progress || 25) / 100) * qty);
           const jobProg = Math.min(100, Math.max(10, Math.round((compQty / qty) * 100)));
           completedUnits += Math.min(qty, compQty);
@@ -1387,10 +1455,10 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     if (!targetOrder) return null;
     const prog = calculateOrderProgress(targetOrder, productionJobs);
 
-    const totalRequiredPieces = prog.itemsBreakdown.reduce((sum: number, item: any) => sum + Math.max(0, Number(item.quantity) || 0), 0);
+    const totalRequiredPieces = prog.itemsBreakdown.reduce((sum: number, item: OrderProgressItem) => sum + Math.max(0, Number(item.quantity) || 0), 0);
     const totalCompletedPieces = prog.itemsBreakdown.reduce((sum: number, item: any) => sum + Math.min(Math.max(0, Number(item.completedQuantity) || 0), Math.max(0, Number(item.quantity) || 0)), 0);
     const totalRemainingPieces = Math.max(0, totalRequiredPieces - totalCompletedPieces);
-    const completedItemsCount = prog.itemsBreakdown.filter((item: any) => item.isCompleted).length;
+    const completedItemsCount = prog.itemsBreakdown.filter((item: OrderProgressItem) => item.isCompleted).length;
 
     return (
       <div className="space-y-4 font-sans text-right">
@@ -1592,7 +1660,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-900">
-                  {prog.itemsBreakdown.map((it: any) => {
+                  {prog.itemsBreakdown.map((it: OrderProgressItem) => {
                     const rem = Math.max(0, it.quantity - (it.completedQuantity || 0));
 
                     return (
@@ -1868,7 +1936,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
   };
 
   // Export Materials & Inventory CSV for external stock auditing
-  const legacyHandleExportMaterialsCSV = (materialsList: any[] = materials) => {
+  const legacyHandleExportMaterialsCSV = (materialsList: MaterialExportRecord[] = materials) => {
     if (!materialsList || materialsList.length === 0) {
       addTerminalLog("WARN", "لا يوجد خامات للتصدير");
       return;
@@ -2136,7 +2204,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     setEditOrderItems(prev => prev.filter((_, idx) => idx !== index));
   };
 
-  const updateEditOrderDraftItem = (index: number, key: 'name' | 'qty' | 'price' | 'notes', val: any) => {
+  const updateEditOrderDraftItem = (index: number, key: 'name' | 'qty' | 'price' | 'notes', val: string | number) => {
     setEditOrderItems(prev => prev.map((item, idx) => {
       if (idx === index) {
         return { ...item, [key]: val };
