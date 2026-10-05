@@ -46,7 +46,7 @@ export function getActorId(req: express.Request): string {
 export function sanitizeProductionJob(job: ProductionJobView, req: express.Request): Record<string, unknown> {
   const safeJob: Record<string, unknown> = { ...job };
   const user = core.getRequestUser(req);
-  if (user?.role === "employee") {
+  if (user?.role === "employee" || user?.role === "viewer") {
     delete safeJob.materialPricePerUnit;
     delete safeJob.materialCostUSD;
     delete safeJob.technicianCostUSD;
