@@ -13,6 +13,7 @@ import {
   machines,
   productionJobs,
   sanitizeProductionJob,
+  persistProductionState,
 } from "./shared.ts";
 
 const {
@@ -45,6 +46,7 @@ app.post("/api/production/jobs/:id/assign", (req, res) => {
     }
 
     if (operatorId) job.operatorId = operatorId;
+    await persistProductionState();
     res.json({ success: true, job: sanitizeProductionJob(job, req) });
   });
 }
