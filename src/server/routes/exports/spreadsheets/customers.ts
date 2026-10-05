@@ -3,6 +3,10 @@ import ExcelJS from "exceljs";
 import * as core from "../../../server-core.ts";
 import { asExportRecord } from "../utils.ts";
 
+function canViewCustomerPrivateData(req: express.Request): boolean {
+  return core.getRequestUser(req)?.role === "admin";
+}
+
 const { ORDERS, INVOICES, INVENTORY, CUSTOMERS, MATERIALS } = core;
 
 export function registerCustomersCsvRoute(app: express.Express) {
@@ -10,6 +14,7 @@ export function registerCustomersCsvRoute(app: express.Express) {
     try {
       const custs = CUSTOMERS;
       const allOrders = ORDERS;
+      const includePrivateCustomerData = canViewCustomerPrivateData(req);
 
       const headers = ["معرف العميل", "اسم العميل", "رقم الهاتف", "الواتساب", "الشركة", "العنوان", "عدد الطلبات", "إجمالي المسحوبات (ل.س)", "ملاحظات"];
       const rows = custs.map(c => {
@@ -18,10 +23,10 @@ export function registerCustomersCsvRoute(app: express.Express) {
         return [
           c.id,
           c.name || "",
-          c.phone || "",
-          asExportRecord(c).whatsapp || c.phone || "",
+          includePrivateCustomerData ? (c.phone || "") : "🔒 محجوب",
+          includePrivateCustomerData ? (asExportRecord(c).whatsapp || c.phone || "") : "🔒 محجوب",
           c.company || "فردي",
-          c.address || "",
+          includePrivateCustomerData ? (c.address || "") : "🔒 محجوب",
           cOrders.length,
           totalSpent,
           asExportRecord(c).notes || ""
