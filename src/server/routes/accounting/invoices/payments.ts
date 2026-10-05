@@ -7,6 +7,11 @@ const { INVOICES } = core;
 
 export function registerInvoicePaymentRoutes(app: express.Express) {
   app.post("/api/accounting/invoices/:id/payments", async (req, res) => {
+    const user = core.getRequestUser(req);
+    if (!user || !["admin", "accountant"].includes(user.role)) {
+      res.status(403).json({ success: false, message: "تسجيل دفعات الفواتير متاح للإدارة والحسابات فقط" });
+      return;
+    }
     const { amount, currency = "USD", notes, paymentMethod, paymentId } = req.body;
     const inv = INVOICES.find(i => i.id === req.params.id);
     if (!inv) {
