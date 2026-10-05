@@ -34,8 +34,9 @@ export function registerOrderPdfRoute(app: express.Express) {
 
       const customer = CUSTOMERS.find(c => c.id === order.customerId);
       const customerName = customer ? customer.name : "عميل عام";
-      const customerPhone = customer ? customer.phone : "-";
-      const customerAddress = customer ? customer.address : "-";
+      const canViewCustomerPrivateData = user.role === "admin";
+      const customerPhone = canViewCustomerPrivateData && customer ? customer.phone : "محجوب لحماية الخصوصية";
+      const customerAddress = canViewCustomerPrivateData && customer ? customer.address : "محجوب لحماية الخصوصية";
 
       const doc = new PDFDocument({ size: "A4", margin: 50 });
       const fontFile = await ensureFontExists(RESOURCE_FONT_PATH);
