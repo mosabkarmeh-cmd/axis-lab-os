@@ -128,7 +128,16 @@ export function createLocalSqliteRuntime(config: LocalSqliteRuntimeConfig, deps:
         console.error("[SQLITE] Legacy JSON migration failed:", error);
       }
     }
-    if (recoveredFrom) await flushLocalSqlite();
+    if (recoveredFrom) {
+      if (fs.existsSync(recoveredFrom) && fs.statSync(recoveredFrom).isDirectory()) {
+        try {
+          await restoreUploadedFilesFromBackup(recoveredFrom);
+        } catch (error) {
+          console.error("[SQLITE] Recovered database but failed to restore its uploaded files:", error);
+        }
+      }
+      await flushLocalSqlite();
+    }
     return localSqlite;
   }
 
