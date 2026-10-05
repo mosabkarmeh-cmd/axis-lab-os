@@ -158,6 +158,13 @@ function assert(condition, message) {
     });
     assert(orderCreate.response.ok && orderCreate.body.id, `order fixture failed: ${JSON.stringify(orderCreate.body)}`);
 
+    const blockedEmployeeOrderUpdate = await employeeRequest(`/api/orders/${orderCreate.body.id}`, {
+      method: "PUT",
+      body: JSON.stringify({ paidAmount: 999999 }),
+    });
+    assert(blockedEmployeeOrderUpdate.response.status === 403,
+      `employee financial order update was not blocked: ${blockedEmployeeOrderUpdate.response.status}`);
+
     const employeeOrders = await employeeRequest("/api/orders");
     assert(employeeOrders.response.ok && Array.isArray(employeeOrders.body), "employee cannot read orders");
     const employeeOrder = employeeOrders.body.find(item => item.id === orderCreate.body.id);
