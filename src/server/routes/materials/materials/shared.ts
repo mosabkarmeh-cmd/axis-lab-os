@@ -6,7 +6,8 @@ export function getActorId(req: express.Request): string {
 }
 
 export function isEmployee(req: express.Request): boolean {
-  return core.getRequestUser(req)?.role === "employee";
+  const role = core.getRequestUser(req)?.role;
+  return role === "employee" || role === "viewer";
 }
 
 export function sanitizeMaterialForEmployee<T>(material: T, req: express.Request): T {
