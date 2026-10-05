@@ -15,6 +15,7 @@ const {
   USERS,
   ACTIVITY_LOGS,
   nextActivityLogId,
+  getNextNumber,
   sendProductionJobEmailNotification,
 } = core;
 
@@ -108,7 +109,7 @@ export function registerProductionJobQueueRoutes(app: express.Express) {
 
     const newJob: ProductionJobView = {
       id: "job-" + Date.now(),
-      jobNo: "JOB-2026-" + String(productionJobs.length + 1).padStart(3, "0"),
+      jobNo: getNextNumber("job"),
       orderId: orderId || null,
       orderNumber: orderNumber || "يدوي",
       itemName,
