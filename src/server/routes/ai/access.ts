@@ -11,11 +11,12 @@ export type AiAccessScope = {
 export function getAiAccessScope(req: express.Request): AiAccessScope {
   const user = core.getRequestUser(req);
   const role = user?.role || null;
-  const privileged = role === "admin" || role === "accountant";
+  const canViewFinancials = role === "admin" || role === "accountant";
+  const canViewCustomerPrivateData = role === "admin";
   return {
     role,
-    canViewFinancials: privileged,
-    canViewCustomerPrivateData: privileged,
-    canUsePricingTools: privileged,
+    canViewFinancials,
+    canViewCustomerPrivateData,
+    canUsePricingTools: canViewFinancials,
   };
 }
