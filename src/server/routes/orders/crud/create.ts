@@ -48,7 +48,14 @@ export function registerOrderCreateRoutes(app: express.Express) {
     const computedTotal = itemsSubtotal + (itemsSubtotal * (taxRate / 100)) - discountAmt;
     
     // Respect the explicit totalPrice from the frontend if passed, otherwise use computedTotal
-    const finalTotal = totalPrice !== undefined ? Number(totalPrice) : Math.max(0, computedTotal);
+    const finalTotal = Math.max(
+      0,
+      totalPrice !== undefined ? Number(totalPrice) || 0 : computedTotal,
+    );
+    const normalizedPaidAmount = Math.min(
+      finalTotal,
+      Math.max(0, Number(paidAmount) || 0),
+    );
     const orderNum = getNextNumber("order");
     recordBenchmark(orderCreateBenchmarks, "calculate_totals_and_number", totalsStartedAt);
     const objectBuildStartedAt = performance.now();
@@ -64,8 +71,8 @@ export function registerOrderCreateRoutes(app: express.Express) {
       exchangeRateAtCreation: Number(SETTINGS.exchangeRate) > 0 ? Number(SETTINGS.exchangeRate) : 135,
       taxPercent: taxRate,
       discount: discountAmt,
-      paidAmount: Number(paidAmount) || 0,
-      remaining: Math.max(0, finalTotal - (Number(paidAmount) || 0)),
+      paidAmount: normalizedPaidAmount,
+      remaining: Math.max(0, finalTotal - normalizedPaidAmount),
       notes: notes || "",
       createdById: getActorId(req),
       createdAt: new Date().toISOString(),
