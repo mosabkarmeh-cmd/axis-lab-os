@@ -25,6 +25,15 @@ function getActorId(req: express.Request): string {
   return core.getRequestUser(req)?.id || "system";
 }
 
+function requireAdmin(req: express.Request, res: express.Response): boolean {
+  const user = core.getRequestUser(req);
+  if (!user || user.role !== "admin") {
+    res.status(403).json({ success: false, message: "النسخ والاستعادة متاحة لمدير النظام فقط" });
+    return false;
+  }
+  return true;
+}
+
 function publicBackup(backup: Record<string, unknown>) {
   const { filePath, ...safeBackup } = backup;
   return safeBackup;
@@ -32,10 +41,12 @@ function publicBackup(backup: Record<string, unknown>) {
 
 export function registerBackupRoutes(app: express.Express) {
 app.get("/api/backup", (req, res) => {
+    if (!requireAdmin(req, res)) return;
     res.json({ success: true, backups: BACKUPS.map(publicBackup) });
   });
 
   app.post("/api/backup", async (req, res) => {
+    if (!requireAdmin(req, res)) return;
     if (!USE_SQLITE) {
       res.status(501).json({ success: false, message: "النسخ المحلي الفعلي متاح في وضع SQLite فقط." });
       return;
@@ -57,6 +68,7 @@ app.get("/api/backup", (req, res) => {
   });
 
   app.post("/api/backup/restore/:id", async (req, res) => {
+    if (!requireAdmin(req, res)) return;
     if (!USE_SQLITE) {
       res.status(501).json({ success: false, message: "استعادة SQLite المحلية متاحة في وضع SQLite فقط." });
       return;
