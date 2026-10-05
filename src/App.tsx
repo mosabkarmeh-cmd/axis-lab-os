@@ -181,14 +181,14 @@ type MaterialExportRecord = {
   };
 };
 
-type ProgressInputItem = OrderItem & {
+type ProgressInputItem = (OrderItem & {
   name?: string;
   material?: string;
   materialCategory?: string;
   completedQuantity?: number;
   isCompleted?: boolean;
   status?: string;
-};
+}) & Record<string, unknown>;
 
 type ProgressJob = ProductionJob & {
   title?: string;
