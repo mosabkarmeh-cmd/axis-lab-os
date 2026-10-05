@@ -105,7 +105,9 @@ function assert(condition, message) {
 
     const SQL = await initSqlJs({ locateFile: file => path.resolve("node_modules/sql.js/dist", file) });
     const database = new SQL.Database(fs.readFileSync(dataFile));
-    database.run("UPDATE app_state SET value = ? WHERE key = ?", ["{ definitely-not-valid-json", "ORDERS"]);
+    database.run("UPDATE app_state SET value = ? WHERE key = ?", ["{ definitely-not-valid-json", "SETTINGS"]);
+    const changedRows = Number(database.exec("SELECT changes()")[0].values[0][0]);
+    assert(changedRows === 1, "corruption test could not find a persisted SETTINGS payload");
     fs.writeFileSync(dataFile, Buffer.from(database.export()));
     database.close();
 
@@ -117,7 +119,7 @@ function assert(condition, message) {
     assert(exitCode !== 0, `server exited successfully after persisted payload corruption: ${exitCode}`);
 
     const verify = new SQL.Database(fs.readFileSync(dataFile));
-    const storedValue = String(verify.exec("SELECT value FROM app_state WHERE key = 'ORDERS'")[0].values[0][0]);
+    const storedValue = String(verify.exec("SELECT value FROM app_state WHERE key = 'SETTINGS'")[0].values[0][0]);
     verify.close();
     assert(storedValue === "{ definitely-not-valid-json", "corrupt payload was unexpectedly overwritten");
 
