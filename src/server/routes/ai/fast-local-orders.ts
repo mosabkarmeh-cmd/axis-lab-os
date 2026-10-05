@@ -6,6 +6,8 @@ const { ORDERS, CUSTOMERS, MATERIALS, INVENTORY } = core;
 export function handleFastLocalOrderAction(action: unknown, payload: FastLocalPayload, req: Request, res: Response): boolean {
   switch (String(action)) {
             case "order-hints": {
+              const user = core.getRequestUser(req);
+              const canViewCustomerPrivateData = user?.role === "admin" || user?.role === "accountant";
               const customerId = payload?.customerId;
               const cust = CUSTOMERS.find(c => c.id === customerId);
               const customerOrders = ORDERS.filter(o => o.customerId === customerId);
@@ -32,14 +34,16 @@ export function handleFastLocalOrderAction(action: unknown, payload: FastLocalPa
               }
     
               const hintMessage = cust
-                ? `العميل ${cust.name} - لديه ${customerOrders.length} طلبات سابقة بالورشة. ${isVIP ? "🌟 عميل مميز VIP." : ""} الأكثر طلباً: ${recommendedItem}`
+                ? canViewCustomerPrivateData
+                  ? `العميل ${cust.name} - لديه ${customerOrders.length} طلبات سابقة بالورشة. ${isVIP ? "🌟 عميل مميز VIP." : ""} الأكثر طلباً: ${recommendedItem}`
+                  : `العميل ${cust.name} - لديه ${customerOrders.length} طلبات سابقة بالورشة. الأكثر طلباً: ${recommendedItem}`
                 : "تم تحديد العميل المفضل للطلب.";
     
               res.json({
                 success: true,
                 hintMessage,
                 recommendedItem,
-                isVIP,
+                isVIP: canViewCustomerPrivateData ? isVIP : false,
                 ordersCount: customerOrders.length
               });
               break;
