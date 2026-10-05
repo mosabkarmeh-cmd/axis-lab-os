@@ -4,12 +4,12 @@ type TerminalLog = { time: string; type: string; msg: string };
 
 type TerminalOptions = {
   currentUser: { fullName?: string } | null;
-  token: string | null;
+  sessionActive: boolean;
   users: Array<{ fullName: string; role: string }>;
   addTerminalLog: (type: string, message: string) => void;
 };
 
-export function useTerminalActions({ currentUser, token, users, addTerminalLog }: TerminalOptions) {
+export function useTerminalActions({ currentUser, sessionActive, users, addTerminalLog }: TerminalOptions) {
   const [terminalLogs, setTerminalLogs] = useState<TerminalLog[]>([
     { time: "11:22:01", type: "SYSTEM", msg: "AXIS LAB bootstrap engine initialized." },
     { time: "11:22:05", type: "DB", msg: "Prisma Database Client initialized in memory." },
@@ -43,11 +43,11 @@ export function useTerminalActions({ currentUser, token, users, addTerminalLog }
       else if (command === "clear") setTerminalLogs([]);
       else if (command === "prisma-generate" || command === "npx prisma generate") runTerminalCommand("npx prisma generate");
       else if (command === "prisma-migrate" || command === "npx prisma migrate dev") runTerminalCommand("npx prisma migrate dev");
-      else if (command === "status") addTerminalLog("STATUS", `User: ${currentUser?.fullName || "Guest"}, Active token: ${token ? "YES" : "NO"}`);
+      else if (command === "status") addTerminalLog("STATUS", `User: ${currentUser?.fullName || "Guest"}, Active session: ${sessionActive ? "YES" : "NO"}`);
       else if (command === "users") addTerminalLog("INFO", `Users: ${users.map((user) => `${user.fullName} (${user.role})`).join(" | ")}`);
       else addTerminalLog("ERROR", `Command not found: "${command}". Type help for a list.`);
     }, 200);
-  }, [addTerminalLog, commandInput, currentUser, runTerminalCommand, token, users]);
+  }, [addTerminalLog, commandInput, currentUser, runTerminalCommand, sessionActive, users]);
 
   return { terminalLogs, setTerminalLogs, commandInput, setCommandInput, handleTerminalSubmit, executeTerminalCommand };
 }
