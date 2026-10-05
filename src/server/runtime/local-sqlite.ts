@@ -98,10 +98,10 @@ export function createLocalSqliteRuntime(config: LocalSqliteRuntimeConfig, deps:
         for (const candidate of candidates) {
           try {
             const candidateStat = fs.statSync(candidate);
-            const candidateDatabase = candidateStat.isDirectory()
-              ? path.join(candidate, "axis-data.sqlite")
-              : candidate;
-            bytes = fs.readFileSync(candidateDatabase);
+            const inspected = candidateStat.isDirectory()
+              ? await inspectSqliteBackup(candidate)
+              : await inspectSqliteBackup(candidate);
+            bytes = fs.readFileSync(inspected.databaseFile);
             localSqlite = openDatabase(bytes);
             recoveredFrom = candidate;
             console.error(`[SQLITE] Recovered database from backup ${candidate}`);
