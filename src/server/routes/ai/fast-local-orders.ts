@@ -7,7 +7,7 @@ export function handleFastLocalOrderAction(action: unknown, payload: FastLocalPa
   switch (String(action)) {
             case "order-hints": {
               const user = core.getRequestUser(req);
-              const canViewCustomerPrivateData = user?.role === "admin" || user?.role === "accountant";
+              const canViewCustomerPrivateData = user?.role === "admin";
               const customerId = payload?.customerId;
               const cust = CUSTOMERS.find(c => c.id === customerId);
               const customerOrders = ORDERS.filter(o => o.customerId === customerId);
