@@ -84,7 +84,7 @@ app.get("/api/backup", (req, res) => {
       await persistStateNow();
       const safetyBackup = await createSqliteBackup("safety");
       const previousSqlite = core.localSqlite;
-      let restoredSqlite: ReturnType<typeof SQL.Database> | null = null;
+      let restoredSqlite: import("sql.js").Database | null = null;
       try {
         const SQL = await initSqlJs({
           locateFile: (file: string) => process.env.SQLITE_WASM_PATH || path.join(APP_RUNTIME_ROOT, "node_modules", "sql.js", "dist", file)
