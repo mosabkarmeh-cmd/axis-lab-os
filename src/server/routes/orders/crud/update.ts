@@ -9,11 +9,13 @@ const {
   INVOICES,
   ACTIVITY_LOGS,
   nextActivityLogId,
+  persistMutationWithFastDurability,
+  sypToUsd,
 } = core;
 
 export function registerOrderUpdateRoutes(app: express.Express) {
   // API - Update Order (Edit details)
-  app.put("/api/orders/:id", (req, res) => {
+  app.put("/api/orders/:id", async (req, res) => {
     const { notes, priority, items, paidAmount, customerId, deliveryDateExpected, taxPercent, discount } = req.body;
     const order = ORDERS.find(o => o.id === req.params.id);
     if (!order) {
@@ -78,12 +80,54 @@ export function registerOrderUpdateRoutes(app: express.Express) {
     // Sync matching Invoice
     const matchingInv = INVOICES.find(inv => inv.orderId === order.id);
     if (matchingInv) {
-      matchingInv.totalPrice = order.totalPrice;
-      matchingInv.paidAmount = order.paidAmount;
-      matchingInv.remaining = order.remaining;
-      matchingInv.status = order.remaining === 0 ? "paid" : order.paidAmount > 0 ? "partially_paid" : "unpaid";
+      const exchangeRate = Number(order.exchangeRateAtCreation) > 0
+        ? Number(order.exchangeRateAtCreation)
+        : 135;
+
+      matchingInv.totalPriceSYP = Math.round(order.totalPrice);
+      matchingInv.paidAmountSYP = Math.round(order.paidAmount);
+      matchingInv.remainingSYP = Math.round(order.remaining);
+      matchingInv.totalPriceUSD = Number(sypToUsd(order.totalPrice, exchangeRate).toFixed(2));
+      matchingInv.paidAmountUSD = Number(sypToUsd(order.paidAmount, exchangeRate).toFixed(2));
+      matchingInv.remainingUSD = Number(sypToUsd(order.remaining, exchangeRate).toFixed(2));
+
+      // Preserve the invoice's public USD fields as the canonical USD-facing values.
+      matchingInv.totalPrice = matchingInv.totalPriceUSD;
+      matchingInv.paidAmount = matchingInv.paidAmountUSD;
+      matchingInv.remaining = matchingInv.remainingUSD;
+      matchingInv.subtotal = Number(sypToUsd(itemsSubtotal, exchangeRate).toFixed(2));
+      matchingInv.discount = Number(sypToUsd(discountAmt, exchangeRate).toFixed(2));
+      matchingInv.taxPercent = taxRate;
+      matchingInv.exchangeRateAtIssue = Number(matchingInv.exchangeRateAtIssue) > 0
+        ? matchingInv.exchangeRateAtIssue
+        : exchangeRate;
+      matchingInv.status = order.remaining === 0
+        ? "paid"
+        : order.paidAmount > 0
+          ? "partially_paid"
+          : "unpaid";
+
       if (customerId) matchingInv.customerId = customerId;
       if (deliveryDateExpected) matchingInv.dueDate = deliveryDateExpected;
+
+      matchingInv.items = order.items.map((item: OrderItem, idx: number) => {
+        const quantity = Number(item.quantity) || 1;
+        const unitPriceSYP = Math.round(Number(item.unitPrice) || 0);
+        const totalSYP = Math.round(Number(item.totalPrice) || quantity * unitPriceSYP);
+        return {
+          id: item.id || `invitem-${Date.now()}-${idx}`,
+          invoiceId: matchingInv.id,
+          productName: item.productName,
+          quantity,
+          unitPriceSYP,
+          totalSYP,
+          unitPrice: Number(sypToUsd(unitPriceSYP, exchangeRate).toFixed(2)),
+          total: Number(sypToUsd(totalSYP, exchangeRate).toFixed(2)),
+          discount: 0,
+          tax: 0,
+          createdAt: new Date().toISOString(),
+        };
+      });
     }
 
     // 2. Compute detailed financial & operational differences
@@ -155,6 +199,8 @@ export function registerOrderUpdateRoutes(app: express.Express) {
       createdAt: new Date().toISOString()
     });
 
+    await persistMutationWithFastDurability();
+    res.locals.axisPersistScheduled = true;
     res.json(orderForResponse(req, order));
   });
 }
