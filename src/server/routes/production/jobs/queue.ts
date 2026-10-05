@@ -260,8 +260,6 @@ export function registerProductionJobQueueRoutes(app: express.Express) {
       });
     }
 
-    await persistProductionState();
-
     ACTIVITY_LOGS.unshift({
       id: nextActivityLogId(),
       userId: getActorId(req),
