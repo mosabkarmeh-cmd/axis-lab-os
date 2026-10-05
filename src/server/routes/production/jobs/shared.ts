@@ -58,3 +58,7 @@ export function sanitizeProductionJob(job: ProductionJobView, req: express.Reque
 export function sanitizeProductionJobs(jobs: ProductionJobView[], req: express.Request) {
   return jobs.map(job => sanitizeProductionJob(job, req));
 }
+
+export async function persistProductionState(): Promise<void> {
+  await core.persistMutationWithFastDurability();
+}
