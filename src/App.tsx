@@ -155,7 +155,7 @@ const USERS = [
 
 export default function App() {
   // Authentication states
-  const [token, setToken] = useState<string | null>(null);
+  const [sessionActive, setSessionActive] = useState<boolean>(false);
   const [theme, setTheme] = useLocalStorage<"dark" | "light">("axislab_theme", "dark");
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authEmail, setAuthEmail] = useState<string>("admin@axislab.com");
@@ -772,20 +772,16 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     return () => clearInterval(pollInterval);
   }, [currentUser?.id]);
 
-  // Auto-verify saved JWT token on mount
+  // Session restoration is server-verified through the HttpOnly cookie.
   useEffect(() => {
-    const savedToken = localStorage.getItem("axislab_token");
-    if (savedToken) {
-      addTerminalLog("SYSTEM", "استعادة الجلسة: يتم فحص صلاحية رمز JWT المخزن...");
-      fetch("/api/auth/verify", {
-        headers: { "Authorization": `Bearer ${savedToken}` }
-      })
+    addTerminalLog("SYSTEM", "التحقق من جلسة الخادم الحالية...");
+    fetch("/api/auth/verify", { credentials: "include" })
       .then(res => {
-        if (res.ok) return res.json();
-        throw new Error("Expired or invalid");
+        if (!res.ok) throw new Error("No active session");
+        return res.json();
       })
       .then(data => {
-        setToken(savedToken);
+        setSessionActive(true);
         setCurrentUser(data.user);
         if (data.user.role === "accountant") {
           setActiveView("accounting");
@@ -794,43 +790,40 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
         } else {
           setActiveView("dashboard");
         }
-        addTerminalLog("JWT", `مرحباً بعودتك فني ${data.user.fullName}! تم التحقق من سلامة رمز JWT واستعادة الجلسة الآمنة.`);
+        addTerminalLog("AUTH", `تم التحقق من جلسة ${data.user.fullName} عبر HttpOnly cookie.`);
         fetchLogs();
       })
       .catch(() => {
-        addTerminalLog("WARNING", "انتهت صلاحية رمز المصادقة القديم أو تم التلاعب به. يرجى تسجيل الدخول مجدداً.");
-        localStorage.removeItem("axislab_token");
-        document.cookie = "axislab_token=; path=/; max-age=0; SameSite=Lax";
+        setSessionActive(false);
+        setCurrentUser(null);
       });
-    }
-  }, []);
+  }, [addTerminalLog]);
 
   useEffect(() => {
-    if (currentUser?.mustChangePassword && token) {
+    if (currentUser?.mustChangePassword) {
       setFirstRunPasswordCurrent(authPassword || null);
     } else {
       setFirstRunPasswordCurrent(null);
     }
-  }, [currentUser?.mustChangePassword, token, authPassword]);
+  }, [currentUser?.mustChangePassword, authPassword]);
 
   const handleFirstRunPasswordChange = async (currentPassword: string, newPassword: string) => {
-    if (!token) return;
+    if (!currentUser) return;
     setIsFirstRunPasswordLoading(true);
     try {
-      const res = await fetch("/api/auth/change-password", {
+      const data = await apiFetchJson<{ user: User }>("/api/auth/change-password", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ currentPassword, newPassword }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "تعذر تغيير كلمة المرور");
       setCurrentUser(data.user);
       setFirstRunPasswordCurrent(null);
       setAuthError(null);
       addTerminalLog("AUTH", "تم تغيير كلمة مرور المسؤول المؤقتة بنجاح.");
-    } catch (error: any) {
-      setAuthError(error.message);
-      addTerminalLog("ERROR", error.message);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "تعذر تغيير كلمة المرور";
+      setAuthError(message);
+      addTerminalLog("ERROR", message);
     } finally {
       setIsFirstRunPasswordLoading(false);
     }
@@ -852,26 +845,23 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     }
   }, [currentUser, activeView]);
 
-  // Decode JWT on state update
+  // Renderer never receives the JWT. The diagnostic HUD exposes only non-sensitive
+  // session metadata so authentication remains server-owned.
   useEffect(() => {
-    if (token) {
-      try {
-        const parts = token.split(".");
-        if (parts.length === 3) {
-          const payloadDecoded = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
-          setInspectToken({
-            header: { alg: "HS256", typ: "JWT" },
-            payload: payloadDecoded,
-            signature: parts[2]
-          });
-        }
-      } catch (e) {
-        setInspectToken(null);
-      }
+    if (sessionActive && currentUser) {
+      setInspectToken({
+        header: { transport: "HttpOnly cookie", visibility: "server-only" },
+        payload: {
+          userId: currentUser.id,
+          role: currentUser.role,
+          sessionActive: true,
+        },
+        signature: "Not accessible from renderer",
+      });
     } else {
       setInspectToken(null);
     }
-  }, [token]);
+  }, [sessionActive, currentUser]);
 
   // Database fetchers use the shared safe API client from src/lib/api.ts.
   const fetchMachines = async () => {
@@ -1035,7 +1025,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
 
   const { handleLogin, handleRegister, setAuthPreset } = useAuthActions({
     authEmail, authPassword, authFullName, authRole,
-    setToken, setCurrentUser, setAuthError, setIsAuthLoading, setIsRegisterMode,
+    setSessionActive, setCurrentUser, setAuthError, setIsAuthLoading, setIsRegisterMode,
     setActivePreset, setAuthEmail, setAuthPassword, setActiveView,
     addTerminalLog, fetchLogs,
   });
@@ -1047,7 +1037,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
   const [selectedMemoryLayer, setSelectedMemoryLayer] = useState<string>("short_term");
   const {
     terminalLogs, setTerminalLogs, commandInput, setCommandInput, handleTerminalSubmit, executeTerminalCommand,
-  } = useTerminalActions({ currentUser, token, users: USERS, addTerminalLog });
+  } = useTerminalActions({ currentUser, sessionActive, users: USERS, addTerminalLog });
   useEffect(() => {
     terminalBottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [terminalLogs]);
@@ -1150,7 +1140,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     editingOrder, setEditingOrder, editOrderItems,
   });
 
-  const { handleLogout } = useLogoutAction({ setToken, setCurrentUser, addTerminalLog });
+  const { handleLogout } = useLogoutAction({ setSessionActive, setCurrentUser, addTerminalLog });
 
   // Helper to calculate technical order completion progress based on each part/item and material breakdown (حسب تفاصيل كل مادة وعدد القطع والتكرارات)
   const calculateOrderProgress = (ord: any, jobsList: any[] = productionJobs) => {
@@ -2655,7 +2645,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
   // Authenticated Workspace Header & Framework
   return (
     <div id="axis-system" dir="rtl" className={`flex flex-col h-screen w-full bg-[#09090b] text-zinc-300 font-sans overflow-hidden ${theme === "light" ? "theme-light" : ""}`}>
-      <AutoLogoutTimer token={token} onLogout={() => handleLogout(true)} />
+      <AutoLogoutTimer sessionActive={sessionActive} onLogout={() => handleLogout(true)} />
       {firstRunPasswordCurrent && (
         <FirstRunPasswordModal
           initialCurrentPassword={firstRunPasswordCurrent}
