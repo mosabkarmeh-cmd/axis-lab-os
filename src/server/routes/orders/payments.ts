@@ -23,6 +23,11 @@ export function registerOrderPaymentRoutes(app: express.Express) {
   // in persistStateNow. If the durable commit fails, restore every affected
   // collection so the API cannot report a payment that was not persisted.
     app.post("/api/orders/:id/payments", async (req, res) => {
+    const user = core.getRequestUser(req);
+    if (!user || !["admin", "accountant"].includes(user.role)) {
+      res.status(403).json({ success: false, message: "تسجيل الدفعات متاح للإدارة والحسابات فقط" });
+      return;
+    }
     const { amount, currency = "USD", notes, paymentMethod, paymentId } = req.body;
     const order = ORDERS.find(o => o.id === req.params.id);
     if (!order) {
@@ -46,6 +51,11 @@ export function registerOrderPaymentRoutes(app: express.Express) {
   });
   // API - Delete Payment Installment
   app.delete("/api/orders/:orderId/payments/:paymentId", (req, res) => {
+    const user = core.getRequestUser(req);
+    if (!user || !["admin", "accountant"].includes(user.role)) {
+      res.status(403).json({ success: false, message: "حذف الدفعات متاح للإدارة والحسابات فقط" });
+      return;
+    }
     const { orderId, paymentId } = req.params;
 
     const order = ORDERS.find(o => o.id === orderId);
