@@ -28,6 +28,15 @@ if (!aiPricing.includes('getRequestUser') || !aiPricing.includes('403')) fail.pu
 if (!orderResponse.includes('new Set(["employee", "viewer"])')) fail.push('order financial boundary does not include viewer');
 if (!productionShared.includes('user?.role === "employee" || user?.role === "viewer"')) fail.push('production financial boundary does not include viewer');
 
+const pgCustomers = read('src/server/routes/customers.ts');
+const pgProducts = read('src/server/routes/products.ts');
+const pgMaterials = read('src/server/routes/materials/pg/catalog.ts');
+const inventoryRead = read('src/server/routes/materials/inventory/read.ts');
+if (!pgCustomers.includes('sanitizeCustomer(result, req)')) fail.push('PostgreSQL customer mutation response bypasses sanitizer');
+if (!pgProducts.includes('["employee", "viewer"]')) fail.push('PostgreSQL product price boundary does not include viewer');
+if (!pgMaterials.includes('["employee", "viewer"]')) fail.push('PostgreSQL material price boundary does not include viewer');
+if (!inventoryRead.includes('["employee", "viewer"]')) fail.push('inventory valuation boundary does not include viewer');
+
 const server = read('server.ts');
 if (server.includes('path.join(process.cwd(), "Amiri-Regular.ttf")')) fail.push('server has unstable font path');
 if (server.includes('path.join(process.cwd(), "node_modules", "sql.js"')) fail.push('server has unstable wasm path');
