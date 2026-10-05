@@ -32,10 +32,14 @@ const pgCustomers = read('src/server/routes/customers.ts');
 const pgProducts = read('src/server/routes/products.ts');
 const pgMaterials = read('src/server/routes/materials/pg/catalog.ts');
 const inventoryRead = read('src/server/routes/materials/inventory/read.ts');
+const orderPayments = read('src/server/routes/orders/payments.ts');
+const invoicePayments = read('src/server/routes/accounting/invoices/payments.ts');
 if (!pgCustomers.includes('sanitizeCustomer(result, req)')) fail.push('PostgreSQL customer mutation response bypasses sanitizer');
 if (!pgProducts.includes('["employee", "viewer"]')) fail.push('PostgreSQL product price boundary does not include viewer');
 if (!pgMaterials.includes('["employee", "viewer"]')) fail.push('PostgreSQL material price boundary does not include viewer');
 if (!inventoryRead.includes('["employee", "viewer"]')) fail.push('inventory valuation boundary does not include viewer');
+if (!orderPayments.includes('[\"admin\", \"accountant\"]')) fail.push('order payment role boundary missing');
+if (!invoicePayments.includes('[\"admin\", \"accountant\"]')) fail.push('invoice payment role boundary missing');
 
 const server = read('server.ts');
 if (server.includes('path.join(process.cwd(), "Amiri-Regular.ttf")')) fail.push('server has unstable font path');
