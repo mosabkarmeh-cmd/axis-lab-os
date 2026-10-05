@@ -79,6 +79,8 @@ export function handleFastLocalOperationsAction(action: unknown, payload: FastLo
               });
               
               // incomeTrend calculation
+              const user = core.getRequestUser(req);
+              const canViewFinancials = user?.role === "admin" || user?.role === "accountant";
               const totalRevenue = ORDERS.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
               const incomeTrend = totalRevenue > 0 ? `+$${Math.round(totalRevenue * 0.12)} نمو قوي` : "+14.5% نمو معتدل";
               
@@ -99,10 +101,10 @@ export function handleFastLocalOperationsAction(action: unknown, payload: FastLo
               }
               
               res.json({
-                incomeTrend,
+                incomeTrend: canViewFinancials ? incomeTrend : "🔒 المؤشر المالي محجوب عن هذا الحساب",
                 efficiencyRate,
                 bestSellerProduct,
-                expenseAnomaly
+                expenseAnomaly: canViewFinancials ? expenseAnomaly : "🔒 المؤشر المالي محجوب عن هذا الحساب"
               });
               break;
             }
