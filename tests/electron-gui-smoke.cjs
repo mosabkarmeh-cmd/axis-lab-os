@@ -34,8 +34,6 @@ async function main() {
     const fixtureBody = await fixtureResponse.json().catch(() => ({}));
     if (!fixtureResponse.ok) throw new Error("GUI employee session fixture failed: HTTP " + fixtureResponse.status + " body=" + JSON.stringify(fixtureBody));
     if (fixtureBody?.user?.role !== "employee") throw new Error("GUI session fixture did not return an employee user");
-    if (!fixtureBody?.token) throw new Error("GUI session fixture did not return a CI token");
-    await page.evaluate((token) => localStorage.setItem("axislab_token", token), fixtureBody.token);
     const setCookies = typeof fixtureResponse.headers.getSetCookie === "function"
       ? fixtureResponse.headers.getSetCookie()
       : [fixtureResponse.headers.get("set-cookie")].filter(Boolean);
@@ -53,7 +51,7 @@ async function main() {
       sameSite: "Lax"
     }]);
     const verifyBeforeReload = await page.evaluate(async () => {
-      const response = await fetch("/api/auth/verify", { headers: { "Authorization": "Bearer " + localStorage.getItem("axislab_token") } });
+      const response = await fetch("/api/auth/verify");
       return { status: response.status, body: await response.text() };
     });
     if (verifyBeforeReload.status !== 200) throw new Error("GUI token verification before reload failed: " + JSON.stringify(verifyBeforeReload));
@@ -62,7 +60,6 @@ async function main() {
       await page.getByText("الطلبات والعملاء", { exact: false }).first().waitFor();
     } catch (error) {
       console.error("POST-RELOAD URL: " + page.url());
-      console.error("POST-RELOAD TOKEN PRESENT: " + String(await page.evaluate(() => Boolean(localStorage.getItem("axislab_token")))));
       console.error("POST-RELOAD BODY:\n" + (await page.locator("body").innerText()).slice(0, 12000));
       throw error;
     }
