@@ -26,8 +26,24 @@ import { registerSystemRoutes } from "./system.ts";
 const { USE_POSTGRES, getRequestUser } = core;
 
 export async function registerRoutes(app: express.Express) {
-  // Mount PostgreSQL-backed routers only when PostgreSQL mode is active.
-  // Memory mode uses the built-in seeded handlers below and never emits connection errors.
+  // Public authentication/session endpoints and the health endpoint are registered
+  // before the authenticated operational boundary.
+  registerAuthRoutes(app);
+  registerSystemRoutes(app);
+
+  // All operational APIs registered below require an authenticated session.
+  // Mounting PostgreSQL routers only after this boundary prevents unauthenticated access
+  // to database-backed customers/products/materials/production handlers.
+  app.use("/api", (req, res, next) => {
+    const user = getRequestUser(req);
+    if (!user) {
+      res.status(401).json({ success: false, message: "يجب تسجيل الدخول للوصول إلى واجهات النظام" });
+      return;
+    }
+    next();
+  });
+
+  // Mount PostgreSQL-backed routers only after authentication.
   if (USE_POSTGRES) {
     app.use("/api/customers", customersRouter);
     app.use("/api/products", productsRouter);
@@ -102,21 +118,6 @@ export async function registerRoutes(app: express.Express) {
     const allowedViewerWrite = req.path === "/auth/change-password" || req.path.endsWith("/read");
     if (user?.role === "viewer" && ["POST", "PUT", "PATCH", "DELETE"].includes(req.method) && !allowedViewerWrite) {
       res.status(403).json({ success: false, message: "حساب المشاهدة للقراءة فقط ولا يسمح بتعديل البيانات" });
-      return;
-    }
-    next();
-  });
-
-  registerAuthRoutes(app);
-
-  registerSystemRoutes(app);
-
-  // All operational APIs registered below require an authenticated session.
-  // Auth routes and the public health endpoint are registered before this boundary.
-  app.use("/api", (req, res, next) => {
-    const user = getRequestUser(req);
-    if (!user) {
-      res.status(401).json({ success: false, message: "يجب تسجيل الدخول للوصول إلى واجهات النظام" });
       return;
     }
     next();
