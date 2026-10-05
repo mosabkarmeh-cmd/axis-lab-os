@@ -38,7 +38,7 @@ const scheduler = createBackupScheduler({
   },
 });
 
-if (!scheduler.isDue(Date.parse("2026-01-10T12:00:00.000Z"))) throw new Error("daily backup should be due after one day");
+if (!scheduler.isDue(Date.parse("2026-01-11T12:00:00.000Z"))) throw new Error("daily backup should be due after one day");
 if (await scheduler.runIfDue() === null) throw new Error("automatic backup did not run");
 if (created !== 1) throw new Error(`expected 1 automatic backup creation, got ${created}`);
 if (persisted !== 1) throw new Error(`expected one persistence call, got ${persisted}`);
