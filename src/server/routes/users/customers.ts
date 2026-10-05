@@ -124,7 +124,7 @@ app.get("/api/customers", (req, res) => {
     };
 
     CUSTOMERS[index] = updatedCust;
-    res.json(updatedCust);
+    res.json(sanitizeCustomer(updatedCust, req));
   });
 
   // API - Delete Customer
