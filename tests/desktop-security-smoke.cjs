@@ -23,8 +23,8 @@ assert(!/res\.json\(\{\s*token\s*,/.test(authRoutes), "login must not return JWT
 assert(!/res\.json\(\{[^}]*token\s*\}/s.test(authRoutes.match(/app\.post\(["']\/api\/test\/gui-session["'][\s\S]*?\n\s*\}\);/)?.[0] || ""), "GUI test session must not return JWT in JSON");
 assert(/httpOnly:\s*true/.test(authRoutes), "authentication cookie must be HttpOnly");
 assert(/sameSite:\s*["']lax["']/.test(authRoutes), "authentication cookie must define SameSite");
-assert(/getRequestUser(req: express.Request)/.test(auth), "request authentication must use the Express Request type");
-assert(!/getRequestUser(req:\s*any)/.test(auth), "request authentication must not use any");
+assert(/getRequestUser\(req: express\.Request\)/.test(auth), "request authentication must use the Express Request type");
+assert(!/getRequestUser\(req:\s*any\)/.test(auth), "request authentication must not use any");
 
 assert(!/webContents\.executeJavaScript\(/.test(main), "desktop main must not inject arbitrary renderer JavaScript");
 assert(/setWindowOpenHandler/.test(main), "external window handling must be explicitly controlled");
