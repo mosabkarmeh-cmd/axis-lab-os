@@ -28,7 +28,7 @@ const runtimeFiles = walk(path.join(ROOT, "src/server/runtime")).filter(function
   return !["business-state.ts", "core-state.ts", "operational-seeds.ts"].includes(path.basename(file));
 });
 const clientFiles = walk(path.join(ROOT, "src")).filter(function (file) {
-  const rel = path.relative(ROOT, file);
+  const rel = path.relative(ROOT, file).replace(/\\/g, "/");
   if (rel === "src/App.tsx") return false;
   return !file.includes(path.join("src", "server") + path.sep);
 });
