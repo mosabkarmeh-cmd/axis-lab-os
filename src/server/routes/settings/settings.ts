@@ -7,6 +7,37 @@ function getActorId(req: express.Request): string {
   return core.getRequestUser(req)?.id || "system";
 }
 
+function requireAdmin(req: express.Request, res: express.Response): boolean {
+  const user = core.getRequestUser(req);
+  if (!user || user.role !== "admin") {
+    res.status(403).json({ success: false, message: "هذه العملية متاحة لمدير النظام فقط" });
+    return false;
+  }
+  return true;
+}
+
+function requireFinancialSettingsAccess(req: express.Request, res: express.Response): boolean {
+  const user = core.getRequestUser(req);
+  if (!user || !["admin", "accountant"].includes(user.role)) {
+    res.status(403).json({ success: false, message: "لا تملك صلاحية تعديل سعر الصرف" });
+    return false;
+  }
+  return true;
+}
+
+function safeCompanySettings() {
+  const company = SETTINGS.company;
+  return {
+    name: company.name,
+    address: company.address,
+    phone: company.phone,
+    whatsapp: company.whatsapp,
+    email: company.email,
+    instagram: company.instagram,
+    logo: company.logo,
+  };
+}
+
 const {
   SETTINGS,
   ACTIVITY_LOGS,
@@ -48,6 +79,7 @@ app.get("/api/network/info", (req, res) => {
   });
 
   app.put("/api/exchange-rate", (req, res) => {
+    if (!requireFinancialSettingsAccess(req, res)) return;
     const { exchangeRate } = req.body;
     const rate = Number(exchangeRate);
     if (!rate || rate <= 0) {
@@ -59,10 +91,22 @@ app.get("/api/network/info", (req, res) => {
   });
 
   app.get("/api/settings", (req, res) => {
-    res.json({ success: true, settings: publicSettings() });
+    const user = core.getRequestUser(req);
+    if (user?.role === "admin") {
+      res.json({ success: true, settings: publicSettings() });
+      return;
+    }
+    res.json({
+      success: true,
+      settings: {
+        company: safeCompanySettings(),
+        exchangeRate: SETTINGS.exchangeRate,
+      },
+    });
   });
 
   app.put("/api/settings", (req, res) => {
+    if (!requireAdmin(req, res)) return;
     const { company, smtp, pricing, production, inventory, backup, autoArchive, exchangeRate, partnerSharePercent } = req.body;
     if (company) SETTINGS.company = { ...SETTINGS.company, ...company };
     if (smtp) mergeSmtpSettings(smtp);
@@ -111,6 +155,7 @@ app.get("/api/network/info", (req, res) => {
   });
 
   app.post("/api/settings/test-smtp", async (req, res) => {
+    if (!requireAdmin(req, res)) return;
     const { testEmail } = req.body;
     const targetEmail = testEmail || SETTINGS.smtp?.fromEmail || "techs@axislab.com";
 
