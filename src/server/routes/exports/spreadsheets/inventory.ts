@@ -3,11 +3,17 @@ import ExcelJS from "exceljs";
 import * as core from "../../../server-core.ts";
 import { asExportRecord } from "../utils.ts";
 
+function canViewMaterialPricing(req: express.Request): boolean {
+  const role = core.getRequestUser(req)?.role;
+  return role === "admin" || role === "accountant";
+}
+
 const { ORDERS, INVOICES, INVENTORY, CUSTOMERS, MATERIALS } = core;
 
 export function registerInventoryExcelRoute(app: express.Express) {
   app.get("/api/export/inventory/excel", async (req, res) => {
     try {
+      const includePricing = canViewMaterialPricing(req);
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet("تقرير المخزون والمواد");
 
@@ -34,8 +40,8 @@ export function registerInventoryExcelRoute(app: express.Express) {
           color: m.color || "-",
           available: qty,
           minimum: m.minimumStock,
-          price: m.pricePerUnit,
-          totalValue: qty * m.pricePerUnit
+          price: includePricing ? m.pricePerUnit : 0,
+          totalValue: includePricing ? qty * m.pricePerUnit : 0
         });
       });
 
@@ -62,7 +68,7 @@ export function registerInventoryExcelRoute(app: express.Express) {
         available: "",
         minimum: "",
         price: "",
-        totalValue: totalVal
+        totalValue: includePricing ? totalVal : 0
       });
       totalRow.font = { name: "Arial", bold: true };
       totalRow.fill = {
