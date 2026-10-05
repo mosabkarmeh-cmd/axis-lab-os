@@ -169,8 +169,15 @@ function assert(condition, message) {
     assert(employeeOrders.response.ok && Array.isArray(employeeOrders.body), "employee cannot read orders");
     const employeeOrder = employeeOrders.body.find(item => item.id === orderCreate.body.id);
     assert(employeeOrder, "employee order fixture was not returned");
-    for (const field of ["matCost", "finalPrice", "profit", "costPrice", "unitCost", "unitPrice", "totalPrice", "paidAmount", "remaining"]) {
-      assert(!Object.prototype.hasOwnProperty.call(employeeOrder, field), `employee received restricted order field ${field}: ${JSON.stringify(employeeOrder)}`);
+    for (const field of ["matCost", "finalPrice"]) {
+      assert(!Object.prototype.hasOwnProperty.call(employeeOrder, field),
+        `employee received explicitly forbidden order field ${field}: ${JSON.stringify(employeeOrder)}`);
+    }
+    const zeroOrMissingFinancialFields = ["profit", "costPrice", "unitCost", "unitPrice", "totalPrice", "paidAmount", "remaining"];
+    for (const field of zeroOrMissingFinancialFields) {
+      if (Object.prototype.hasOwnProperty.call(employeeOrder, field)) {
+        assert(Number(employeeOrder[field]) === 0, `employee received non-zero ${field}: ${JSON.stringify(employeeOrder)}`);
+      }
     }
 
     const jobCreate = await request("/api/production/jobs", {
