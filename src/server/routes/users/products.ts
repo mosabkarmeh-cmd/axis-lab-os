@@ -16,7 +16,7 @@ const {
 } = core;
 
 function sanitizeProduct<T extends Record<string, unknown>>(product: T, req: express.Request): T {
-  if (getRequestUser(req)?.role !== "employee") return product;
+  if (!["employee", "viewer"].includes(getRequestUser(req)?.role || "")) return product;
   return { ...product, price: 0 } as T;
 }
 
