@@ -2,11 +2,9 @@ import express from "express";
 import { db } from "../../db/index.ts";
 import { machines, productionJobs } from "../../db/schema.ts";
 import { eq } from "drizzle-orm";
-import { getVerifiedRequestUser } from "../auth.ts";
+import { getRequestUser } from "../server-core.ts";
 
 const router = express.Router();
-
-const getRequestUser = getVerifiedRequestUser;
 
 const errorMessage = (err: unknown) => err instanceof Error ? err.message : String(err);
 
