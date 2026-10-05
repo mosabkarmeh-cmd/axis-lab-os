@@ -324,6 +324,10 @@ export function createLocalSqliteRuntime(config: LocalSqliteRuntimeConfig, deps:
     };
   }
 
+  async function deleteSqliteBackup(filePath: string) {
+    await fs.promises.rm(filePath, { recursive: true, force: true });
+  }
+
   async function restoreUploadedFilesFromBackup(filePath: string) {
     const stat = await fs.promises.stat(filePath);
     if (!stat.isDirectory()) return false;
@@ -392,6 +396,7 @@ export function createLocalSqliteRuntime(config: LocalSqliteRuntimeConfig, deps:
     createSqliteBackup,
     inspectSqliteBackup,
     restoreUploadedFilesFromBackup,
+    deleteSqliteBackup,
     uploadDirectory,
     readFinancialTablesFromSqlite,
   };
