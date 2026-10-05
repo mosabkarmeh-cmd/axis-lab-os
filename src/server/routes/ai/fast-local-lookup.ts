@@ -20,6 +20,8 @@ export function handleFastLocalLookupAction(action: unknown, payload: FastLocalP
               ).slice(0, 5);
     
               // Annotate with quick learning analytics from orders history
+              const user = core.getRequestUser(req);
+              const canViewCustomerPrivateData = user?.role === "admin" || user?.role === "accountant";
               const results = matched.map(c => {
                 const customerOrders = ORDERS.filter(o => o.customerId === c.id);
                 const totalPaid = customerOrders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
@@ -46,6 +48,16 @@ export function handleFastLocalLookupAction(action: unknown, payload: FastLocalP
                   }
                 });
     
+                if (!canViewCustomerPrivateData) {
+                  return {
+                    id: c.id,
+                    name: c.name,
+                    company: c.company || "",
+                    ordersCount: customerOrders.length,
+                    lastOrderedProduct: favoriteProduct,
+                  };
+                }
+
                 return {
                   ...c,
                   ordersCount: customerOrders.length,
