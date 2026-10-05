@@ -181,7 +181,7 @@ export async function startServer() {
   // Flush any pending state save on a normal shutdown (Ctrl+C, systemd stop, etc.)
   // so the last few seconds of work aren't lost.
   const gracefulShutdown = async () => {
-    backupScheduler?.stop();
+    await backupScheduler?.stop();
     console.log("[STATE] Shutting down, saving latest data before exit...");
     if (persistTimer) clearTimeout(persistTimer);
     try {
