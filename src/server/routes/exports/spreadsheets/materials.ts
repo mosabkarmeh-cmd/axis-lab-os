@@ -57,7 +57,7 @@ export function registerMaterialsCsvRoute(app: express.Express) {
           min,
           inv?.location || 'المستودع الرئيسي',
           statusText,
-          includePricing ? totalVal
+          includePricing ? totalVal : 0
         ];
       });
 
