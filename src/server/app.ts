@@ -6,6 +6,7 @@ import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
 import * as core from "./server-core.ts";
 import { registerRoutes } from "./routes/index.ts";
+import { createBackupScheduler } from "./runtime/backup-scheduler.ts";
 
 declare global {
   namespace Express {
@@ -29,6 +30,10 @@ const {
   schedulePersist,
   persistStateNow,
   persistTimer,
+  SETTINGS,
+  BACKUPS,
+  createSqliteBackup,
+  deleteSqliteBackup,
 } = core;
 
 export async function startServer() {
@@ -103,6 +108,17 @@ export async function startServer() {
   normalizeLegacyMaterialPrices();
   if (USE_POSTGRES || USE_SQLITE) await persistStateNow();
 
+  const backupScheduler = USE_SQLITE
+    ? createBackupScheduler({
+        settings: SETTINGS,
+        backups: BACKUPS,
+        createBackup: createSqliteBackup,
+        deleteBackup: deleteSqliteBackup,
+        persist: schedulePersist,
+      })
+    : null;
+  backupScheduler?.start();
+
   // Keep the warehouse cache in sync with the real tables on every API request - cheap
   // for a single-workshop's data volume, and means every one of the ~100 read call sites
   // across this file (dashboards, reports, order/production lookups, ...) that use
@@ -165,6 +181,7 @@ export async function startServer() {
   // Flush any pending state save on a normal shutdown (Ctrl+C, systemd stop, etc.)
   // so the last few seconds of work aren't lost.
   const gracefulShutdown = async () => {
+    await backupScheduler?.stop();
     console.log("[STATE] Shutting down, saving latest data before exit...");
     if (persistTimer) clearTimeout(persistTimer);
     try {

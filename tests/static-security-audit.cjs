@@ -19,6 +19,17 @@ if (authBoundaryIndex < 0 || postgresMountIndex < 0 || postgresMountIndex < auth
   fail.push('PostgreSQL routers are mounted before the central authentication boundary');
 }
 if (!index.includes('registerUserRoutes(app, { includeLegacyCustomerProductRoutes: !USE_POSTGRES })')) fail.push('legacy customer/product handlers are not mode-gated');
+const settings = read('src/server/routes/settings/settings.ts');
+const backup = read('src/server/routes/settings/backup.ts');
+const persistence = read('src/server/runtime/state-persistence.ts');const notificationsStatuses = read('src/server/routes/notifications-statuses.ts');
+if (!notificationsStatuses.includes('function requireAdmin(req: express.Request, res: express.Response)')) fail.push('recycle-bin/order-status route admin helper missing');
+if (!notificationsStatuses.includes('if (!requireAdmin(req, res)) return;')) fail.push('recycle-bin/order-status mutation endpoints lack admin boundary');
+
+if (!settings.includes('requireAdmin(req, res)')) fail.push('system settings write path is missing server-side admin authorization');
+if (!settings.includes('requireFinancialSettingsAccess(req, res)')) fail.push('exchange-rate write path is missing admin/accountant authorization');
+if (!settings.includes('user?.role === "admin"')) fail.push('settings read path does not distinguish admin from non-admin users');
+if (!backup.includes('النسخ والاستعادة متاحة لمدير النظام فقط') || !backup.includes('if (!requireAdmin(req, res)) return;')) fail.push('backup/restore APIs are not admin-only on the server');
+if (!persistence.includes('if (deps.useSqlite || deps.usePostgres) throw err;')) fail.push('persisted-state load errors can still fall back to seed data in database-backed mode');
 const system = read('src/server/routes/system.ts');
 const quotation = read('src/server/routes/quotation.ts');
 const aiAdvisor = read('src/server/routes/ai/advisor.ts');

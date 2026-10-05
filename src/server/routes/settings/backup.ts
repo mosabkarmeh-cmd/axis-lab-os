@@ -1,7 +1,6 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
-import multer from "multer";
 import initSqlJs from "sql.js";
 import * as core from "../../server-core.ts";
 
@@ -13,16 +12,25 @@ const {
   flushLocalSqlite,
   USE_SQLITE,
   BACKUPS,
+  FILES,
   ACTIVITY_LOGS,
   nextActivityLogId,
   createSqliteBackup,
-  checksumFile,
   persistStateNow,
   schedulePersist,
 } = core;
 
 function getActorId(req: express.Request): string {
   return core.getRequestUser(req)?.id || "system";
+}
+
+function requireAdmin(req: express.Request, res: express.Response): boolean {
+  const user = core.getRequestUser(req);
+  if (!user || user.role !== "admin") {
+    res.status(403).json({ success: false, message: "النسخ والاستعادة متاحة لمدير النظام فقط" });
+    return false;
+  }
+  return true;
 }
 
 function publicBackup(backup: Record<string, unknown>) {
@@ -32,10 +40,12 @@ function publicBackup(backup: Record<string, unknown>) {
 
 export function registerBackupRoutes(app: express.Express) {
 app.get("/api/backup", (req, res) => {
+    if (!requireAdmin(req, res)) return;
     res.json({ success: true, backups: BACKUPS.map(publicBackup) });
   });
 
   app.post("/api/backup", async (req, res) => {
+    if (!requireAdmin(req, res)) return;
     if (!USE_SQLITE) {
       res.status(501).json({ success: false, message: "النسخ المحلي الفعلي متاح في وضع SQLite فقط." });
       return;
@@ -52,11 +62,12 @@ app.get("/api/backup", (req, res) => {
       schedulePersist();
       res.json({ success: true, backup: publicBackup(newBackup) });
     } catch (error: unknown) {
-      res.status(500).json({ success: false, message: `فشل إنشاء النسخة الاحتياطية: ${error instanceof Error ? error instanceof Error ? error.message : String(error) : String(error)}` });
+      res.status(500).json({ success: false, message: `فشل إنشاء النسخة الاحتياطية: ${error instanceof Error ? error.message : String(error)}` });
     }
   });
 
   app.post("/api/backup/restore/:id", async (req, res) => {
+    if (!requireAdmin(req, res)) return;
     if (!USE_SQLITE) {
       res.status(501).json({ success: false, message: "استعادة SQLite المحلية متاحة في وضع SQLite فقط." });
       return;
@@ -68,27 +79,55 @@ app.get("/api/backup", (req, res) => {
       return;
     }
     try {
-      const actualChecksum = await checksumFile(backupObj.filePath);
-      if (actualChecksum !== backupObj.sha256) {
-        res.status(409).json({ success: false, message: "فشل التحقق من سلامة النسخة الاحتياطية؛ checksum غير مطابق." });
-        return;
-      }
+      const verifiedBackup = await core.inspectSqliteBackup(backupObj.filePath, backupObj.sha256);
       await persistStateNow();
       const safetyBackup = await createSqliteBackup("safety");
-      const SQL = await initSqlJs({ locateFile: (file: string) => process.env.SQLITE_WASM_PATH || path.join(APP_RUNTIME_ROOT, "node_modules", "sql.js", "dist", file) });
-      setLocalSqlite(new SQL.Database(fs.readFileSync(backupObj.filePath)));
-      await loadPersistedState();
-      if (safetyBackup) BACKUPS.unshift(safetyBackup);
-      await refreshWarehouseCache();
-      ACTIVITY_LOGS.unshift({
-        id: nextActivityLogId(), userId: getActorId(req), action: "RESTORE_BACKUP",
-        entityType: "Backup", entityId: id, createdAt: new Date().toISOString()
-      });
-      await flushLocalSqlite();
-      schedulePersist();
-      res.json({ success: true, message: "تم التحقق من النسخة واستعادتها. تم الاحتفاظ بنسخة أمان قبل الاستعادة." });
+      const previousSqlite = core.localSqlite;
+      let restoredSqlite: import("sql.js").Database | null = null;
+      try {
+        const SQL = await initSqlJs({
+          locateFile: (file: string) => process.env.SQLITE_WASM_PATH || path.join(APP_RUNTIME_ROOT, "node_modules", "sql.js", "dist", file)
+        });
+        restoredSqlite = new SQL.Database(fs.readFileSync(verifiedBackup.databaseFile));
+        setLocalSqlite(restoredSqlite);
+        await loadPersistedState();
+
+        if (verifiedBackup.packagePath) {
+          await core.restoreUploadedFilesFromBackup(verifiedBackup.packagePath);
+          const restoredUploadDirectory = core.uploadDirectory();
+          for (const file of FILES) {
+            if (file.name) file.path = path.join(restoredUploadDirectory, path.basename(file.name));
+          }
+        }
+
+        if (safetyBackup) BACKUPS.unshift(safetyBackup);
+        await refreshWarehouseCache();
+        ACTIVITY_LOGS.unshift({
+          id: nextActivityLogId(), userId: getActorId(req), action: "RESTORE_BACKUP",
+          entityType: "Backup", entityId: id, createdAt: new Date().toISOString()
+        });
+        await flushLocalSqlite();
+        schedulePersist();
+
+        if (previousSqlite && previousSqlite !== restoredSqlite) {
+          try { previousSqlite.close(); } catch {}
+        }
+        res.json({ success: true, message: "تم التحقق من النسخة واستعادتها بما فيها ملفات التصميم. تم الاحتفاظ بنسخة أمان قبل الاستعادة." });
+      } catch (restoreError) {
+        setLocalSqlite(previousSqlite);
+        try { await loadPersistedState(); } catch (rollbackError) {
+          console.error("[BACKUP] Failed to reload pre-restore database during rollback:", rollbackError);
+        }
+        if (safetyBackup?.filePath) {
+          try { await core.restoreUploadedFilesFromBackup(safetyBackup.filePath); } catch (rollbackFileError) {
+            console.error("[BACKUP] Failed to rollback uploaded files from safety backup:", rollbackFileError);
+          }
+        }
+        try { restoredSqlite?.close(); } catch {}
+        throw restoreError;
+      }
     } catch (error: unknown) {
-      res.status(500).json({ success: false, message: `فشل استعادة النسخة الاحتياطية: ${error instanceof Error ? error instanceof Error ? error.message : String(error) : String(error)}` });
+      res.status(500).json({ success: false, message: `فشل استعادة النسخة الاحتياطية: ${error instanceof Error ? error.message : String(error)}` });
     }
   });
 

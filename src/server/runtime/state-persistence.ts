@@ -144,7 +144,8 @@ async function loadPersistedState(): Promise<number> {
     }
     return restored;
   } catch (err) {
-    console.error("[STATE] Failed to load persisted app state, starting from built-in seed data:", err);
+    console.error("[STATE] Failed to load persisted app state:", err);
+    if (deps.useSqlite || deps.usePostgres) throw err;
     return 0;
   }
 }

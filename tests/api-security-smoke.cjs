@@ -66,6 +66,13 @@ const waitForHealth = async () => {
   }
   throw new Error(`Server did not become healthy on port ${port}. Logs: ${serverLog}`);
 };
+const backupDatabasePath = (name) => {
+  const backupPath = path.join(tempDir, "backups", name);
+  return fs.existsSync(backupPath) && fs.statSync(backupPath).isDirectory()
+    ? path.join(backupPath, "axis-data.sqlite")
+    : backupPath;
+};
+
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
@@ -257,7 +264,7 @@ const assert = (condition, message) => {
     assert(backup.response.ok && backup.body.backup?.sha256 && !backup.body.backup?.filePath, "Real SQLite backup metadata is invalid or leaks its local path");
     const backupFilesBeforeRestore = fs.readdirSync(path.join(tempDir, "backups")).filter((name) => name.endsWith(".sqlite"));
     const backupContainsOrder = backupFilesBeforeRestore.some((name) => {
-      const backupDb = new SQL.Database(fs.readFileSync(path.join(tempDir, "backups", name)));
+      const backupDb = new SQL.Database(fs.readFileSync(backupDatabasePath(name)));
       const rows = backupDb.exec("SELECT payload FROM local_entities WHERE collection = 'ORDERS' AND entity_id = ?", [orderId]);
       const contains = rows.length > 0 && rows[0].values.length > 0;
       backupDb.close();
@@ -266,7 +273,7 @@ const assert = (condition, message) => {
     assert(backupContainsOrder, `Manual backup did not contain the newly created order ${orderId}: ${JSON.stringify(backupFilesBeforeRestore)}`);
     let backupInvoiceState = [];
     const backupContainsFinancialLedger = backupFilesBeforeRestore.some((name) => {
-      const backupDb = new SQL.Database(fs.readFileSync(path.join(tempDir, "backups", name)));
+      const backupDb = new SQL.Database(fs.readFileSync(backupDatabasePath(name)));
       const invoiceCount = Number(backupDb.exec("SELECT COUNT(*) FROM local_invoices")[0].values[0][0]);
       const invoiceStateRows = backupDb.exec("SELECT id, paid_amount, remaining, payload FROM local_invoices WHERE id = ?", [restoredInvoice.id]);
       if (invoiceStateRows.length) backupInvoiceState.push({ name, row: invoiceStateRows[0].values });
@@ -316,7 +323,7 @@ const assert = (condition, message) => {
     await waitForHealth();
     const recoveredOrders = await request("/api/orders");
     const recoveryCandidates = fs.readdirSync(path.join(tempDir, "backups")).filter((name) => name.endsWith(".sqlite")).map((name) => {
-      const candidateDb = new SQL.Database(fs.readFileSync(path.join(tempDir, "backups", name)));
+      const candidateDb = new SQL.Database(fs.readFileSync(backupDatabasePath(name)));
       const rows = candidateDb.exec("SELECT payload FROM local_entities WHERE collection = 'ORDERS' AND entity_id = ?", [orderId]);
       const hasOrder = rows.length > 0 && rows[0].values.length > 0;
       candidateDb.close();

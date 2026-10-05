@@ -20,6 +20,15 @@ const {
 } = core;
 
 export function registerNotificationsStatusRoutes(app: express.Express) {
+function requireAdmin(req: express.Request, res: express.Response): boolean {
+  const user = getRequestUser(req);
+  if (!user || user.role !== "admin") {
+    res.status(403).json({ success: false, message: "هذه العملية متاحة لمدير النظام فقط" });
+    return false;
+  }
+  return true;
+}
+
   app.get("/api/notifications", (req, res) => {
     res.json({ success: true, notifications: NOTIFICATIONS });
   });
@@ -55,10 +64,12 @@ export function registerNotificationsStatusRoutes(app: express.Express) {
     res.json({ success: true, notification: notif });
   });
   app.get("/api/recycle-bin", (req, res) => {
+    if (!requireAdmin(req, res)) return;
     res.json({ success: true, items: DELETED_ITEMS });
   });
 
   app.post("/api/recycle-bin/restore/:id", async (req, res) => {
+    if (!requireAdmin(req, res)) return;
     const index = DELETED_ITEMS.findIndex(item => item.id === req.params.id);
     if (index === -1) {
       res.status(404).json({ success: false, message: "العنصر غير موجود في سلة المحذوفات" });
@@ -112,6 +123,7 @@ export function registerNotificationsStatusRoutes(app: express.Express) {
   });
 
   app.delete("/api/recycle-bin/permanent/:id", (req, res) => {
+    if (!requireAdmin(req, res)) return;
     const index = DELETED_ITEMS.findIndex(item => item.id === req.params.id);
     if (index === -1) {
       res.status(404).json({ success: false, message: "العنصر غير موجود" });
@@ -125,6 +137,7 @@ export function registerNotificationsStatusRoutes(app: express.Express) {
   });
 
   app.post("/api/order-statuses", (req, res) => {
+    if (!requireAdmin(req, res)) return;
     const { name, color } = req.body;
     if (!name) {
       res.status(400).json({ success: false, message: "الاسم مطلوب" });
@@ -142,6 +155,7 @@ export function registerNotificationsStatusRoutes(app: express.Express) {
   });
 
   app.put("/api/order-statuses/:id", (req, res) => {
+    if (!requireAdmin(req, res)) return;
     const status = ORDER_STATUSES.find(s => s.id === req.params.id);
     if (!status) {
       res.status(404).json({ success: false, message: "الحالة غير موجودة" });
@@ -155,6 +169,7 @@ export function registerNotificationsStatusRoutes(app: express.Express) {
   });
 
   app.delete("/api/order-statuses/:id", (req, res) => {
+    if (!requireAdmin(req, res)) return;
     const index = ORDER_STATUSES.findIndex(s => s.id === req.params.id);
     if (index === -1) {
       res.status(404).json({ success: false, message: "الحالة غير موجودة" });
@@ -169,6 +184,7 @@ export function registerNotificationsStatusRoutes(app: express.Express) {
   });
 
   app.post("/api/order-statuses/reorder", (req, res) => {
+    if (!requireAdmin(req, res)) return;
     const { order } = req.body; // array of status ids
     if (Array.isArray(order)) {
       order.forEach((id: string, idx: number) => {
