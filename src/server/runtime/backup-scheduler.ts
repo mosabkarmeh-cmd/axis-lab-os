@@ -24,7 +24,7 @@ const FREQUENCY_MS: Record<BackupFrequency, number> = {
 
 export function createBackupScheduler(deps: BackupSchedulerDependencies) {
   let timer: ReturnType<typeof setInterval> | null = null;
-  let running = false;
+  let activeRun: Promise<BackupSeed | null> | null = null;
 
   function isDue(now = Date.now()) {
     if (!deps.settings.backup.autoBackup) return false;
@@ -58,23 +58,27 @@ export function createBackupScheduler(deps: BackupSchedulerDependencies) {
     }
   }
 
-  async function runIfDue() {
-    if (running || !isDue()) return null;
-    running = true;
-    try {
-      const backup = await deps.createBackup("auto");
-      if (!backup) return null;
-      deps.backups.unshift(backup);
-      await pruneAutoBackups();
-      await deps.persist();
-      console.log(`[BACKUP] Automatic backup completed: ${backup.id}`);
-      return backup;
-    } catch (error) {
-      console.error("[BACKUP] Automatic backup failed:", error);
-      return null;
-    } finally {
-      running = false;
-    }
+  function runIfDue() {
+    if (activeRun) return activeRun;
+    if (!isDue()) return Promise.resolve(null);
+
+    activeRun = (async () => {
+      try {
+        const backup = await deps.createBackup("auto");
+        if (!backup) return null;
+        deps.backups.unshift(backup);
+        await pruneAutoBackups();
+        await deps.persist();
+        console.log(`[BACKUP] Automatic backup completed: ${backup.id}`);
+        return backup;
+      } catch (error) {
+        console.error("[BACKUP] Automatic backup failed:", error);
+        return null;
+      } finally {
+        activeRun = null;
+      }
+    })();
+    return activeRun;
   }
 
   function start() {
@@ -84,10 +88,12 @@ export function createBackupScheduler(deps: BackupSchedulerDependencies) {
     timer.unref?.();
   }
 
-  function stop() {
-    if (!timer) return;
-    clearInterval(timer);
-    timer = null;
+  async function stop() {
+    if (timer) {
+      clearInterval(timer);
+      timer = null;
+    }
+    if (activeRun) await activeRun;
   }
 
   return {
