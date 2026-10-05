@@ -13,6 +13,9 @@ const {
   nextEntityId,
   createNotification,
   idNum,
+  USE_SQLITE,
+  persistMutationWithFastDurability,
+  getRequestUser,
 } = core;
 
 export function registerImportMasterDataRoutes(app: express.Express) {
@@ -26,6 +29,39 @@ app.post("/api/import/customers", async (req, res) => {
 
     const imported: Array<Record<string, unknown>> = [];
     const errors: string[] = [];
+
+    if (USE_SQLITE) {
+      for (let idx = 0; idx < items.length; idx++) {
+        const it = items[idx] && typeof items[idx] === "object" ? items[idx] as Record<string, unknown> : {};
+        const name = String(it.name || "").trim();
+        if (!name) {
+          errors.push(`السطر ${idx + 1}: حقل الاسم مطلوب`);
+          continue;
+        }
+        if (CUSTOMERS.some(customer => customer.name.trim().toLowerCase() === name.toLowerCase())) {
+          errors.push(`السطر ${idx + 1}: العميل موجود مسبقًا`);
+          continue;
+        }
+        const newCust = {
+          id: nextEntityId("c"),
+          name,
+          phone: it.phone ? String(it.phone) : "",
+          whatsapp: it.whatsapp ? String(it.whatsapp) : (it.phone ? String(it.phone) : ""),
+          email: it.email ? String(it.email) : "",
+          company: it.company ? String(it.company) : "أفراد",
+          address: it.address ? String(it.address) : "",
+          notes: it.notes ? String(it.notes) : "",
+          category: it.category ? String(it.category) : "شركة",
+        };
+        CUSTOMERS.push(newCust);
+        imported.push(newCust);
+      }
+      if (imported.length > 0) {
+        createNotification("استيراد عملاء جماعي", `تم استيراد عدد ${imported.length} عملاء بنجاح من ملف بيانات خارجي.`, "system");
+      }
+      await persistMutationWithFastDurability();
+      return res.json({ success: true, count: imported.length, imported, errors });
+    }
 
     for (let idx = 0; idx < items.length; idx++) {
       const it = items[idx] && typeof items[idx] === "object" ? items[idx] as Record<string, unknown> : {};
@@ -75,6 +111,38 @@ app.post("/api/import/customers", async (req, res) => {
     const imported: unknown[] = [];
     const errors: string[] = [];
 
+    if (USE_SQLITE) {
+      for (let idx = 0; idx < items.length; idx++) {
+        const it = items[idx] && typeof items[idx] === "object" ? items[idx] as Record<string, unknown> : {};
+        const name = String(it.name || "").trim();
+        const price = Number(it.price);
+        if (!name || !Number.isFinite(price) || price < 0) {
+          errors.push(`السطر ${idx + 1}: الاسم والسعر مطلوبان`);
+          continue;
+        }
+        if (PRODUCTS.some(product => product.name.trim().toLowerCase() === name.toLowerCase() || product.code === String(it.code || ""))) {
+          errors.push(`السطر ${idx + 1}: المنتج أو كوده موجود مسبقًا`);
+          continue;
+        }
+        const newProd = {
+          id: nextEntityId("p"),
+          name,
+          code: it.code ? String(it.code) : `PRD-${Date.now().toString().slice(-4)}-${idx}`,
+          category: it.category ? String(it.category) : "عام",
+          price,
+          description: it.description ? String(it.description) : "",
+          stock: Number(it.stock) || 0,
+        };
+        PRODUCTS.push(newProd);
+        imported.push(newProd);
+      }
+      if (imported.length > 0) {
+        createNotification("استيراد منتجات جماعي", `تم استيراد عدد ${imported.length} منتجات وموديلات جديدة إلى مكتبة التصاميم.`, "system");
+      }
+      await persistMutationWithFastDurability();
+      return res.json({ success: true, count: imported.length, imported, errors });
+    }
+
     for (let idx = 0; idx < items.length; idx++) {
       const it = items[idx] && typeof items[idx] === "object" ? items[idx] as Record<string, unknown> : {};
       if (!it.name || !it.price) {
@@ -121,6 +189,62 @@ app.post("/api/import/customers", async (req, res) => {
 
     const imported: unknown[] = [];
     const errors: string[] = [];
+
+    if (USE_SQLITE) {
+      for (let idx = 0; idx < items.length; idx++) {
+        const it = items[idx] && typeof items[idx] === "object" ? items[idx] as Record<string, unknown> : {};
+        const name = String(it.name || "").trim();
+        const code = String(it.code || "").trim();
+        const pricePerUnit = Number(it.pricePerUnit);
+        const duplicateName = MATERIALS.some(material => String(material.name || "").trim().toLowerCase() === name.toLowerCase());
+        const duplicateCode = code && MATERIALS.some(material => String(material.notes || "").match(/كود المادة:\s*([^|]+)/)?.[1]?.trim().toLowerCase() === code.toLowerCase());
+        if (!name || !Number.isFinite(pricePerUnit) || pricePerUnit < 0) {
+          errors.push(`السطر ${idx + 1}: الاسم وسعر المفرد الصحيح مطلوبان`);
+          continue;
+        }
+        if (duplicateName || duplicateCode) {
+          errors.push(`السطر ${idx + 1}: المادة أو كودها موجود مسبقًا`);
+          continue;
+        }
+        const materialId = nextEntityId("m");
+        const inventoryId = nextEntityId("inv");
+        const stock = Math.max(0, Number(it.stock) || 0);
+        const newMat = {
+          id: materialId,
+          name,
+          category: it.category ? String(it.category) : "عام",
+          subCategory: it.subCategory ? String(it.subCategory) : "general",
+          thickness: Number(it.thickness) || 0,
+          color: it.color ? String(it.color) : "natural",
+          width: Number(it.width) || 1220,
+          height: Number(it.height) || 2440,
+          unit: it.unit ? String(it.unit) : "sheet",
+          pricePerUnit,
+          minimumStock: Number(it.minimumStock) || 5,
+          supplierId: it.supplierId ? String(it.supplierId) : null,
+          notes: [code ? `كود المادة: ${code}` : "", it.notes ? String(it.notes) : ""].filter(Boolean).join(" | "),
+          status: "active",
+          qualityStatus: it.qualityStatus ? String(it.qualityStatus) : "inspected",
+          createdAt: new Date().toISOString(),
+        };
+        const newInv = {
+          id: inventoryId,
+          materialId,
+          quantity: stock,
+          reservedQuantity: 0,
+          availableQuantity: stock,
+          location: it.location ? String(it.location) : "المستودع الرئيسي",
+        };
+        MATERIALS.push(newMat);
+        INVENTORY.push(newInv);
+        imported.push(newMat);
+      }
+      if (imported.length > 0) {
+        createNotification("استيراد خامات ومواد", `تم استيراد عدد ${imported.length} خامات ومواد جديدة لدفتر المخزون والمستودع.`, "inventory");
+      }
+      await persistMutationWithFastDurability();
+      return res.json({ success: true, count: imported.length, imported, errors });
+    }
 
     for (let idx = 0; idx < items.length; idx++) {
       const it = items[idx] && typeof items[idx] === "object" ? items[idx] as Record<string, unknown> : {};
