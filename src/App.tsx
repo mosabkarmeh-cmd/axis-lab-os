@@ -749,8 +749,10 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
   });
   const laserUtilizationPercent = Math.min(100, Math.max(0, Math.round(65 + (laserMachines.length > 0 ? (runningLasersCount / laserMachines.length) * 20 : 0) + Math.min(todayLaserJobs.length * 4, 15))));
 
-  // Load initial data from memory endpoints
+  // Load initial data only after the server has restored and verified the current session.
+  // This avoids first-mount 401s racing the HttpOnly cookie session restoration.
   useEffect(() => {
+    if (!sessionActive || !currentUser) return;
     fetchCustomers();
     fetchProducts();
     fetchOrders();
@@ -761,7 +763,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
     fetchNotifications();
     fetchRecycleBin();
     fetchOrderStatuses();
-  }, []);
+  }, [currentUser?.id, sessionActive]);
 
   // One coordinated LAN sync keeps all clients consistent without overlapping requests.
   useEffect(() => {
