@@ -13,6 +13,7 @@ import {
   machines,
   productionJobs,
   sanitizeProductionJob,
+  persistProductionState,
 } from "./shared.ts";
 
 const {
@@ -236,6 +237,8 @@ app.post("/api/production/jobs/:id/complete", async (req, res) => {
       entityId: job.id,
       createdAt: new Date().toISOString(),
     });
+
+    await persistProductionState();
 
     sendProductionJobEmailNotification(
       job,
