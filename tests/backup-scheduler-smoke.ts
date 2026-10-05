@@ -1,6 +1,7 @@
 import { createBackupScheduler } from "../src/server/runtime/backup-scheduler.ts";
+import type { BackupSeed } from "../src/server/runtime/operational-seeds.ts";
 
-const backups = [
+const backups: BackupSeed[] = [
   { id: "auto-old", name: "old", createdAt: "2026-01-01T00:00:00.000Z", status: "completed", kind: "auto", filePath: "/tmp/auto-old" },
   { id: "auto-newer", name: "newer", createdAt: "2026-01-10T00:00:00.000Z", status: "completed", kind: "auto", filePath: "/tmp/auto-newer" },
   { id: "manual-keep", name: "manual", createdAt: "2026-01-10T00:00:00.000Z", status: "completed", kind: "manual", filePath: "/tmp/manual" },
