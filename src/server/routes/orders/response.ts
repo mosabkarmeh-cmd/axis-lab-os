@@ -2,6 +2,7 @@ import express from "express";
 import * as core from "../../server-core.ts";
 
 const { getRequestUser } = core;
+const FINANCIAL_RESTRICTED_ROLES = new Set(["employee", "viewer"]);
 
 const EMPLOYEE_HIDDEN_FIELDS = new Set([
   "matCost", "finalPrice", "profit", "profitPercent", "costPrice", "unitCost",
@@ -35,11 +36,11 @@ function sanitizeForEmployee(value: unknown): unknown {
 }
 
 export function orderForResponse(req: express.Request, order: unknown): unknown {
-  return getRequestUser(req)?.role === "employee" ? sanitizeForEmployee(order) : order;
+  return FINANCIAL_RESTRICTED_ROLES.has(getRequestUser(req)?.role || "") ? sanitizeForEmployee(order) : order;
 }
 
 export function ordersForResponse(req: express.Request, orders: unknown[]): unknown[] {
-  return getRequestUser(req)?.role === "employee"
+  return FINANCIAL_RESTRICTED_ROLES.has(getRequestUser(req)?.role || "")
     ? orders.map(order => sanitizeForEmployee(order))
     : orders;
 }
