@@ -7,7 +7,7 @@ import * as core from "../../../server-core.ts";
 const { getRequestUser } = core;
 
 function sanitizeMaterialResponse<T extends Record<string, unknown>>(material: T, req: express.Request): T {
-  if (getRequestUser(req)?.role !== "employee") return material;
+  if (!["employee", "viewer"].includes(getRequestUser(req)?.role || "")) return material;
   return { ...material, pricePerUnit: 0 } as T;
 }
 
