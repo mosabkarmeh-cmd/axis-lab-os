@@ -3,14 +3,32 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const initSqlJs = require("sql.js");
+const net = require("node:net");
 
 const root = process.cwd();
-const port = 49700 + Math.floor(Math.random() * 200);
-const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "axis-payload-corruption-"));
-const dataFile = path.join(tempDir, "axis-data.sqlite");
+let port;
+let tempDir;
+let dataFile;
 
 let server;
 let logs = "";
+
+async function allocateFreePort() {
+  return new Promise((resolve, reject) => {
+    const probe = net.createServer();
+    probe.unref();
+    probe.once("error", reject);
+    probe.listen(0, "127.0.0.1", () => {
+      const address = probe.address();
+      const assigned = address && typeof address === "object" ? address.port : null;
+      probe.close(error => {
+        if (error) reject(error);
+        else if (!assigned) reject(new Error("Could not allocate a free TCP port"));
+        else resolve(assigned);
+      });
+    });
+  });
+}
 
 function start() {
   server = spawn(process.execPath, [path.resolve("dist/server.cjs")], {
@@ -78,6 +96,9 @@ function assert(condition, message) {
 
 (async () => {
   try {
+    port = await allocateFreePort();
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "axis-payload-corruption-"));
+    dataFile = path.join(tempDir, "axis-data.sqlite");
     start();
     assert(await waitForHealth(), `initial server did not become healthy:\n${logs}`);
     await stop();
