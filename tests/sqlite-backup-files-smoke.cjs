@@ -117,7 +117,9 @@ function assert(condition, message) {
     const uploadBody = await uploadResponse.json();
     assert(uploadResponse.ok && uploadBody.file?.id, `upload failed: ${JSON.stringify(uploadBody)}`);
     const uploadedFile = uploadBody.file;
-    assert(fs.existsSync(uploadedFile.path), "uploaded file was not written to disk");
+    assert(!Object.prototype.hasOwnProperty.call(uploadedFile, "path"), "upload response leaked its server filesystem path");
+    const uploadedFilePath = path.join(tempDir, "uploads", uploadedFile.name);
+    assert(fs.existsSync(uploadedFilePath), "uploaded file was not written to disk");
 
     const backupResponse = await request("/api/backup", { method: "POST", body: JSON.stringify({}) });
     const backupBody = await backupResponse.json();
@@ -132,7 +134,7 @@ function assert(condition, message) {
 
     const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
     assert(manifest.formatVersion === 1, `unexpected backup format: ${JSON.stringify(manifest)}`);
-    const normalizedUpload = uploadedFile.path.split(path.sep).slice(-1)[0];
+    const normalizedUpload = uploadedFilePath.split(path.sep).slice(-1)[0];
     const manifestUpload = manifest.uploads.find(item => item.path.endsWith(normalizedUpload));
     assert(manifestUpload, `uploaded file was not indexed in backup manifest: ${JSON.stringify(manifest.uploads)}`);
     const backedUpUploadPath = path.join(backupPackage, "uploads", ...manifestUpload.path.split("/"));
@@ -141,13 +143,13 @@ function assert(condition, message) {
 
     const deleteResponse = await request(`/api/files/${uploadedFile.id}`, { method: "DELETE" });
     assert(deleteResponse.ok, `file delete failed: ${await deleteResponse.text()}`);
-    assert(!fs.existsSync(uploadedFile.path), "uploaded file still exists after delete");
+    assert(!fs.existsSync(uploadedFilePath), "uploaded file still exists after delete");
 
     const restoreResponse = await request(`/api/backup/restore/${backupBody.backup.id}`, { method: "POST", body: JSON.stringify({}) });
     const restoreBody = await restoreResponse.json();
     assert(restoreResponse.ok, `restore failed: ${JSON.stringify(restoreBody)}`);
-    assert(fs.existsSync(uploadedFile.path), "restore did not recreate uploaded file");
-    assert(fs.readFileSync(uploadedFile.path).equals(originalContent), "restored uploaded file content changed");
+    assert(fs.existsSync(uploadedFilePath), "restore did not recreate uploaded file");
+    assert(fs.readFileSync(uploadedFilePath).equals(originalContent), "restored uploaded file content changed");
 
     const restoredFilesResponse = await request("/api/files/entity/order/ord-backup-test");
     const restoredFilesBody = await restoredFilesResponse.json();
