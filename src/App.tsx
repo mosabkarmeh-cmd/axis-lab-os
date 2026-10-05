@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { safeApiFetch } from "./lib/api";
+import { safeApiFetch, apiFetchJson } from "./lib/api";
 import { useLocalStorage } from "./hooks/useLocalStorage";
 import { useOrderFilters } from "./hooks/useOrderFilters";
 import { useCurrencyCalculator } from "./hooks/useCurrencyCalculator";
@@ -777,7 +777,6 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
 
   // Session restoration is server-verified through the HttpOnly cookie.
   useEffect(() => {
-    addTerminalLog("SYSTEM", "التحقق من جلسة الخادم الحالية...");
     fetch("/api/auth/verify", { credentials: "include" })
       .then(res => {
         if (!res.ok) throw new Error("No active session");
@@ -800,7 +799,7 @@ ${compInstagram ? `📸 إنستغرام الورشة: ${compInstagram}\n` : ''}
         setSessionActive(false);
         setCurrentUser(null);
       });
-  }, [addTerminalLog]);
+  }, []);
 
   useEffect(() => {
     if (currentUser?.mustChangePassword) {
