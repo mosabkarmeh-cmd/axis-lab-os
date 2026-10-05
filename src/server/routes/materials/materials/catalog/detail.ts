@@ -43,4 +43,3 @@ app.get("/api/materials/:id", (req, res) => {
     res.json({ success: true, material: sanitizeMaterialForEmployee(detail, req) });
   });
 }
-}
