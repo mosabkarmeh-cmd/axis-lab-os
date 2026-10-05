@@ -3,7 +3,20 @@ import fs from "fs";
 import PDFDocument from "pdfkit";
 import * as core from "../server-core.ts";
 
-const { ORDERS, CUSTOMERS, RESOURCE_FONT_PATH } = core;
+const { ORDERS, CUSTOMERS, RESOURCE_FONT_PATH, getRequestUser } = core;
+
+function requireQuotationAccess(req: express.Request, res: express.Response): boolean {
+  const user = getRequestUser(req);
+  if (!user) {
+    res.status(401).json({ success: false, message: "يجب تسجيل الدخول" });
+    return false;
+  }
+  if (!["admin", "accountant"].includes(user.role)) {
+    res.status(403).json({ success: false, message: "عروض الأسعار محجوبة عن حساب الموظف" });
+    return false;
+  }
+  return true;
+}
 
 function reverseArabicLine(value: string): string {
   return value.split("\n").map(line => line.split(" ").reverse().join(" ")).join("\n");
@@ -33,6 +46,7 @@ function asQuotationItem(value: unknown): QuotationItem {
 
 export function registerQuotationRoutes(app: express.Express) {
   app.get("/api/print/quotation/:id", async (req, res) => {
+    if (!requireQuotationAccess(req, res)) return;
     try {
       const orderId = req.params.id;
       const order = ORDERS.find(o => o.id === orderId);
@@ -148,6 +162,7 @@ export function registerQuotationRoutes(app: express.Express) {
   });
 
   app.get("/api/orders/:id/quotation/pdf", async (req, res) => {
+    if (!requireQuotationAccess(req, res)) return;
     res.redirect(`/api/print/quotation/${req.params.id}`);
   });
 
