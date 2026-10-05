@@ -17,11 +17,24 @@ export function registerOrderUpdateRoutes(app: express.Express) {
   // API - Update Order (Edit details)
   app.put("/api/orders/:id", async (req, res) => {
     const { notes, priority, items, paidAmount, customerId, deliveryDateExpected, taxPercent, discount } = req.body;
+    const user = core.getRequestUser(req);
     const order = ORDERS.find(o => o.id === req.params.id);
     if (!order) {
       res.status(404).json({ error: "الطلب غير موجود" });
       return;
     }
+
+    if (
+      user?.role === "employee" &&
+      (items !== undefined || paidAmount !== undefined || taxPercent !== undefined || discount !== undefined)
+    ) {
+      res.status(403).json({
+        success: false,
+        message: "الموظف مخول بالتعديلات التشغيلية فقط ولا يمكنه تعديل بنود الطلب أو أي قيمة مالية.",
+      });
+      return;
+    }
+
     if (order.currencyFinalizedAt && (items !== undefined || paidAmount !== undefined || taxPercent !== undefined || discount !== undefined)) {
       res.status(409).json({ error: "الطلب نهائي ومثبت مالياً؛ لا يمكن تعديل البنود أو المبالغ بعد التسليم الكامل." });
       return;
