@@ -16,14 +16,27 @@ for (const match of core.matchAll(/\bexport\s*\{([^}]+)\}/gs)) {
 }
 
 const routeDir = path.join(root, "src/server/routes");
-for (const name of fs.readdirSync(routeDir).filter((n) => n.endsWith(".ts") && n !== "index.ts")) {
-  const source = read(path.join("src/server/routes", name));
-  const match = source.match(/\b(?:const|let|var)\s*\{([\s\S]*?)\}\s*=\s*core\s*;/);
-  if (!match) continue;
-  for (const part of match[1].split(",")) {
-    const local = part.trim().split("=")[0].trim();
-    if (/^[A-Za-z_$][\w$]*$/.test(local) && !exported.has(local)) {
-      fail(`${name} depends on non-exported server-core symbol: ${local}`);
+const routeFiles = [];
+const walkRoutes = (dir) => {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (["node_modules", ".git", "dist"].includes(entry.name)) continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) walkRoutes(full);
+    else if (entry.name.endsWith(".ts")) routeFiles.push(full);
+  }
+};
+walkRoutes(routeDir);
+
+for (const fullPath of routeFiles) {
+  const source = fs.readFileSync(fullPath, "utf8");
+  const rel = path.relative(root, fullPath);
+  const matches = source.matchAll(/\b(?:const|let|var)\s*\{([\s\S]*?)\}\s*=\s*core\s*;/g);
+  for (const match of matches) {
+    for (const part of match[1].split(",")) {
+      const local = part.trim().split("=")[0].trim();
+      if (/^[A-Za-z_$][\w$]*$/.test(local) && !exported.has(local)) {
+        fail(`${rel} depends on non-exported server-core symbol: ${local}`);
+      }
     }
   }
 }
