@@ -1,3 +1,17 @@
+import * as core from "../../../server-core.ts";
+import type { PaymentRecord } from "./shared.ts";
+
+const {
+  ORDERS,
+  INVOICES,
+  ACTIVITY_LOGS,
+  nextActivityLogId,
+  SETTINGS,
+} = core;
+
+type OrderRecord = (typeof ORDERS)[number];
+type InvoiceRecord = (typeof INVOICES)[number];
+
 export function applyPayment(params: {
   order: OrderRecord | null;
   inv: InvoiceRecord | null;
