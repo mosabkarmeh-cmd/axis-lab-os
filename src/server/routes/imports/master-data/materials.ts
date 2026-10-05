@@ -162,4 +162,3 @@ export function registerImportMaterialRoutes(app: express.Express) {
     res.json({ success: true, count: imported.length, imported, errors });
   });
 }
-}
