@@ -11,7 +11,6 @@ const {
   ACTIVITY_LOGS,
   nextActivityLogId,
   DELETED_ITEMS,
-  LOCAL_DATA_FILE,
   persistMutationWithFastDurability,
   uploadDirectory: getUploadDirectory,
 } = core;
