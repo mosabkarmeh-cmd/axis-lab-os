@@ -192,6 +192,15 @@ function assert(condition, message) {
     });
     assert(pricing.response.status === 403, `employee pricing was not blocked: ${pricing.response.status}`);
 
+    const aiChat = await employeeRequest("/api/ai/chat", {
+      method: "POST",
+      body: JSON.stringify({ message: "كم الإيرادات والأرباح والديون؟" }),
+    });
+    assert(aiChat.response.ok, `employee AI chat failed: ${JSON.stringify(aiChat.body)}`);
+    const aiText = String(aiChat.body.text || "");
+    assert(!/\$\s*\d|(?:إيرادات|أرباح|ديون|تكلف(?:ة|تها)|مدفوع(?:ات)?).{0,30}\d/i.test(aiText),
+      `employee AI disclosed a financial figure: ${aiText}`);
+
     const accounting = await employeeRequest("/api/accounting/invoices");
     assert(accounting.response.status === 403, `employee accounting access was not blocked: ${accounting.response.status}`);
 
