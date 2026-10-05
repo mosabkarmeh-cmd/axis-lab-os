@@ -46,7 +46,7 @@ export function registerOrderUpdateRoutes(app: express.Express) {
     if (notes !== undefined) order.notes = notes;
     if (deliveryDateExpected) order.deliveryDateExpected = deliveryDateExpected;
     if (paidAmount !== undefined) {
-      order.paidAmount = Number(paidAmount) || 0;
+      order.paidAmount = Math.max(0, Number(paidAmount) || 0);
     }
 
     if (taxPercent !== undefined) order.taxPercent = Number(taxPercent) || 0;
@@ -74,7 +74,7 @@ export function registerOrderUpdateRoutes(app: express.Express) {
     const taxRate = order.taxPercent !== undefined ? order.taxPercent : 0;
     const discountAmt = order.discount !== undefined ? order.discount : 0;
     order.totalPrice = Math.max(0, itemsSubtotal + (itemsSubtotal * (taxRate / 100)) - discountAmt);
-
+    order.paidAmount = Math.min(order.paidAmount, order.totalPrice);
     order.remaining = Math.max(0, order.totalPrice - order.paidAmount);
 
     // Sync matching Invoice
