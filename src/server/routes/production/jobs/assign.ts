@@ -26,7 +26,7 @@ const {
 } = core;
 
 export function registerProductionAssignRoute(app: express.Express) {
-app.post("/api/production/jobs/:id/assign", (req, res) => {
+app.post("/api/production/jobs/:id/assign", async (req, res) => {
     const { id } = req.params;
     const { machineId, operatorId } = req.body;
     const job = productionJobs.find(item => item.id === id);
