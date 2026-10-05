@@ -3,12 +3,18 @@ import ExcelJS from "exceljs";
 import * as core from "../../../server-core.ts";
 import { asExportRecord } from "../utils.ts";
 
+function canViewMaterialPricing(req: express.Request): boolean {
+  const role = core.getRequestUser(req)?.role;
+  return role === "admin" || role === "accountant";
+}
+
 const { ORDERS, INVOICES, INVENTORY, CUSTOMERS, MATERIALS } = core;
 
 export function registerMaterialsCsvRoute(app: express.Express) {
   app.get("/api/export/materials/csv", async (req, res) => {
     try {
       const mats = MATERIALS;
+      const includePricing = canViewMaterialPricing(req);
 
       const headers = [
         "كود المادة",
@@ -44,14 +50,14 @@ export function registerMaterialsCsvRoute(app: express.Express) {
           m.thickness || '-',
           m.color || '-',
           quality,
-          priceSYP,
+          includePricing ? priceSYP : 0,
           qty,
           m.unit || 'وحدة',
           reserved,
           min,
           inv?.location || 'المستودع الرئيسي',
           statusText,
-          totalVal
+          includePricing ? totalVal
         ];
       });
 
