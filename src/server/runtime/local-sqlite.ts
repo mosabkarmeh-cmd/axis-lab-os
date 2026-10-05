@@ -264,7 +264,7 @@ export function createLocalSqliteRuntime(config: LocalSqliteRuntimeConfig, deps:
     return { isPackage, packagePath: isPackage ? filePath : null, databaseFile, manifest };
   }
 
-  async function createSqliteBackup(kind = "manual") {
+  async function createSqliteBackup(kind: "manual" | "safety" | "auto" = "manual") {
     if (!useSqlite) return null;
     await deps.persistStateNow();
     await flushLocalSqlite();
