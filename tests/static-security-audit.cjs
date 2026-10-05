@@ -12,6 +12,22 @@ if (auth.includes('localStorage.setItem("axislab_token"')) fail.push('renderer p
 if (auth.includes('document.cookie = `axislab_token=${data.token}')) fail.push('renderer writes auth cookie directly');
 if (/initialPassword\s*=\s*['"]12345['"]/.test(desktop)) fail.push('default bootstrap password remains hardcoded');
 if (install.includes('admin@axislab.com / admin123') || install.includes('employee@axislab.com / employee123')) fail.push('installer docs expose obsolete default credentials');
+const index = read('src/server/routes/index.ts');
+const system = read('src/server/routes/system.ts');
+const quotation = read('src/server/routes/quotation.ts');
+const aiAdvisor = read('src/server/routes/ai/advisor.ts');
+const aiPricing = read('src/server/routes/ai/fast-local-pricing.ts');
+const orderResponse = read('src/server/routes/orders/response.ts');
+const productionShared = read('src/server/routes/production/jobs/shared.ts');
+if (!index.includes('app.use("/api", (req, res, next)')) fail.push('operational API auth boundary missing');
+if (!index.includes('registerProductionLegacyRoutes(app, { includeMachines: !USE_POSTGRES })')) fail.push('PostgreSQL production machine route ownership guard missing');
+if (!system.includes('user.role !== "admin"') || !system.includes('سجل النشاط الداخلي')) fail.push('activity logs are not admin-only');
+if (!quotation.includes('requireQuotationAccess') || !quotation.includes('!["admin", "accountant"].includes(user.role)')) fail.push('quotation pricing access guard missing');
+if (!aiAdvisor.includes('getAiAccessScope') || !aiAdvisor.includes('access.canUsePricingTools')) fail.push('AI order advisor pricing access guard missing');
+if (!aiPricing.includes('getRequestUser') || !aiPricing.includes('403')) fail.push('fast-local pricing access guard missing');
+if (!orderResponse.includes('new Set(["employee", "viewer"])')) fail.push('order financial boundary does not include viewer');
+if (!productionShared.includes('user?.role === "employee" || user?.role === "viewer"')) fail.push('production financial boundary does not include viewer');
+
 const server = read('server.ts');
 if (server.includes('path.join(process.cwd(), "Amiri-Regular.ttf")')) fail.push('server has unstable font path');
 if (server.includes('path.join(process.cwd(), "node_modules", "sql.js"')) fail.push('server has unstable wasm path');
