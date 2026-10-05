@@ -29,7 +29,7 @@ export function registerCustomersCsvRoute(app: express.Express) {
           includePrivateCustomerData ? (c.address || "") : "🔒 محجوب",
           cOrders.length,
           totalSpent,
-          asExportRecord(c).notes || ""
+          includePrivateCustomerData ? (asExportRecord(c).notes || "") : "🔒 محجوب"
         ];
       });
 
