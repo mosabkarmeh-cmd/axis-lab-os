@@ -218,7 +218,7 @@ app.post("/api/inventory/:materialId/update", async (req, res) => {
         referenceType: "order",
         referenceId: referenceId || null,
         reason: "إلغاء حجز مواد",
-        createdById: "system",
+        createdById: getActorId(req),
         createdAt: new Date().toISOString()
       };
       INVENTORY_TRANSACTIONS.push(newTx);
@@ -230,5 +230,4 @@ app.post("/api/inventory/:materialId/update", async (req, res) => {
       res.status(500).json({ success: false, message: "فشل إلغاء حجز المخزون: " + (err instanceof Error ? err.message : String(err)) });
     }
   });
-}
 }
