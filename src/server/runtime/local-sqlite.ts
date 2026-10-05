@@ -97,10 +97,7 @@ export function createLocalSqliteRuntime(config: LocalSqliteRuntimeConfig, deps:
           .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
         for (const candidate of candidates) {
           try {
-            const candidateStat = fs.statSync(candidate);
-            const inspected = candidateStat.isDirectory()
-              ? await inspectSqliteBackup(candidate)
-              : await inspectSqliteBackup(candidate);
+            const inspected = await inspectSqliteBackup(candidate);
             bytes = fs.readFileSync(inspected.databaseFile);
             localSqlite = openDatabase(bytes);
             recoveredFrom = candidate;
