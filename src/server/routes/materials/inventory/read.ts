@@ -39,12 +39,12 @@ app.get("/api/inventory/transactions", (req, res) => {
       if (avail <= 0) outOfStock++;
     });
 
-    const isEmployee = getRequestUser(req)?.role === "employee";
+    const isRestricted = ["employee", "viewer"].includes(getRequestUser(req)?.role || "");
     res.json({
       success: true,
       stats: {
         totalMaterials,
-        totalValue: isEmployee ? 0 : totalValue,
+        totalValue: isRestricted ? 0 : totalValue,
         lowStock,
         outOfStock,
       },
