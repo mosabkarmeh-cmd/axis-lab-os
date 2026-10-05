@@ -36,7 +36,8 @@
     "test:pre-release": "node scripts/pre-release-audit.cjs",
     "test:decomposition": "node scripts/decomposition-audit.cjs",
     "test:source": "node scripts/static-source-check.cjs",
-    "test:desktop-security": "node tests/desktop-security-smoke.cjs"
+    "test:desktop-security": "node tests/desktop-security-smoke.cjs",
+    "test:employee-boundary": "npm run build && node tests/employee-financial-boundary-smoke.cjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
