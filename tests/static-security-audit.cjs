@@ -41,6 +41,10 @@ const pgProducts = read('src/server/routes/products.ts');
 const pgMaterials = read('src/server/routes/materials/pg/catalog.ts');
 const inventoryRead = read('src/server/routes/materials/inventory/read.ts');
 const orderPayments = read('src/server/routes/orders/payments.ts');
+const orderPdf = read('src/server/routes/exports/pdf/order.ts');
+const customerCsv = read('src/server/routes/exports/spreadsheets/customers.ts');
+const materialCsv = read('src/server/routes/exports/spreadsheets/materials.ts');
+const inventoryExcel = read('src/server/routes/exports/spreadsheets/inventory.ts');
 const invoicePayments = read('src/server/routes/accounting/invoices/payments.ts');
 if (!pgCustomers.includes('sanitizeCustomer(result, req)')) fail.push('PostgreSQL customer mutation response bypasses sanitizer');
 if (!pgProducts.includes('["employee", "viewer"]')) fail.push('PostgreSQL product price boundary does not include viewer');
@@ -48,6 +52,10 @@ if (!pgMaterials.includes('["employee", "viewer"]')) fail.push('PostgreSQL mater
 if (!inventoryRead.includes('["employee", "viewer"]')) fail.push('inventory valuation boundary does not include viewer');
 if (!orderPayments.includes('[\"admin\", \"accountant\"]')) fail.push('order payment role boundary missing');
 if (!invoicePayments.includes('[\"admin\", \"accountant\"]')) fail.push('invoice payment role boundary missing');
+if (!orderPdf.includes('canViewCustomerPrivateData = user.role === "admin"')) fail.push('order PDF customer privacy boundary missing');
+if (!customerCsv.includes('return core.getRequestUser(req)?.role === "admin"')) fail.push('customer CSV private-data boundary missing');
+if (!materialCsv.includes('includePricing = canViewMaterialPricing(req)')) fail.push('material CSV pricing boundary missing');
+if (!inventoryExcel.includes('includePricing = canViewMaterialPricing(req)')) fail.push('inventory Excel pricing boundary missing');
 
 const server = read('server.ts');
 if (server.includes('path.join(process.cwd(), "Amiri-Regular.ttf")')) fail.push('server has unstable font path');
