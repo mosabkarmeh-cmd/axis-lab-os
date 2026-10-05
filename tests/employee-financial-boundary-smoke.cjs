@@ -42,11 +42,19 @@ function start() {
 
 function stop() {
   return new Promise(resolve => {
-    if (!server || server.killed) return resolve();
-    server.once("exit", resolve);
+    if (!server) return resolve();
+    let exited = false;
+    const onExit = () => {
+      exited = true;
+      resolve();
+    };
+    server.once("exit", onExit);
     server.kill("SIGTERM");
     setTimeout(() => {
-      if (!server.killed) server.kill("SIGKILL");
+      if (!exited) {
+        try { server.kill("SIGKILL"); } catch {}
+        resolve();
+      }
     }, 3000);
   });
 }
