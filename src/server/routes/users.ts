@@ -3,8 +3,14 @@ import { registerUserManagementRoutes } from "./users/management.ts";
 import { registerLegacyCustomerRoutes } from "./users/customers.ts";
 import { registerLegacyProductRoutes } from "./users/products.ts";
 
-export function registerUserRoutes(app: express.Express) {
+export function registerUserRoutes(
+  app: express.Express,
+  options: { includeLegacyCustomerProductRoutes?: boolean } = {},
+) {
   registerUserManagementRoutes(app);
-  registerLegacyCustomerRoutes(app);
-  registerLegacyProductRoutes(app);
+
+  if (options.includeLegacyCustomerProductRoutes !== false) {
+    registerLegacyCustomerRoutes(app);
+    registerLegacyProductRoutes(app);
+  }
 }
