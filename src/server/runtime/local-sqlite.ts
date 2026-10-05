@@ -312,9 +312,10 @@ export function createLocalSqliteRuntime(config: LocalSqliteRuntimeConfig, deps:
     const packageSize = databaseStat.size + uploads.reduce((sum, file) => sum + file.size, 0);
     return {
       id,
-      name: `${kind === "safety" ? "نسخة أمان قبل الاستعادة" : "نسخة احتياطية"} - ${new Date().toLocaleDateString("ar-EG")}`,
+      name: `${kind === "safety" ? "نسخة أمان قبل الاستعادة" : kind === "auto" ? "نسخة احتياطية تلقائية" : "نسخة احتياطية يدوية"} - ${new Date().toLocaleDateString("ar-EG")}`,
       createdAt: manifest.createdAt,
       status: "completed",
+      kind,
       filePath: packagePath,
       size: packageSize,
       sha256: databaseSha256,
