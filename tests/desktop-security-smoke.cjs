@@ -8,7 +8,10 @@ const assert = (value, message) => {
 const main = fs.readFileSync(path.resolve(__dirname, "../desktop/main.cjs"), "utf8");
 const preload = fs.readFileSync(path.resolve(__dirname, "../desktop/preload.cjs"), "utf8");
 const authRoutes = fs.readFileSync(path.resolve(__dirname, "../src/server/routes/auth.ts"), "utf8");
-const auth = fs.readFileSync(path.resolve(__dirname, "../src/server/runtime/auth-runtime.ts"), "utf8");
+const canonicalAuthPath = path.resolve(__dirname, "../src/server/runtime/auth-runtime.ts");
+const obsoleteAuthPath = path.resolve(__dirname, "../src/server/auth.ts");
+assert(!fs.existsSync(obsoleteAuthPath), "obsolete duplicate auth module still exists");
+const auth = fs.readFileSync(canonicalAuthPath, "utf8");
 
 assert(/contextIsolation:\s*true/.test(main), "context isolation is not enabled");
 assert(/nodeIntegration:\s*false/.test(main), "nodeIntegration must be disabled");
