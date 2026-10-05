@@ -1,6 +1,7 @@
 import * as core from "../../../server-core.ts";
 import type { FastLocalPayload } from "../fast-local-types.ts";
 import { getMaterialProcessProfile } from "./profile.ts";
+import { calculateMaterialUsage } from "./nesting.ts";
 
 const { MATERIALS, MACHINES, SETTINGS } = core;
 
@@ -38,29 +39,23 @@ const {
               // Find machine if machineId provided
               const machine = MACHINES.find(m => m.id === machineId);
     
-              // Dynamic Nesting & Waste Ratio Calculation
               const lowerMatName = (mat?.name || "").toLowerCase();
-              let materialFragilityWaste = 4; // base fragility
-              if (lowerMatName.includes("أكريليك") || lowerMatName.includes("acrylic")) {
-                materialFragilityWaste = 8;
-              } else if (lowerMatName.includes("خشب") || lowerMatName.includes("wood") || lowerMatName.includes("mdf")) {
-                materialFragilityWaste = 10;
-              } else if (lowerMatName.includes("جلد") || lowerMatName.includes("leather")) {
-                materialFragilityWaste = 12;
-              }
-    
-              const estimatedPiecesPerSheet = Math.max(1, Math.floor(sheetAreaCm2 / (pieceAreaCm2 * 1.12)));
-              const sheetUtilizationPercent = Math.min(94, Math.max(30, Math.round(((estimatedPiecesPerSheet * pieceAreaCm2) / sheetAreaCm2) * 100)));
-              const autoWastePercent = Math.min(35, Math.max(5, Math.round((100 - sheetUtilizationPercent) * 0.4 + materialFragilityWaste)));
-              
-              const calculatedWastePercent = (typeof wasteOverridePercent === 'number' && wasteOverridePercent >= 0)
-                ? wasteOverridePercent
-                : autoWastePercent;
-              const wasteFactor = 1 + (calculatedWastePercent / 100);
-    
-              // 1. Raw material cost including exact calculated waste factor
-              const rawMaterialCost = Math.max(0.15, (pieceAreaCm2 / sheetAreaCm2) * matPricePerSheetUSD * wasteFactor);
-    
+              const materialUsage = calculateMaterialUsage({
+                materialName: lowerMatName,
+                sheetAreaCm2,
+                pieceAreaCm2,
+                matPricePerSheetUSD,
+                wasteOverridePercent,
+              });
+              const {
+                estimatedPiecesPerSheet,
+                sheetUtilizationPercent,
+                autoWastePercent,
+                calculatedWastePercent,
+                wasteFactor,
+                rawMaterialCost,
+              } = materialUsage;
+
               const processProfile = getMaterialProcessProfile(lowerMatName, thicknessMm);
               const {
                 cutSpeedMms,
