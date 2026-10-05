@@ -1,7 +1,6 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
-import https from "https";
 import multer from "multer";
 import * as core from "../server-core.ts";
 
@@ -12,12 +11,13 @@ const {
   ACTIVITY_LOGS,
   nextActivityLogId,
   DELETED_ITEMS,
-  RESOURCE_FONT_PATH,
+  LOCAL_DATA_FILE,
+  persistMutationWithFastDurability,
 } = core;
 
 export function registerFileRoutes(app: express.Express) {
 // ==================== FILES & DOCUMENTS API ====================
-  const UPLOAD_DIR = path.join(process.cwd(), "uploads");
+  const UPLOAD_DIR = process.env.AXIS_FILES_DIR || path.join(path.dirname(LOCAL_DATA_FILE), "uploads");
   if (!fs.existsSync(UPLOAD_DIR)) {
     fs.mkdirSync(UPLOAD_DIR, { recursive: true });
   }
@@ -51,16 +51,16 @@ export function registerFileRoutes(app: express.Express) {
 
   // File Upload
   app.post("/api/files/upload", (req, res, next) => {
-    upload.single("file")(req, res, (err: any) => {
+    upload.single("file")(req, res, (err: unknown) => {
       if (err) {
         const message = err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE"
           ? "حجم الملف أكبر من الحد المسموح (25MB)"
-          : err.message || "فشل رفع الملف";
+          : err instanceof Error ? err.message : "فشل رفع الملف";
         return res.status(400).json({ success: false, message });
       }
       next();
     });
-  }, (req, res) => {
+  }, async (req, res) => {
     try {
       const file = req.file;
       if (!file) {
@@ -94,9 +94,11 @@ export function registerFileRoutes(app: express.Express) {
         createdAt: new Date().toISOString()
       });
 
+      await persistMutationWithFastDurability();
+      res.locals.axisPersistScheduled = true;
       res.status(201).json({ success: true, file: newFile });
-    } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, message: error instanceof Error ? error.message : String(error) });
     }
   });
 
@@ -122,7 +124,7 @@ export function registerFileRoutes(app: express.Express) {
   });
 
   // Delete a file
-  app.delete("/api/files/:id", (req, res) => {
+  app.delete("/api/files/:id", async (req, res) => {
     const idx = FILES.findIndex(f => f.id === req.params.id);
     if (idx === -1) {
       return res.status(404).json({ success: false, message: "الملف غير موجود" });
@@ -149,6 +151,8 @@ export function registerFileRoutes(app: express.Express) {
       createdAt: new Date().toISOString()
     });
 
+    await persistMutationWithFastDurability();
+    res.locals.axisPersistScheduled = true;
     res.json({ success: true, file });
   });
 }
