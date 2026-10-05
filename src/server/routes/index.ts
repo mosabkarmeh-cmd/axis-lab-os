@@ -140,7 +140,7 @@ export async function registerRoutes(app: express.Express) {
 
   registerExportRoutes(app);
 
-  registerProductionLegacyRoutes(app);
+  registerProductionLegacyRoutes(app, { includeMachines: !USE_POSTGRES });
 
   registerImportRoutes(app);
 
