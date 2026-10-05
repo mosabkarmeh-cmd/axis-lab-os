@@ -1,14 +1,13 @@
 name: Windows CI
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
-      - 'refactor/v0.15.0-final'
   pull_request:
     branches:
       - main
-      - 'refactor/v0.15.0-final'
 
 permissions:
   contents: read
@@ -119,7 +118,7 @@ jobs:
       - name: Upload Windows installers
         uses: actions/upload-artifact@v4
         with:
-          name: axis-lab-os-v0.15.0-windows-installers
+          name: axis-lab-os-windows-installers
           if-no-files-found: error
           path: |
             ${{ runner.temp }}/axis-lab-current-user-setup.exe

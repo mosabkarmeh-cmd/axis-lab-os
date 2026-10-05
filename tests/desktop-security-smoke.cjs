@@ -8,7 +8,10 @@ const assert = (value, message) => {
 const main = fs.readFileSync(path.resolve(__dirname, "../desktop/main.cjs"), "utf8");
 const preload = fs.readFileSync(path.resolve(__dirname, "../desktop/preload.cjs"), "utf8");
 const authRoutes = fs.readFileSync(path.resolve(__dirname, "../src/server/routes/auth.ts"), "utf8");
-const auth = fs.readFileSync(path.resolve(__dirname, "../src/server/auth.ts"), "utf8");
+const canonicalAuthPath = path.resolve(__dirname, "../src/server/runtime/auth-runtime.ts");
+const obsoleteAuthPath = path.resolve(__dirname, "../src/server/auth.ts");
+assert(!fs.existsSync(obsoleteAuthPath), "obsolete duplicate auth module still exists");
+const auth = fs.readFileSync(canonicalAuthPath, "utf8");
 
 assert(/contextIsolation:\s*true/.test(main), "context isolation is not enabled");
 assert(/nodeIntegration:\s*false/.test(main), "nodeIntegration must be disabled");
@@ -20,8 +23,8 @@ assert(!/res\.json\(\{\s*token\s*,/.test(authRoutes), "login must not return JWT
 assert(!/res\.json\(\{[^}]*token\s*\}/s.test(authRoutes.match(/app\.post\(["']\/api\/test\/gui-session["'][\s\S]*?\n\s*\}\);/)?.[0] || ""), "GUI test session must not return JWT in JSON");
 assert(/httpOnly:\s*true/.test(authRoutes), "authentication cookie must be HttpOnly");
 assert(/sameSite:\s*["']lax["']/.test(authRoutes), "authentication cookie must define SameSite");
-assert(/getVerifiedRequestUser\(req: Request\)/.test(auth), "request authentication must use the Express Request type");
-assert(!/getVerifiedRequestUser\(req:\s*any\)/.test(auth), "request authentication must not use any");
+assert(/getRequestUser\(req: express\.Request\)/.test(auth), "request authentication must use the Express Request type");
+assert(!/getRequestUser\(req:\s*any\)/.test(auth), "request authentication must not use any");
 
 assert(!/webContents\.executeJavaScript\(/.test(main), "desktop main must not inject arbitrary renderer JavaScript");
 assert(/setWindowOpenHandler/.test(main), "external window handling must be explicitly controlled");
