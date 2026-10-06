@@ -27,6 +27,7 @@ const {
   ACTIVITY_LOGS,
   nextEntityId,
   nextActivityLogId,
+  getRequestUser,
 } = core;
 
 type RemnantRecord = {
