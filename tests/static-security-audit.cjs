@@ -78,6 +78,9 @@ const machines = read('src/server/routes/production/machines.ts');
 const materialAi = read('src/server/routes/materials/materials/catalog/ai-classify.ts');
 const legacyCustomers = read('src/server/routes/users/customers.ts');
 const legacyProducts = read('src/server/routes/users/products.ts');
+const orderItemProgress = read('src/server/routes/orders/items-progress.ts');
+const systemRoute = read('src/server/routes/system.ts');
+const aiMemory = read('src/server/routes/ai/memory.ts');
 if (!pgCustomers.includes('sanitizeCustomer(result, req)')) fail.push('PostgreSQL customer mutation response bypasses sanitizer');
 if (!pgProducts.includes('["employee", "viewer"]')) fail.push('PostgreSQL product price boundary does not include viewer');
 if (!pgMaterials.includes('["employee", "viewer"]')) fail.push('PostgreSQL material price boundary does not include viewer');
@@ -114,6 +117,11 @@ if (!machines.includes('!["admin", "employee"].includes(user.role)')) fail.push(
 if (!materialAi.includes('["admin", "employee"].includes(role)')) fail.push('material AI classification lacks role boundary');
 if (!legacyCustomers.includes('!["admin", "employee"].includes(user.role)')) fail.push('legacy customer writes lack role boundary');
 if (!legacyProducts.includes('role !== "admin"')) fail.push('legacy product writes lack admin boundary');
+if (!orderItemProgress.includes('getRequestUser')) fail.push('order item progress lacks authentication/role enforcement');
+if (!orderItemProgress.includes('user.role !== "admin"')) fail.push('order item structural mutations are not admin-only');
+if (!orderItemProgress.includes('Number.isFinite(requestedCompleted)')) fail.push('order item progress lacks finite quantity validation');
+if (!systemRoute.includes('معلومات الشبكة الداخلية متاحة لمدير النظام فقط')) fail.push('network diagnostics are not admin-only');
+if (!aiMemory.includes('تم حجب توصيات التسعير')) fail.push('AI memory does not hide pricing strategy from restricted roles');
 
 if (!orderPdf.includes('canViewCustomerPrivateData = user.role === "admin"')) fail.push('order PDF customer privacy boundary missing');
 if (!customerCsv.includes('return core.getRequestUser(req)?.role === "admin"')) fail.push('customer CSV private-data boundary missing');
