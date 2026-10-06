@@ -1,7 +1,7 @@
 import express from "express";
 import * as core from "../../../server-core.ts";
 import { asInvoiceItem, getActorId, type InvoiceItem } from "./shared.ts";
-import { calculateLineTotal } from "../../../domain/financial/pricing-engine.ts";
+import { calculateLineTotal, calculateInvoiceTotals } from "../../../domain/financial/pricing-engine.ts";
 
 const {
   INVOICES,
@@ -73,14 +73,19 @@ export function registerInvoiceCreateRoutes(app: express.Express) {
         createdAt: new Date().toISOString()
       }];
     }
-    const computedSubtotal = invItems.reduce((sum: number, it: InvoiceItem) => sum + (it.quantity * it.unitPrice), 0);
-    const computedTotal = invItems.reduce((sum: number, it: InvoiceItem) => sum + it.total, 0);
-    if (!Number.isFinite(computedSubtotal) || !Number.isFinite(computedTotal) || computedTotal < 0) {
+    const invoicePricing = calculateInvoiceTotals(
+      invItems,
+      invItems.map((item) => Number(item.discount || 0)),
+      invItems.map((item) => Number(item.tax || 0)),
+      taxPercent,
+      discount,
+    );
+    const computedSubtotal = invoicePricing.subtotal;
+    const finalTotal = invoicePricing.total;
+    if (!Number.isFinite(computedSubtotal) || !Number.isFinite(finalTotal) || finalTotal < 0) {
       res.status(400).json({ success: false, message: "تعذر حساب إجمالي الفاتورة" });
       return;
     }
-    const safeTotal = Math.max(0, computedTotal);
-    const finalTotal = safeTotal;
 
     const newInv = {
       id: invoiceId,
