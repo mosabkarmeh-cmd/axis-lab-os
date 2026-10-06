@@ -2,11 +2,16 @@ import express from "express";
 import * as core from "../../server-core.ts";
 import { getActorId, orderForResponse } from "./response.ts";
 
-const { ORDERS, ACTIVITY_LOGS, nextActivityLogId } = core;
+const { ORDERS, ACTIVITY_LOGS, nextActivityLogId, getRequestUser, persistStateNow } = core;
 
 export function registerOrderItemProgressRoutes(app: express.Express) {
 // API - Update Order Item Progress (تحديث نسبة إنجاز أجزاء ومواد الطلب والتكرارات)
-  app.patch("/api/orders/:id/items-progress", (req, res) => {
+  app.patch("/api/orders/:id/items-progress", async (req, res) => {
+    const user = getRequestUser(req);
+    if (!user || !["admin", "employee"].includes(user.role)) {
+      res.status(403).json({ success: false, message: "تحديث إنجاز الطلب متاح للإدارة والموظفين التشغيليين فقط" });
+      return;
+    }
     const { itemId, materialName, setAllCompleted, resetAll, addItem, removeItemId, completedQuantity } = req.body;
     const order = ORDERS.find(o => o.id === req.params.id);
     if (!order) {
@@ -38,6 +43,21 @@ export function registerOrderItemProgressRoutes(app: express.Express) {
     };
 
     let autoNote = "";
+
+    if ((addItem && addItem.productName) || removeItemId) {
+      if (user.role !== "admin") {
+        res.status(403).json({ success: false, message: "إضافة أو حذف بنود الطلب متاح لمدير النظام فقط" });
+        return;
+      }
+    }
+
+    if (completedQuantity !== undefined) {
+      const requestedCompleted = Number(completedQuantity);
+      if (!Number.isFinite(requestedCompleted) || requestedCompleted < 0) {
+        res.status(400).json({ success: false, message: "كمية الإنجاز يجب أن تكون رقماً غير سالب وصالحاً" });
+        return;
+      }
+    }
 
     if (addItem && addItem.productName) {
       const newId = "item-" + Date.now();
@@ -141,6 +161,7 @@ export function registerOrderItemProgressRoutes(app: express.Express) {
       createdAt: new Date().toISOString()
     });
 
+    await persistStateNow();
     res.json(orderForResponse(req, order));
   });
 }
