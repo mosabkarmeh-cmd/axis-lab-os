@@ -82,6 +82,8 @@ const legacyProducts = read('src/server/routes/users/products.ts');
 const orderItemProgress = read('src/server/routes/orders/items-progress.ts');
 const systemRoute = read('src/server/routes/system.ts');
 const aiMemory = read('src/server/routes/ai/memory.ts');
+const aiFastParser = read('src/server/routes/ai/fast-local-parser.ts');
+const aiFastLookup = read('src/server/routes/ai/fast-local-lookup.ts');
 if (!pgCustomers.includes('sanitizeCustomer(result, req)')) fail.push('PostgreSQL customer mutation response bypasses sanitizer');
 if (!pgProducts.includes('["employee", "viewer"]')) fail.push('PostgreSQL product price boundary does not include viewer');
 if (!pgMaterials.includes('["employee", "viewer"]')) fail.push('PostgreSQL material price boundary does not include viewer');
@@ -124,6 +126,8 @@ if (!orderItemProgress.includes('user.role !== "admin"')) fail.push('order item 
 if (!orderItemProgress.includes('Number.isFinite(requestedCompleted)')) fail.push('order item progress lacks finite quantity validation');
 if (!systemRoute.includes('معلومات الشبكة الداخلية متاحة لمدير النظام فقط')) fail.push('network diagnostics are not admin-only');
 if (!aiMemory.includes('تم حجب توصيات التسعير')) fail.push('AI memory does not hide pricing strategy from restricted roles');
+if (!aiFastParser.includes('access.canViewFinancials')) fail.push('AI quick order parser lacks financial visibility boundary');
+if (!aiFastLookup.includes('price: 0')) fail.push('AI product autocomplete may expose product pricing');
 
 if (!orderPdf.includes('canViewCustomerPrivateData = user.role === "admin"')) fail.push('order PDF customer privacy boundary missing');
 if (!customerCsv.includes('return core.getRequestUser(req)?.role === "admin"')) fail.push('customer CSV private-data boundary missing');
