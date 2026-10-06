@@ -147,7 +147,7 @@ if (!materialCsv.includes('includePricing = canViewMaterialPricing(req)')) fail.
 if (!inventoryExcel.includes('includePricing = canViewMaterialPricing(req)')) fail.push('inventory Excel pricing boundary missing');
 
 const filesRoute = read('src/server/routes/files.ts');
-if (!filesRoute.includes('function canAccessFileEntity')) fail.push('file entity access policy is missing');
+if (!filesRoute.includes('const canAccessFileEntity')) fail.push('file entity access policy is missing');
 if (!filesRoute.includes('if (!canAccessFileEntity(req, file))')) fail.push('file download route lacks entity authorization');
 if (!filesRoute.includes('if (!canAccessFileEntity(req, target))')) fail.push('file entity listing lacks entity authorization');
 if (!filesRoute.includes('const uploadTarget = validateUploadTarget(req)')) fail.push('file upload route lacks upload-target authorization');
