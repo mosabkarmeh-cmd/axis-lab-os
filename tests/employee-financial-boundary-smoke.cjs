@@ -293,6 +293,30 @@ function assert(condition, message) {
     });
     assert(pricing.response.status === 403, `employee pricing was not blocked: ${pricing.response.status}`);
 
+    const quickParser = await employeeRequest("/api/ai/fast-local", {
+      method: "POST",
+      body: JSON.stringify({
+        action: "quick-order-parser",
+        payload: { rawText: "طلب 10 قطع أكريليك 30x40" },
+      }),
+    });
+    assert(quickParser.response.ok, `employee quick parser failed: ${JSON.stringify(quickParser.body)}`);
+    assert(Number(quickParser.body.financials?.unitPriceUSD || 0) === 0, "employee quick parser leaked unit pricing");
+    assert(Number(quickParser.body.financials?.totalPriceUSD || 0) === 0, "employee quick parser leaked total pricing");
+    assert(Number(quickParser.body.financials?.totalPriceSYP || 0) === 0, "employee quick parser leaked SYP pricing");
+
+    const productAutocomplete = await employeeRequest("/api/ai/fast-local", {
+      method: "POST",
+      body: JSON.stringify({
+        action: "autocomplete-product",
+        payload: { query: "Employee boundary" },
+      }),
+    });
+    assert(productAutocomplete.response.ok, `employee product autocomplete failed: ${JSON.stringify(productAutocomplete.body)}`);
+    for (const product of (productAutocomplete.body || [])) {
+      assert(Number(product.price || 0) === 0, `employee AI autocomplete leaked product price: ${JSON.stringify(product)}`);
+    }
+
     const aiChat = await employeeRequest("/api/ai/chat", {
       method: "POST",
       body: JSON.stringify({ message: "كم الإيرادات والأرباح والديون؟" }),
@@ -357,6 +381,38 @@ function assert(condition, message) {
     assert(!settingsRead.body.settings?.smtp, "employee received SMTP settings");
     assert(!Object.prototype.hasOwnProperty.call(settingsRead.body.settings || {}, "partnerSharePercent"),
       "employee received partner share settings");
+
+    const networkInfo = await employeeRequest("/api/network/info");
+    assert(networkInfo.response.status === 403, `employee network diagnostics were not blocked: ${networkInfo.response.status}`);
+
+    const numberingWrite = await employeeRequest("/api/accounting/numbering/1", {
+      method: "PUT",
+      body: JSON.stringify({ nextNumber: 999999 }),
+    });
+    assert(numberingWrite.response.status === 403, `employee numbering settings were not blocked: ${numberingWrite.response.status}`);
+
+    const notificationCreate = await employeeRequest("/api/notifications", {
+      method: "POST",
+      body: JSON.stringify({ title: "Employee forbidden notification", message: "forbidden" }),
+    });
+    assert(notificationCreate.response.status === 403, `employee notification creation was not blocked: ${notificationCreate.response.status}`);
+
+    const notificationDelete = await employeeRequest("/api/notifications/nonexistent", { method: "DELETE" });
+    assert(notificationDelete.response.status === 403, `employee notification deletion was not blocked: ${notificationDelete.response.status}`);
+
+    const machineCreate = await employeeRequest("/api/production/machines", {
+      method: "POST",
+      body: JSON.stringify({ name: "Employee forbidden machine", type: "laser_co2" }),
+    });
+    assert(machineCreate.response.status === 403, `employee machine creation was not blocked: ${machineCreate.response.status}`);
+
+    const itemStructureUpdate = await employeeRequest(`/api/orders/${orderCreate.body.id}/items-progress`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        addItem: { productName: "Employee forbidden item", quantity: 1, unitPrice: 999999 },
+      }),
+    });
+    assert(itemStructureUpdate.response.status === 403, `employee order item structure mutation was not blocked: ${itemStructureUpdate.response.status}`);
 
     const reports = await employeeRequest("/api/reports/analytics");
     assert(reports.response.status === 403, `employee reports access was not blocked: ${reports.response.status}`);
