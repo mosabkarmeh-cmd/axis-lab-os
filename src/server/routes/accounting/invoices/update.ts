@@ -1,7 +1,7 @@
 import express from "express";
 import * as core from "../../../server-core.ts";
 import { asInvoiceItem, getActorId } from "./shared.ts";
-import { calculateLineTotal } from "../../../domain/financial/pricing-engine.ts";
+import { calculateLineTotal, calculateInvoiceTotals } from "../../../domain/financial/pricing-engine.ts";
 
 const {
   INVOICES,
@@ -69,10 +69,16 @@ export function registerInvoiceUpdateRoutes(app: express.Express) {
       }
       inv.items = normalizedItems;
     }
-    const computedSubtotal = Array.isArray(inv.items) ? inv.items.reduce((sum: number, it) => sum + Number(it.quantity || 0) * Number(it.unitPrice || 0), 0) : 0;
-    const computedTotal = Array.isArray(inv.items) ? inv.items.reduce((sum: number, it) => sum + Number(it.total || 0), 0) : 0;
-    if (!Number.isFinite(computedSubtotal) || !Number.isFinite(computedTotal) || computedTotal < 0) { res.status(400).json({ success: false, message: "تعذر حساب إجمالي الفاتورة من البنود" }); return; }
-    const finalTotal = Math.max(0, computedTotal);
+    const invoicePricing = calculateInvoiceTotals(
+      inv.items || [],
+      (inv.items || []).map((item) => Number(item.discount || 0)),
+      (inv.items || []).map((item) => Number(item.tax || 0)),
+      inv.taxPercent,
+      inv.discount,
+    );
+    const computedSubtotal = invoicePricing.subtotal;
+    const finalTotal = invoicePricing.total;
+    if (!Number.isFinite(computedSubtotal) || !Number.isFinite(finalTotal) || finalTotal < 0) { res.status(400).json({ success: false, message: "تعذر حساب إجمالي الفاتورة من البنود" }); return; }
     const paidAmount = Number.isFinite(Number(inv.paidAmount)) ? Math.max(0, Number(inv.paidAmount)) : 0;
     if (paidAmount > finalTotal) { res.status(409).json({ success: false, message: "لا يمكن أن يتجاوز المدفوع إجمالي الفاتورة بعد التعديل." }); return; }
     inv.subtotal = computedSubtotal;
