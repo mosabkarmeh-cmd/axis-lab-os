@@ -11,6 +11,9 @@ let tempDir;
 let dataFile;
 
 let server;
+let serverExitObserved = false;
+let serverExitCode = null;
+let serverExitSignal = null;
 let logs = "";
 
 async function allocateFreePort() {
@@ -50,6 +53,14 @@ function start() {
   });
   server.stdout.on("data", chunk => { logs += chunk.toString(); });
   server.stderr.on("data", chunk => { logs += chunk.toString(); });
+  serverExitObserved = false;
+  serverExitCode = null;
+  serverExitSignal = null;
+  server.once("exit", (code, signal) => {
+    serverExitObserved = true;
+    serverExitCode = code;
+    serverExitSignal = signal;
+  });
 }
 
 async function waitForHealth(timeoutMs = 12000) {
@@ -81,11 +92,11 @@ function stop() {
 
 function waitForExit(timeoutMs = 8000) {
   return new Promise((resolve, reject) => {
-    if (server.killed) return resolve(0);
+    if (serverExitObserved) return resolve(serverExitCode);
     const timer = setTimeout(() => reject(new Error("server did not exit after persisted payload corruption")), timeoutMs);
-    server.once("exit", code => {
+    server.once("exit", () => {
       clearTimeout(timer);
-      resolve(code);
+      resolve(serverExitCode);
     });
   });
 }
@@ -117,6 +128,7 @@ function assert(condition, message) {
 
     const exitCode = await waitForExit();
     assert(exitCode !== 0, `server exited successfully after persisted payload corruption: ${exitCode}`);
+    assert(serverExitSignal === null, `server was terminated by signal ${serverExitSignal}`);
 
     const verify = new SQL.Database(fs.readFileSync(dataFile));
     const storedValue = String(verify.exec("SELECT value FROM app_state WHERE key = 'SETTINGS'")[0].values[0][0]);
