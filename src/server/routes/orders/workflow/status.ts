@@ -37,6 +37,11 @@ app.patch("/api/orders/:id/status", async (req, res) => {
       return;
     }
 
+    if (status === "cancelled" && core.getRequestUser(req)?.role !== "admin") {
+      res.status(403).json({ success: false, message: "إلغاء الطلبات متاح لمدير النظام فقط" });
+      return;
+    }
+
     // Orders are stored in SYP. Block delivery only when at least one whole lira remains.
     const deliveryRemainingSYP = Math.max(0, Math.round(Number(order.remainingSYP ?? order.remaining ?? 0)));
     if (status === "delivered" && deliveryRemainingSYP > 0) {
