@@ -105,6 +105,7 @@ if (!invoiceCreate.includes('const finalTotal = safeTotal')) fail.push('invoice 
 if (!invoiceCredit.includes('["admin", "accountant"]')) fail.push('invoice credit-note role boundary missing');
 if (!invoiceCredit.includes('currencyFinalizedAt')) fail.push('invoice credit-note lacks finalization guard');
 if (!orderStatus.includes('["admin", "employee"]')) fail.push('order status mutation lacks role boundary');
+if (!orderStatus.includes('ORDER_STATUS_TRANSITIONS') || !orderStatus.includes('انتقال غير مسموح من حالة')) fail.push('order workflow transition matrix is missing');
 if (!orderAssignments.includes('role !== "admin"')) fail.push('worker assignment is not admin-only');
 if (!paymentSettlement.includes('!["SYP", "USD"].includes(currency)')) fail.push('payment settlement does not validate currency');
 if (!legacyMaterials.includes('role !== "admin"')) fail.push('legacy material mutations lack admin boundary');
