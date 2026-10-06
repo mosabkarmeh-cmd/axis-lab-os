@@ -78,6 +78,10 @@ app.get("/api/remnants", (req, res) => {
       return;
     }
 
+    if (!MATERIALS.some(material => material.id === materialId)) {
+      res.status(400).json({ success: false, message: "المادة المحددة غير موجودة" });
+      return;
+    }
     const w = Number(width) || 0;
     const h = Number(height) || 0;
     const q = quantity === undefined ? 1 : Number(quantity);
@@ -126,6 +130,10 @@ app.get("/api/remnants", (req, res) => {
 
     const reqW = Number(requiredWidth);
     const reqH = Number(requiredHeight);
+    if (!Number.isFinite(reqW) || !Number.isFinite(reqH) || reqW <= 0 || reqH <= 0) {
+      res.status(400).json({ success: false, message: "الأبعاد المطلوبة يجب أن تكون أرقاماً موجبة وصالحة" });
+      return;
+    }
 
     const match = REMNANTS.filter(r => 
       r.materialId === materialId &&
