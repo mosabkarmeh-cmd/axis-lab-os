@@ -9,6 +9,7 @@ const {
   schedulePersist,
   SUPPLIERS,
   idNum,
+  getRequestUser,
 } = core;
 
 export function registerSupplierRoutes(app: express.Express) {
@@ -17,6 +18,8 @@ app.get("/api/suppliers", (req, res) => {
   });
 
   app.post("/api/suppliers", async (req, res) => {
+    const role = getRequestUser(req)?.role;
+    if (!role || !["admin", "accountant"].includes(role)) { res.status(403).json({ success: false, message: "إدارة الموردين متاحة للإدارة والحسابات فقط" }); return; }
     const { name, phone, email, address, notes } = req.body;
     if (!name) {
       res.status(400).json({ success: false, message: "Name is required" });
