@@ -41,6 +41,56 @@ export function calculateDocumentTotals(
   };
 }
 
+export interface InvoiceTotals extends DocumentTotals {
+  lineAdjustments: number;
+}
+
+export function calculateInvoiceTotals(
+  lines: readonly PricingLine[],
+  lineDiscounts: readonly number[] = [],
+  lineTaxes: readonly number[] = [],
+  taxPercent: unknown = 0,
+  discount: unknown = 0,
+): InvoiceTotals {
+  const rawSubtotal = lines.reduce((sum, line) => {
+    const quantity = Math.max(0, Number(line.quantity) || 0);
+    const unitPrice = finiteNonNegative(line.unitPrice);
+    return sum + quantity * unitPrice;
+  }, 0);
+
+  const lineDiscountTotal = lines.reduce(
+    (sum, _, index) => sum + finiteNonNegative(lineDiscounts[index] ?? 0),
+    0,
+  );
+  const lineTaxTotal = lines.reduce(
+    (sum, _, index) => sum + finiteNonNegative(lineTaxes[index] ?? 0),
+    0,
+  );
+  const netBeforeDocumentAdjustments = Math.max(
+    0,
+    rawSubtotal - lineDiscountTotal + lineTaxTotal,
+  );
+  const normalizedTaxPercent = finiteNonNegative(taxPercent);
+  const taxAmount = netBeforeDocumentAdjustments * (normalizedTaxPercent / 100);
+  const normalizedDiscount = Math.min(
+    netBeforeDocumentAdjustments,
+    finiteNonNegative(discount),
+  );
+  const total = Math.max(
+    0,
+    netBeforeDocumentAdjustments + taxAmount - normalizedDiscount,
+  );
+
+  return {
+    subtotal: rawSubtotal,
+    taxPercent: normalizedTaxPercent,
+    taxAmount,
+    discount: normalizedDiscount,
+    total,
+    lineAdjustments: lineDiscountTotal - lineTaxTotal,
+  };
+}
+
 export function calculateLineTotal(
   quantity: unknown,
   unitPrice: unknown,
