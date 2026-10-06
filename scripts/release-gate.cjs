@@ -88,10 +88,10 @@ if (process.env.AXIS_RELEASE_SKIP_BUILD !== "1") {
 }
 run("lint", ["run", "lint"]);
 run("pre-release audits", ["run", "test:pre-release"]);
-run("employee financial boundary", ["run", "test:employee-boundary"]);
-run("workflow RBAC", ["run", "test:rbac-workflow"]);
-run("production completion", ["run", "test", "--", "tests/production-completion-smoke.cjs"]);
-run("inventory guards", ["run", "test", "--", "tests/inventory-guards-smoke.cjs"]);
-run("payment/G-code regression", ["run", "test", "--", "tests/payment-gcode-regression-smoke.cjs"]);
+run("employee financial boundary", ["exec", "node", "--", "tests/employee-financial-boundary-smoke.cjs"]);
+run("workflow RBAC", ["exec", "node", "--", "tests/rbac-workflow-integration-smoke.cjs"]);
+run("production completion", ["exec", "node", "--", "tests/production-completion-smoke.cjs"]);
+run("inventory guards", ["exec", "node", "--", "tests/inventory-guards-smoke.cjs"]);
+run("payment/G-code regression", ["exec", "node", "--", "tests/payment-gcode-regression-smoke.cjs"]);
 
 console.log("[RELEASE-GATE] PASS: source, security, type-check, runtime smoke, and desktop prerequisites are green.");
