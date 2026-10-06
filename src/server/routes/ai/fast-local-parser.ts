@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import type { FastLocalPayload } from "./fast-local-types.ts";
 import * as core from "../../server-core.ts";
 import { normalizeArabicAndDialect } from "./local-chat.ts";
+import { getAiAccessScope } from "./access.ts";
 const { CUSTOMERS, SETTINGS } = core;
 
 export function handleFastLocalParserAction(action: unknown, payload: FastLocalPayload, req: Request, res: Response): boolean {
@@ -110,7 +111,17 @@ export function handleFastLocalParserAction(action: unknown, payload: FastLocalP
               const estimatedUnitPriceUSD = Math.max(8, Math.round((parsedWidth * parsedLength * 0.018 + parsedThicknessMm * 1.5 + 4)));
               const estimatedTotalPriceUSD = estimatedUnitPriceUSD * parsedQuantity;
               const exchangeRate = SETTINGS.exchangeRate;
-    
+              const access = getAiAccessScope(req);
+              const financials = access.canViewFinancials ? {
+                unitPriceUSD: estimatedUnitPriceUSD,
+                totalPriceUSD: estimatedTotalPriceUSD,
+                totalPriceSYP: estimatedTotalPriceUSD * exchangeRate
+              } : {
+                unitPriceUSD: 0,
+                totalPriceUSD: 0,
+                totalPriceSYP: 0
+              };
+
               res.json({
                 success: true,
                 customerName: parsedCustomer,
@@ -129,11 +140,7 @@ export function handleFastLocalParserAction(action: unknown, payload: FastLocalP
                 deliveryPromise,
                 componentsList: componentsList.length > 0 ? componentsList : ["القطعة الرئيسية المحفورة"],
                 specialNotes: specialNotes.length > 0 ? specialNotes : ["قص ونقش بحسب المخطط القياسي للورشة"],
-                financials: {
-                  unitPriceUSD: estimatedUnitPriceUSD,
-                  totalPriceUSD: estimatedTotalPriceUSD,
-                  totalPriceSYP: estimatedTotalPriceUSD * exchangeRate
-                },
+                financials,
                 confidenceBreakdown: {
                   customer: matchedCust ? 0.99 : 0.90,
                   material: 0.96,
