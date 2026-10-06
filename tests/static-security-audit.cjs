@@ -75,6 +75,7 @@ const productionStart = read('src/server/routes/production/jobs/start.ts');
 const productionPause = read('src/server/routes/production/jobs/pause-progress.ts');
 const productionComplete = read('src/server/routes/production/jobs/complete.ts');
 const machines = read('src/server/routes/production/machines.ts');
+const pgMachines = read('src/server/routes/production.ts');
 const materialAi = read('src/server/routes/materials/materials/catalog/ai-classify.ts');
 const legacyCustomers = read('src/server/routes/users/customers.ts');
 const legacyProducts = read('src/server/routes/users/products.ts');
@@ -114,6 +115,7 @@ if (!productionStart.includes('requireProductionOperator(req, res)')) fail.push(
 if (!productionPause.includes('requireProductionOperator(req, res)')) fail.push('production pause/progress lacks role boundary');
 if (!productionComplete.includes('requireProductionOperator(req, res)')) fail.push('production completion lacks role boundary');
 if (!machines.includes('!["admin", "employee"].includes(user.role)')) fail.push('machine maintenance/update role boundary missing');
+if ((pgMachines.match(/user\.role !== "admin"/g) || []).length < 3) fail.push('PostgreSQL machine mutations are not consistently admin-only');
 if (!materialAi.includes('["admin", "employee"].includes(role)')) fail.push('material AI classification lacks role boundary');
 if (!legacyCustomers.includes('!["admin", "employee"].includes(user.role)')) fail.push('legacy customer writes lack role boundary');
 if (!legacyProducts.includes('role !== "admin"')) fail.push('legacy product writes lack admin boundary');
