@@ -21,20 +21,36 @@ const waitForHealth = async () => { const deadline = Date.now() + 15000; while (
     const createdMaterial = await request("/api/materials", { method: "POST", body: JSON.stringify({ name: "Inventory guard smoke material", category: "Test", subCategory: "test", unit: "sheet", pricePerUnit: 135, minimumStock: 1 }) });
     assert(createdMaterial.response.status === 201 && createdMaterial.body.material?.id, `Inventory smoke material creation failed: ${JSON.stringify(createdMaterial.body)}`);
     const materialId = createdMaterial.body.material.id;
+
+    const customer = await request("/api/customers", {
+      method: "POST",
+      body: JSON.stringify({ name: "Inventory Guard Customer", phone: "+15550000011" }),
+    });
+    assert(customer.response.ok && customer.body.id, `Inventory guard customer fixture failed: ${JSON.stringify(customer.body)}`);
+    const order = await request("/api/orders", {
+      method: "POST",
+      body: JSON.stringify({
+        customerId: customer.body.id,
+        items: [{ productName: "Inventory Guard Order", quantity: 1, unitPrice: 100 }],
+      }),
+    });
+    assert(order.response.ok && order.body.id, `Inventory guard order fixture failed: ${JSON.stringify(order.body)}`);
+    const orderId = order.body.id;
+
     const stockSetup = await request(`/api/inventory/${materialId}/update`, { method: "POST", body: JSON.stringify({ quantity: 5, type: "purchase", reason: "Inventory guard smoke stock" }) });
     assert(stockSetup.response.ok, `Inventory smoke stock setup failed: ${JSON.stringify(stockSetup.body)}`);
     const negativeUpdate = await request(`/api/inventory/${materialId}/update`, { method: "POST", body: JSON.stringify({ quantity: -999999, type: "adjustment" }) });
     assert(negativeUpdate.response.status === 400, `Negative stock update was accepted: ${JSON.stringify(negativeUpdate.body)}`);
-    const negativeReserve = await request(`/api/inventory/${materialId}/reserve`, { method: "POST", body: JSON.stringify({ quantity: -1, referenceId: "negative-reservation" }) });
+    const negativeReserve = await request(`/api/inventory/${materialId}/reserve`, { method: "POST", body: JSON.stringify({ quantity: -1, referenceId: orderId }) });
     assert(negativeReserve.response.status === 400, `Negative reservation was accepted: ${JSON.stringify(negativeReserve.body)}`);
-    const reservation = await request(`/api/inventory/${materialId}/reserve`, { method: "POST", body: JSON.stringify({ quantity: 1, referenceId: "guard-reservation" }) });
+    const reservation = await request(`/api/inventory/${materialId}/reserve`, { method: "POST", body: JSON.stringify({ quantity: 1, referenceId: orderId }) });
     assert(reservation.response.ok, `Reservation setup failed: ${JSON.stringify(reservation.body)}`);
     const reservedAfterSetup = Number(reservation.body.inventory.reservedQuantity);
     const belowReserved = await request(`/api/inventory/${materialId}/update`, { method: "POST", body: JSON.stringify({ quantity: -999999, type: "adjustment" }) });
     assert(belowReserved.response.status === 400, `Update below reserved quantity was accepted: ${JSON.stringify(belowReserved.body)}`);
-    const excessiveUnreserve = await request(`/api/inventory/${materialId}/unreserve`, { method: "POST", body: JSON.stringify({ quantity: 999999, referenceId: "excessive-unreserve" }) });
+    const excessiveUnreserve = await request(`/api/inventory/${materialId}/unreserve`, { method: "POST", body: JSON.stringify({ quantity: 999999, referenceId: orderId }) });
     assert(excessiveUnreserve.response.status === 400, `Excessive unreserve was accepted: ${JSON.stringify(excessiveUnreserve.body)}`);
-    const release = await request(`/api/inventory/${materialId}/unreserve`, { method: "POST", body: JSON.stringify({ quantity: 1, referenceId: "guard-reservation" }) });
+    const release = await request(`/api/inventory/${materialId}/unreserve`, { method: "POST", body: JSON.stringify({ quantity: 1, referenceId: orderId }) });
     assert(release.response.ok && Number(release.body.inventory.reservedQuantity) === reservedAfterSetup - 1, `Valid unreserve failed: ${JSON.stringify(release.body)}`);
     console.log("inventory-guards-smoke: PASS");
   } finally {
