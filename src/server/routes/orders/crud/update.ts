@@ -44,6 +44,17 @@ export function registerOrderUpdateRoutes(app: express.Express) {
       return;
     }
 
+    // Payments must be created/reversed through the dedicated payment endpoints so the payment ledger
+    // remains the source of truth. Directly changing paidAmount would desynchronize order balances
+    // from order.payments and the matching invoice payment ledger.
+    if (paidAmount !== undefined) {
+      res.status(409).json({
+        success: false,
+        message: "لا يمكن تعديل الدفعة مباشرة من تعديل الطلب؛ استخدم مسار الدفعات لتسجيل أو إلغاء سند القبض.",
+      });
+      return;
+    }
+
     if (order.currencyFinalizedAt && (items !== undefined || paidAmount !== undefined || taxPercent !== undefined || discount !== undefined)) {
       res.status(409).json({ error: "الطلب نهائي ومثبت مالياً؛ لا يمكن تعديل البنود أو المبالغ بعد التسليم الكامل." });
       return;
