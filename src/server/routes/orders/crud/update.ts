@@ -72,7 +72,7 @@ export function registerOrderUpdateRoutes(app: express.Express) {
     }
 
     if (taxPercent !== undefined) order.taxPercent = Math.max(0, finiteNumber(taxPercent));
-    if (discount !== undefined) order.discount = Math.min(itemsSubtotal, nonNegativeNumber(discount));
+    if (discount !== undefined) order.discount = nonNegativeNumber(discount);
 
     if (items && items.length > 0) {
       order.items = items.map((rawItem, idx: number) => {
@@ -86,7 +86,7 @@ export function registerOrderUpdateRoutes(app: express.Express) {
           completedQuantity: Math.max(0, Math.min(qty, comp)),
           isCompleted: comp >= qty,
           unitPrice: nonNegativeNumber(it.unitPrice),
-          totalPrice: qty * (Number(it.unitPrice) || 0),
+          totalPrice: qty * nonNegativeNumber(it.unitPrice),
           notes: it.notes || ""
         };
       });
@@ -95,6 +95,7 @@ export function registerOrderUpdateRoutes(app: express.Express) {
     const itemsSubtotal = order.items.reduce((acc: number, cur: OrderItem) => acc + nonNegativeNumber(cur.totalPrice), 0);
     const taxRate = Math.max(0, finiteNumber(order.taxPercent));
     const discountAmt = Math.min(itemsSubtotal, nonNegativeNumber(order.discount));
+    order.discount = discountAmt;
     order.totalPrice = Math.max(0, itemsSubtotal + (itemsSubtotal * (taxRate / 100)) - discountAmt);
     order.paidAmount = Math.min(order.paidAmount, order.totalPrice);
     order.remaining = Math.max(0, order.totalPrice - order.paidAmount);
