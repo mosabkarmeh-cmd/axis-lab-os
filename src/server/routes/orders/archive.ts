@@ -12,9 +12,19 @@ const {
 
 type OrderRecord = (typeof ORDERS)[number];
 
+function requireArchiveAdmin(req: express.Request, res: express.Response): boolean {
+  const user = core.getRequestUser(req);
+  if (!user || user.role !== "admin") {
+    res.status(403).json({ success: false, message: "أرشفة واستعادة الطلبات متاحة لمدير النظام فقط" });
+    return false;
+  }
+  return true;
+}
+
 export function registerOrderArchiveRoutes(app: express.Express) {
 // API - Run Auto Archive Orders
   app.post("/api/orders/auto-archive", (req, res) => {
+    if (!requireArchiveAdmin(req, res)) return;
     const isAutoEnabled = req.body.force ? true : (SETTINGS.autoArchive?.enabled ?? true);
     if (!isAutoEnabled) {
       return res.json({
@@ -115,6 +125,7 @@ export function registerOrderArchiveRoutes(app: express.Express) {
 
   // API - Archive Single Order (Manual Archive)
   app.post("/api/orders/:id/archive", (req, res) => {
+    if (!requireArchiveAdmin(req, res)) return;
     const order = ORDERS.find(o => o.id === req.params.id);
     if (!order) {
       res.status(404).json({ error: "الطلب غير موجود" });
@@ -145,6 +156,7 @@ export function registerOrderArchiveRoutes(app: express.Express) {
 
   // API - Restore Order from Archive
   app.post("/api/orders/:id/restore", (req, res) => {
+    if (!requireArchiveAdmin(req, res)) return;
     const order = ORDERS.find(o => o.id === req.params.id);
     if (!order) {
       res.status(404).json({ error: "الطلب غير موجود" });
