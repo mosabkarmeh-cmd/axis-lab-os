@@ -78,6 +78,7 @@ const machines = read('src/server/routes/production/machines.ts');
 const pgMachines = read('src/server/routes/production.ts');
 const materialAi = read('src/server/routes/materials/materials/catalog/ai-classify.ts');
 const legacyCustomers = read('src/server/routes/users/customers.ts');
+const pgRemnants = read('src/server/routes/materials/pg/remnants.ts');
 const legacyProducts = read('src/server/routes/users/products.ts');
 const orderItemProgress = read('src/server/routes/orders/items-progress.ts');
 const systemRoute = read('src/server/routes/system.ts');
@@ -120,6 +121,8 @@ if (!machines.includes('!["admin", "employee"].includes(user.role)')) fail.push(
 if ((pgMachines.match(/user\.role !== "admin"/g) || []).length < 3) fail.push('PostgreSQL machine mutations are not consistently admin-only');
 if (!materialAi.includes('["admin", "employee"].includes(role)')) fail.push('material AI classification lacks role boundary');
 if (!legacyCustomers.includes('!["admin", "employee"].includes(user.role)')) fail.push('legacy customer writes lack role boundary');
+if (!pgRemnants.includes('requireRemnantOperator(req, res)')) fail.push('PostgreSQL remnant mutation lacks operational-role boundary');
+if (!pgRemnants.includes('core.MATERIALS.some')) fail.push('PostgreSQL remnant mutation does not validate material existence');
 if (!legacyProducts.includes('role !== "admin"')) fail.push('legacy product writes lack admin boundary');
 if (!orderItemProgress.includes('getRequestUser')) fail.push('order item progress lacks authentication/role enforcement');
 if (!orderItemProgress.includes('user.role !== "admin"')) fail.push('order item structural mutations are not admin-only');
