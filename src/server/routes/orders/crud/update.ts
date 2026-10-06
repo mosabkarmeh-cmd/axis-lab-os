@@ -35,7 +35,7 @@ export function registerOrderUpdateRoutes(app: express.Express) {
 
     if (
       user?.role === "employee" &&
-      (items !== undefined || paidAmount !== undefined || taxPercent !== undefined || discount !== undefined)
+      (items !== undefined || paidAmount !== undefined || taxPercent !== undefined || discount !== undefined || customerId !== undefined)
     ) {
       res.status(403).json({
         success: false,
@@ -63,10 +63,28 @@ export function registerOrderUpdateRoutes(app: express.Express) {
       itemsTotalQty: order.items ? order.items.reduce((acc: number, cur: OrderItem) => acc + Number(cur.quantity || 1), 0) : 0,
     };
 
-    if (customerId) order.customerId = customerId;
-    if (priority) order.priority = priority;
+    if (customerId !== undefined) {
+      if (typeof customerId !== "string" || !CUSTOMERS.some(c => c.id === customerId)) {
+        res.status(400).json({ success: false, message: "العميل المحدد غير موجود" });
+        return;
+      }
+      order.customerId = customerId;
+    }
+    if (priority !== undefined) {
+      if (!["low", "normal", "high", "urgent"].includes(priority)) {
+        res.status(400).json({ success: false, message: "أولوية الطلب غير صالحة" });
+        return;
+      }
+      order.priority = priority;
+    }
     if (notes !== undefined) order.notes = notes;
-    if (deliveryDateExpected) order.deliveryDateExpected = deliveryDateExpected;
+    if (deliveryDateExpected !== undefined) {
+      if (!String(deliveryDateExpected || "").trim() || Number.isNaN(Date.parse(String(deliveryDateExpected)))) {
+        res.status(400).json({ success: false, message: "تاريخ التسليم المتوقع غير صالح" });
+        return;
+      }
+      order.deliveryDateExpected = deliveryDateExpected;
+    }
     if (paidAmount !== undefined) {
       order.paidAmount = nonNegativeNumber(paidAmount);
     }
