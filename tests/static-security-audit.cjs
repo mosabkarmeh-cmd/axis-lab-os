@@ -83,7 +83,7 @@ if (!invoiceCredit.includes('["admin", "accountant"]')) fail.push('invoice credi
 if (!invoiceCredit.includes('currencyFinalizedAt')) fail.push('invoice credit-note lacks finalization guard');
 if (!orderStatus.includes('["admin", "employee"]')) fail.push('order status mutation lacks role boundary');
 if (!orderAssignments.includes('role !== "admin"')) fail.push('worker assignment is not admin-only');
-if (!paymentSettlement.includes('!['"SYP"')) fail.push('payment settlement does not validate currency');
+if (!paymentSettlement.includes('!["SYP", "USD"].includes(currency)')) fail.push('payment settlement does not validate currency');
 if (!orderPdf.includes('canViewCustomerPrivateData = user.role === "admin"')) fail.push('order PDF customer privacy boundary missing');
 if (!customerCsv.includes('return core.getRequestUser(req)?.role === "admin"')) fail.push('customer CSV private-data boundary missing');
 if (!materialCsv.includes('includePricing = canViewMaterialPricing(req)')) fail.push('material CSV pricing boundary missing');
