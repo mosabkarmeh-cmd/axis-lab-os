@@ -19,10 +19,18 @@ import {
 const {
   idNum,
   sendProductionJobEmailNotification,
+  getRequestUser,
 } = core;
+
+function requireProductionOperator(req: express.Request, res: express.Response): boolean {
+  const role = getRequestUser(req)?.role;
+  if (!role || !["admin", "employee"].includes(role)) { res.status(403).json({ success: false, message: "عمليات الإنتاج متاحة للإدارة والموظفين التشغيليين فقط" }); return false; }
+  return true;
+}
 
 export function registerProductionPauseProgressRoutes(app: express.Express) {
 app.post("/api/production/jobs/:id/pause", async (req, res) => {
+    if (!requireProductionOperator(req, res)) return;
     const { id } = req.params;
     const job = productionJobs.find(item => item.id === id);
 
@@ -56,6 +64,7 @@ app.post("/api/production/jobs/:id/pause", async (req, res) => {
   });
 
   app.post("/api/production/jobs/:id/progress", async (req, res) => {
+    if (!requireProductionOperator(req, res)) return;
     const { id } = req.params;
     const { progress, elapsedTimeSec } = req.body;
     const job = productionJobs.find(item => item.id === id);
