@@ -14,6 +14,12 @@ const {
   idNum,
 } = core;
 
+function requireMaterialPricingRole(req: express.Request, res: express.Response): boolean {
+  const role = core.getRequestUser(req)?.role;
+  if (!role || !["admin", "accountant"].includes(role)) { res.status(403).json({ success: false, message: "إدارة عروض الموردين متاحة للإدارة والحسابات فقط" }); return false; }
+  return true;
+}
+
 export function registerMaterialSupplierRoutes(app: express.Express) {
   app.get("/api/materials/:id/supplier-quotes", (req, res) => {
     const quotes = SUPPLIER_QUOTES
@@ -23,6 +29,7 @@ export function registerMaterialSupplierRoutes(app: express.Express) {
   });
 
   app.post("/api/materials/:id/supplier-quotes", async (req, res) => {
+    if (!requireMaterialPricingRole(req, res)) return;
     const { supplierId, supplierName, pricePerUnit, minOrderQuantity, deliveryDays, paymentTerms, qualityRating, notes } = req.body;
     if (!pricePerUnit) {
       res.status(400).json({ success: false, message: "سعر الوحدة مطلوب" });
@@ -90,6 +97,7 @@ export function registerMaterialSupplierRoutes(app: express.Express) {
   });
 
   app.delete("/api/materials/:id/supplier-quotes/:quoteId", async (req, res) => {
+    if (!requireMaterialPricingRole(req, res)) return;
     const quoteId = idNum(req.params.quoteId, "sq-");
     try {
       if (quoteId) {
@@ -117,6 +125,7 @@ export function registerMaterialSupplierRoutes(app: express.Express) {
   });
 
   app.post("/api/materials/:id/set-primary-supplier", async (req, res) => {
+    if (!requireMaterialPricingRole(req, res)) return;
     const material = MATERIALS.find(item => item.id === req.params.id);
     if (!material) {
       res.status(404).json({ success: false, message: "Material not found" });
