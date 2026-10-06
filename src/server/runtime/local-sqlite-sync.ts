@@ -59,7 +59,8 @@ export function syncNormalizedLocalEntities(
 export function assertFinancialStateInvariants({
   invoices,
   expenses,
-}: Pick<FinancialCollections, "invoices" | "expenses">) {
+  orders,
+}: FinancialCollections) {
   for (const rawOrder of orders) {
     const order = asRecord(rawOrder);
     const total = Number(order.totalPrice) || 0;
