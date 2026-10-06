@@ -17,6 +17,15 @@ const {
   sypToUsd,
 } = core;
 
+function finiteNumber(value: unknown, fallback = 0): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function nonNegativeNumber(value: unknown, fallback = 0): number {
+  return Math.max(0, finiteNumber(value, fallback));
+}
+
 export function registerOrderCreateRoutes(app: express.Express) {
   // API - Create Order
   app.post("/api/orders", async (req, res) => {
@@ -25,14 +34,14 @@ export function registerOrderCreateRoutes(app: express.Express) {
     const actor = core.getRequestUser(req);
     const financialRestricted = actor?.role === "employee" || actor?.role === "viewer";
     const hasNonZeroFinancialInput =
-      (paidAmount !== undefined && paidAmount !== null && Number(paidAmount) !== 0) ||
-      (taxPercent !== undefined && taxPercent !== null && Number(taxPercent) !== 0) ||
-      (discount !== undefined && discount !== null && Number(discount) !== 0) ||
+      (paidAmount !== undefined && paidAmount !== null && finiteNumber(paidAmount) !== 0) ||
+      (taxPercent !== undefined && taxPercent !== null && finiteNumber(taxPercent) !== 0) ||
+      (discount !== undefined && discount !== null && finiteNumber(discount) !== 0) ||
       (Array.isArray(items) && items.some((rawItem: unknown) => {
         const item = asOrderItem(rawItem);
         return (
-          (item.unitPrice !== undefined && item.unitPrice !== null && Number(item.unitPrice) !== 0) ||
-          (item.totalPrice !== undefined && item.totalPrice !== null && Number(item.totalPrice) !== 0)
+          (item.unitPrice !== undefined && item.unitPrice !== null && finiteNumber(item.unitPrice) !== 0) ||
+          (item.totalPrice !== undefined && item.totalPrice !== null && finiteNumber(item.totalPrice) !== 0)
         );
       }));
 
@@ -59,9 +68,9 @@ export function registerOrderCreateRoutes(app: express.Express) {
       return {
         id: `item-${Date.now()}-${idx}`,
         productName: it.productName,
-        quantity: Number(it.quantity) || 1,
-        unitPrice: Number(it.unitPrice) || 0,
-        totalPrice: (Number(it.quantity) || 1) * (Number(it.unitPrice) || 0),
+        quantity: Math.max(1, finiteNumber(it.quantity, 1)),
+        unitPrice: nonNegativeNumber(it.unitPrice),
+        totalPrice: Math.max(1, finiteNumber(it.quantity, 1)) * nonNegativeNumber(it.unitPrice),
         notes: it.notes || ""
       };
     });
@@ -69,8 +78,8 @@ export function registerOrderCreateRoutes(app: express.Express) {
     const totalsStartedAt = performance.now();
 
     const itemsSubtotal = parsedItems.reduce((acc: number, cur: OrderItem) => acc + Number(cur.totalPrice || 0), 0);
-    const taxRate = Number(taxPercent) || 0;
-    const discountAmt = Number(discount) || 0;
+    const taxRate = Math.max(0, finiteNumber(taxPercent));
+    const discountAmt = Math.min(itemsSubtotal, nonNegativeNumber(discount));
     const computedTotal = itemsSubtotal + (itemsSubtotal * (taxRate / 100)) - discountAmt;
     
     // Server-authoritative total: never trust a client-supplied totalPrice.
@@ -79,7 +88,7 @@ export function registerOrderCreateRoutes(app: express.Express) {
     const finalTotal = Math.max(0, computedTotal);
     const normalizedPaidAmount = Math.min(
       finalTotal,
-      Math.max(0, Number(paidAmount) || 0),
+      nonNegativeNumber(paidAmount),
     );
     const orderNum = getNextNumber("order");
     recordBenchmark(orderCreateBenchmarks, "calculate_totals_and_number", totalsStartedAt);
