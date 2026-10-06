@@ -102,8 +102,8 @@ router.post("/", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   try {
     const user = getRequestUser(req);
-    if (user && user.role === "accountant") {
-      return res.status(403).json({ error: "غير مصرح للمحاسبين بحذف العملاء" });
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ error: "حذف العملاء متاح لمدير النظام فقط" });
     }
 
     const rawId = parseInt(req.params.id.replace("c-", ""));
