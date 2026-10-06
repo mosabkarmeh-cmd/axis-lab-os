@@ -40,10 +40,6 @@ app.get("/api/customers", (req, res) => {
       res.status(403).json({ error: "إضافة العملاء متاحة للإدارة والموظفين فقط" });
       return;
     }
-    if (user && user.role === "accountant") {
-      res.status(403).json({ error: "غير مصرح للمحاسبين بإضافة عملاء جدد" });
-      return;
-    }
     const { name, phone, whatsapp, email, company, address, notes, category } = req.body;
     if (!name || !phone) {
       res.status(400).json({ error: "الاسم ورقم الهاتف حقلان إجباريان" });
@@ -108,10 +104,6 @@ app.get("/api/customers", (req, res) => {
       res.status(403).json({ error: "تعديل العملاء متاح للإدارة والموظفين فقط" });
       return;
     }
-    if (user && user.role === "accountant") {
-      res.status(403).json({ error: "غير مصرح للمحاسبين بتعديل بيانات العملاء" });
-      return;
-    }
 
     const index = CUSTOMERS.findIndex(c => c.id === req.params.id);
     if (index === -1) {
@@ -140,10 +132,6 @@ app.get("/api/customers", (req, res) => {
     const user = getRequestUser(req);
     if (!user || user.role !== "admin") {
       res.status(403).json({ error: "حذف العملاء متاح لمدير النظام فقط" });
-      return;
-    }
-    if (user && user.role === "accountant") {
-      res.status(403).json({ error: "غير مصرح للمحاسبين بحذف العملاء" });
       return;
     }
     const index = CUSTOMERS.findIndex(c => c.id === req.params.id);
