@@ -8,6 +8,7 @@ export type ProductionJobView = {
   orderNumber?: string;
   itemName?: string;
   materialId?: string;
+  materialQuantity?: number;
   machineId?: string | null;
   status?: string;
   progress?: number;
