@@ -100,9 +100,9 @@ if (!read('src/server/routes/orders/crud/update.ts').includes('لا يمكن ت�
 if (!invoicePayments.includes('[\"admin\", \"accountant\"]')) fail.push('invoice payment role boundary missing');
 if (!invoiceUpdate.includes('["admin", "accountant"]')) fail.push('invoice update role boundary missing');
 if (!invoiceCreate.includes('["admin", "accountant"]')) fail.push('invoice create role boundary missing');
-if (!invoiceUpdate.includes('const finalTotal = Math.max(0, computedTotal)')) fail.push('invoice update still trusts client total');
+if (!invoiceUpdate.includes('calculateInvoiceTotals')) fail.push('invoice update bypasses centralized document pricing');
 if (!invoiceUpdate.includes('allowedStatuses = new Set')) fail.push('invoice status lacks server-side status validation');
-if (!invoiceCreate.includes('const finalTotal = safeTotal')) fail.push('invoice create still trusts client total');
+if (!invoiceCreate.includes('calculateInvoiceTotals')) fail.push('invoice create bypasses centralized document pricing');
 if (!invoiceCredit.includes('["admin", "accountant"]')) fail.push('invoice credit-note role boundary missing');
 if (!invoiceCredit.includes('currencyFinalizedAt')) fail.push('invoice credit-note lacks finalization guard');
 if (!orderStatus.includes('["admin", "employee"]')) fail.push('order status mutation lacks role boundary');
