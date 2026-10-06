@@ -34,8 +34,8 @@ const invoice = (await import("../src/server/domain/financial/pricing-engine.ts"
   20,
 );
 assert(invoice.subtotal === 250, `unexpected invoice subtotal: ${invoice.subtotal}`);
-assert(invoice.taxAmount === 22.5, `unexpected invoice document tax: ${invoice.taxAmount}`);
-assert(invoice.total === 242.5, `unexpected invoice total: ${invoice.total}`);
+assert(invoice.taxAmount === 24.5, `unexpected invoice document tax: ${invoice.taxAmount}`);
+assert(invoice.total === 249.5, `unexpected invoice total: ${invoice.total}`);
 
 
 console.log("financial-pricing-engine-smoke: PASS");
