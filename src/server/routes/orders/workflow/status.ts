@@ -21,7 +21,8 @@ function requireStatusRole(req: express.Request, res: express.Response): boolean
   }
   return true;
 }
-\nconst ORDER_STATUS_TRANSITIONS: Record<string, readonly string[]> = {
+
+const ORDER_STATUS_TRANSITIONS: Record<string, readonly string[]> = {
   new: ["design", "in_progress", "cancelled"],
   design: ["design_approved", "cancelled"],
   design_approved: ["cutting", "cancelled"],
