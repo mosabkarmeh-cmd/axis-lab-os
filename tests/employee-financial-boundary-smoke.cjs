@@ -166,6 +166,36 @@ function assert(condition, message) {
     });
     assert(orderCreate.response.ok && orderCreate.body.id, `order fixture failed: ${JSON.stringify(orderCreate.body)}`);
 
+    const serverAuthoritativeOrder = await request("/api/orders", {
+      method: "POST",
+      body: JSON.stringify({
+        customerId: customerCreate.body.id,
+        items: [{ productName: "Server authoritative total", quantity: 2, unitPrice: 100 }],
+        totalPrice: 999999,
+        paidAmount: 25,
+      }),
+    });
+    assert(serverAuthoritativeOrder.response.ok && serverAuthoritativeOrder.body.id,
+      `server-authoritative order fixture failed: ${JSON.stringify(serverAuthoritativeOrder.body)}`);
+    assert(Number(serverAuthoritativeOrder.body.totalPrice) === 200,
+      `client totalPrice overrode server calculation: ${JSON.stringify(serverAuthoritativeOrder.body)}`);
+    assert(Number(serverAuthoritativeOrder.body.paidAmount) === 25,
+      `paidAmount normalization changed unexpectedly: ${JSON.stringify(serverAuthoritativeOrder.body)}`);
+    assert(Number(serverAuthoritativeOrder.body.remaining) === 175,
+      `remaining was not derived server-side: ${JSON.stringify(serverAuthoritativeOrder.body)}`);
+
+    const employeeFinancialCreate = await employeeRequest("/api/orders", {
+      method: "POST",
+      body: JSON.stringify({
+        customerId: customerCreate.body.id,
+        items: [{ productName: "Employee forbidden priced order", quantity: 1, unitPrice: 13500 }],
+        totalPrice: 13500,
+        paidAmount: 5000,
+      }),
+    });
+    assert(employeeFinancialCreate.response.status === 403,
+      `employee financial order creation was not blocked: ${employeeFinancialCreate.response.status}`);
+
     const blockedEmployeeOrderUpdate = await employeeRequest(`/api/orders/${orderCreate.body.id}`, {
       method: "PUT",
       body: JSON.stringify({ paidAmount: 999999 }),
