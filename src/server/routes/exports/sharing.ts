@@ -19,6 +19,14 @@ export function registerExportShareRoutes(app: express.Express) {
     try {
       const { id } = req.params;
       const { email, subject, body, method } = req.body;
+      if (!["email", "whatsapp", "pdf"].includes(method)) {
+        res.status(400).json({ success: false, message: "طريقة المشاركة غير صالحة" });
+        return;
+      }
+      if (method === "email" && !String(email || "").includes("@")) {
+        res.status(400).json({ success: false, message: "البريد الإلكتروني غير صالح" });
+        return;
+      }
       const order = ORDERS.find(o => o.id === id);
       if (!order) {
         res.status(404).json({ success: false, message: "الطلب غير موجود" });
