@@ -2,21 +2,36 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
+const net = require("node:net");
 const jwt = require("jsonwebtoken");
 
-const port = 4100 + Math.floor(Math.random() * 200);
+let port;
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "axis-report-smoke-"));
 const secret = "axis-report-smoke-secret-012345678901234567890";
 const token = jwt.sign({ sub: "u-1", email: "admin@axislab.com", fullName: "Report Smoke", role: "admin" }, secret, { algorithm: "HS256", expiresIn: "10m", issuer: "axislab-api", audience: "axislab-web" });
 const env = { ...process.env, NODE_ENV: "production", DB_MODE: "sqlite", PORT: String(port), SERVER_HOST: "127.0.0.1", ALLOW_PUBLIC_REGISTRATION: "false", JWT_SECRET: secret, AXIS_DATA_FILE: path.join(tempDir, "axis-data.sqlite"), AXIS_LEGACY_DATA_FILE: path.join(tempDir, "missing.json"), SQLITE_WASM_PATH: path.resolve("node_modules/sql.js/dist/sql-wasm.wasm") };
 let child;
+let logs = "";
 const headers = { "content-type": "application/json", authorization: `Bearer ${token}` };
 const request = async (url, options = {}) => { const response = await fetch(`http://127.0.0.1:${port}${url}`, { ...options, headers: { ...headers, ...(options.headers || {}) } }); const body = await response.json(); return { response, body }; };
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
-const waitForHealth = async () => { const deadline = Date.now() + 15000; while (Date.now() < deadline) { try { const response = await fetch(`http://127.0.0.1:${port}/api/health`); if (response.ok) return; } catch {} await new Promise(resolve => setTimeout(resolve, 200)); } throw new Error("server health timeout"); };
+const waitForHealth = async () => { const deadline = Date.now() + 15000; while (Date.now() < deadline) { try { const response = await fetch(`http://127.0.0.1:${port}/api/health`); if (response.ok) return; } catch {} await new Promise(resolve => setTimeout(resolve, 200)); } throw new Error(`server health timeout:\n${logs}`); };
 (async () => {
   try {
-    child = spawn(process.execPath, [path.resolve("dist/server.cjs")], { cwd: process.cwd(), env, stdio: "ignore" });
+    port = await new Promise((resolve, reject) => {
+      const probe = net.createServer();
+      probe.unref();
+      probe.once("error", reject);
+      probe.listen(0, "127.0.0.1", () => {
+        const address = probe.address();
+        const assigned = address && typeof address === "object" ? address.port : null;
+        probe.close((error) => error ? reject(error) : assigned ? resolve(assigned) : reject(new Error("Could not allocate free TCP port")));
+      });
+    });
+    env.PORT = String(port);
+    child = spawn(process.execPath, [path.resolve("dist/server.cjs")], { cwd: process.cwd(), env, stdio: ["ignore", "pipe", "pipe"] });
+    child.stdout.on("data", chunk => { logs += chunk.toString(); });
+    child.stderr.on("data", chunk => { logs += chunk.toString(); });
     await waitForHealth();
     const baseline = await request("/api/accounting/stats");
     const baselineExpensesSYP = Number(baseline.body.stats?.totalExpensesSYP || 0);
