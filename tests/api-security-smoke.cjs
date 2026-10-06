@@ -199,6 +199,29 @@ const assert = (condition, message) => {
       body: JSON.stringify({ amount: 45, paymentId: "final-currency-payment", paymentMethod: "cash" }),
     });
     assert(finalizedPayment.response.ok && finalizedPayment.body.paidAmount === 6075 && finalizedPayment.body.remaining === 0, `Final payment failed: ${JSON.stringify(finalizedPayment.body)}`);
+
+    // Follow the production workflow before testing final delivery/currency freeze.
+    const finalizationWorkflow = [
+      "design",
+      "design_approved",
+      "cutting",
+      "cutting_complete",
+      "assembly",
+      "assembly_complete",
+      "packaging",
+      "ready",
+    ];
+    for (const nextStatus of finalizationWorkflow) {
+      const transition = await request(`/api/orders/${finalizedOrderId}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: nextStatus, notes: `Final currency workflow: ${nextStatus}` }),
+      });
+      assert(
+        transition.response.ok && transition.body.status === nextStatus,
+        `Final currency workflow failed at ${nextStatus}: ${JSON.stringify(transition.body)}`,
+      );
+    }
+
     const delivered = await request(`/api/orders/${finalizedOrderId}/status`, {
       method: "PATCH",
       body: JSON.stringify({ status: "delivered", notes: "Final currency freeze smoke test" }),
