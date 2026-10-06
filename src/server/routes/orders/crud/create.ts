@@ -21,7 +21,30 @@ export function registerOrderCreateRoutes(app: express.Express) {
   // API - Create Order
   app.post("/api/orders", async (req, res) => {
     const orderRequestStartedAt = performance.now();
-    const { customerId, notes, priority, items, totalPrice, paidAmount, createdById, deliveryDateExpected, taxPercent, discount } = req.body;
+    const { customerId, notes, priority, items, paidAmount, createdById, deliveryDateExpected, taxPercent, discount } = req.body;
+    const actor = core.getRequestUser(req);
+    const financialRestricted = actor?.role === "employee" || actor?.role === "viewer";
+    const hasNonZeroFinancialInput =
+      Number(paidAmount) !== 0 ||
+      Number(taxPercent) !== 0 ||
+      Number(discount) !== 0 ||
+      (Array.isArray(items) && items.some((rawItem: unknown) => {
+        const item = asOrderItem(rawItem);
+        return Number(item.unitPrice) !== 0 || Number(item.totalPrice) !== 0;
+      }));
+
+    if (actor?.role === "viewer") {
+      res.status(403).json({ success: false, message: "هذا الحساب للعرض فقط ولا يمكنه إنشاء طلبات." });
+      return;
+    }
+
+    if (financialRestricted && hasNonZeroFinancialInput) {
+      res.status(403).json({
+        success: false,
+        message: "لا يمكن للموظف إدخال أو تعديل أي قيمة مالية في الطلب. يتم التسعير من الحسابات المصرح لها فقط.",
+      });
+      return;
+    }
     if (!customerId || !items || items.length === 0) {
       res.status(400).json({ error: "الرجاء اختيار العميل وإضافة عنصر واحد على الأقل للطلب" });
       return;
@@ -47,11 +70,10 @@ export function registerOrderCreateRoutes(app: express.Express) {
     const discountAmt = Number(discount) || 0;
     const computedTotal = itemsSubtotal + (itemsSubtotal * (taxRate / 100)) - discountAmt;
     
-    // Respect the explicit totalPrice from the frontend if passed, otherwise use computedTotal
-    const finalTotal = Math.max(
-      0,
-      totalPrice !== undefined ? Number(totalPrice) || 0 : computedTotal,
-    );
+    // Server-authoritative total: never trust a client-supplied totalPrice.
+    // The only accepted pricing inputs are item unit prices, tax and discount;
+    // the server derives the final total from them.
+    const finalTotal = Math.max(0, computedTotal);
     const normalizedPaidAmount = Math.min(
       finalTotal,
       Math.max(0, Number(paidAmount) || 0),
