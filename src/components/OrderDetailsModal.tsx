@@ -1,16 +1,17 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
-  Activity,
-  Check,
+  Box,
   CheckCircle2,
   Clock,
   Coins,
+  DollarSign,
   FileDown,
-  FileText,
   FolderOpen,
+  History,
   Info,
   Layers,
+  List,
   Play,
   Printer,
   Receipt,
@@ -20,6 +21,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Sparkles,
+  Terminal,
   Trash2,
   Users,
   Wrench,
