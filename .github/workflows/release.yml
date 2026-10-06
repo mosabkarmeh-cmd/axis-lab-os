@@ -77,9 +77,11 @@ jobs:
           "CSC_LINK=$certPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "CSC_KEY_PASSWORD=$env:CSC_KEY_PASSWORD" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           Write-Host 'Windows code signing certificate configured.'
-      - name: Report unsigned release mode
+      - name: Release signing gate
         if: ${{ env.HAS_CODE_SIGNING != 'true' }}
-        run: Write-Host 'No CSC_CERT_BASE64/CSC_KEY_PASSWORD secrets configured; installers will be unsigned.'
+        shell: pwsh
+        run: |
+          throw 'Official GitHub Releases are blocked until Windows code-signing secrets CSC_CERT_BASE64 and CSC_KEY_PASSWORD are configured.'
       - name: Build Windows installer (Current User)
         run: npm run desktop:package:win:current -- --publish never
 
