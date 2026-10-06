@@ -2,6 +2,7 @@ import express from "express";
 import * as core from "../../../server-core.ts";
 import { getActorId, orderForResponse } from "../response.ts";
 import { asOrderItem, type OrderItem } from "../crud-shared.ts";
+import { calculateDocumentTotals } from "../../../domain/financial/pricing-engine.ts";
 
 const {
   ORDERS,
@@ -23,7 +24,8 @@ function finiteNumber(value: unknown, fallback = 0): number {
 }
 
 function nonNegativeNumber(value: unknown, fallback = 0): number {
-  return Math.max(0, finiteNumber(value, fallback));
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.max(0, parsed) : fallback;
 }
 
 export function registerOrderCreateRoutes(app: express.Express) {
@@ -77,15 +79,14 @@ export function registerOrderCreateRoutes(app: express.Express) {
     recordBenchmark(orderCreateBenchmarks, "parse_items", parseItemsStartedAt);
     const totalsStartedAt = performance.now();
 
-    const itemsSubtotal = parsedItems.reduce((acc: number, cur: OrderItem) => acc + Number(cur.totalPrice || 0), 0);
-    const taxRate = Math.max(0, finiteNumber(taxPercent));
-    const discountAmt = Math.min(itemsSubtotal, nonNegativeNumber(discount));
-    const computedTotal = itemsSubtotal + (itemsSubtotal * (taxRate / 100)) - discountAmt;
-    
+    const pricing = calculateDocumentTotals(parsedItems, taxPercent, discount);
+    const itemsSubtotal = pricing.subtotal;
+    const taxRate = pricing.taxPercent;
+    const discountAmt = pricing.discount;
+
     // Server-authoritative total: never trust a client-supplied totalPrice.
-    // The only accepted pricing inputs are item unit prices, tax and discount;
-    // the server derives the final total from them.
-    const finalTotal = Math.max(0, computedTotal);
+    // The domain engine derives subtotal, tax, discount, and final total.
+    const finalTotal = pricing.total;
     const normalizedPaidAmount = Math.min(
       finalTotal,
       nonNegativeNumber(paidAmount),
