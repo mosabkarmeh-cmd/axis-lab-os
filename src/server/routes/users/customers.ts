@@ -36,6 +36,10 @@ app.get("/api/customers", (req, res) => {
   // API - Add Customer
   app.post("/api/customers", (req, res) => {
     const user = getRequestUser(req);
+    if (!user || !["admin", "employee"].includes(user.role)) {
+      res.status(403).json({ error: "إضافة العملاء متاحة للإدارة والموظفين فقط" });
+      return;
+    }
     if (user && user.role === "accountant") {
       res.status(403).json({ error: "غير مصرح للمحاسبين بإضافة عملاء جدد" });
       return;
@@ -66,6 +70,10 @@ app.get("/api/customers", (req, res) => {
   // API - Update Customer
   app.put("/api/customers/:id", (req, res) => {
     const user = getRequestUser(req);
+    if (!user || !["admin", "employee"].includes(user.role)) {
+      res.status(403).json({ error: "تعديل العملاء متاح للإدارة والموظفين فقط" });
+      return;
+    }
     if (user && user.role === "accountant") {
       res.status(403).json({ error: "غير مصرح للمحاسبين بتعديل بيانات العملاء" });
       return;
@@ -100,6 +108,10 @@ app.get("/api/customers", (req, res) => {
 
   app.patch("/api/customers/:id", (req, res) => {
     const user = getRequestUser(req);
+    if (!user || !["admin", "employee"].includes(user.role)) {
+      res.status(403).json({ error: "تعديل العملاء متاح للإدارة والموظفين فقط" });
+      return;
+    }
     if (user && user.role === "accountant") {
       res.status(403).json({ error: "غير مصرح للمحاسبين بتعديل بيانات العملاء" });
       return;
@@ -130,6 +142,10 @@ app.get("/api/customers", (req, res) => {
   // API - Delete Customer
   app.delete("/api/customers/:id", (req, res) => {
     const user = getRequestUser(req);
+    if (!user || user.role !== "admin") {
+      res.status(403).json({ error: "حذف العملاء متاح لمدير النظام فقط" });
+      return;
+    }
     if (user && user.role === "accountant") {
       res.status(403).json({ error: "غير مصرح للمحاسبين بحذف العملاء" });
       return;
