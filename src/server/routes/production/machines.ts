@@ -4,7 +4,7 @@ import { machines as machinesTable } from "../../../db/schema.ts";
 import { eq } from "drizzle-orm";
 import * as core from "../../server-core.ts";
 
-const { MACHINES, getRequestUser, idNum } = core;
+const { MACHINES, getRequestUser, idNum, persistMutationWithFastDurability } = core;
 
 type MachineView = {
   id: string;
@@ -27,7 +27,7 @@ export function registerProductionMachineRoutes(app: express.Express) {
   });
 
   // API - Add Production Machine (Admin only)
-  app.post("/api/production/machines", (req, res) => {
+  app.post("/api/production/machines", async (req, res) => {
     const user = getRequestUser(req);
     if (!user || user.role !== "admin") {
       res.status(403).json({ success: false, message: "غير مصرح لك بإضافة آلات جديدة" });
@@ -48,11 +48,12 @@ export function registerProductionMachineRoutes(app: express.Express) {
       workingHours: Number(workingHours) || 0
     };
     machines.push(newMachine);
+    await persistMutationWithFastDurability();
     res.json({ success: true, machine: newMachine });
   });
 
   // API - Delete Production Machine (Admin only)
-  app.delete("/api/production/machines/:id", (req, res) => {
+  app.delete("/api/production/machines/:id", async (req, res) => {
     const user = getRequestUser(req);
     if (!user || user.role !== "admin") {
       res.status(403).json({ success: false, message: "غير مصرح لك بحذف الآلات" });
@@ -65,6 +66,7 @@ export function registerProductionMachineRoutes(app: express.Express) {
       return;
     }
     machines.splice(index, 1);
+    await persistMutationWithFastDurability();
     res.json({ success: true, message: "تم حذف الآلة بنجاح" });
   });
 
@@ -115,6 +117,7 @@ export function registerProductionMachineRoutes(app: express.Express) {
       };
     }
     
+    await persistMutationWithFastDurability();
     res.json({ success: true, machine });
   });
 // API - Machine Maintenance Trigger
