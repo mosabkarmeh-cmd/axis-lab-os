@@ -31,7 +31,13 @@ export function applyPayment(params: {
     return { ok: false, status: 409, body: { error: "الفاتورة نهائية ومثبتة؛ لا يمكن تعديل دفعاتها بعد التسليم.", message: "الفاتورة نهائية ومثبتة؛ لا يمكن تعديل دفعاتها بعد التسليم." }, order: null, invoice: null };
   }
 
-  const inputAmount = Number(params.amount) || 0;
+  const inputAmount = Number(params.amount);
+  if (!["SYP", "USD"].includes(currency)) {
+    return { ok: false, status: 400, body: { error: "عملة الدفعة غير مدعومة", message: "عملة الدفعة يجب أن تكون SYP أو USD" }, order: null, invoice: null };
+  }
+  if (!Number.isFinite(inputAmount) || inputAmount <= 0) {
+    return { ok: false, status: 400, body: { error: "مبلغ الدفعة يجب أن يكون أكبر من الصفر", message: "مبلغ الدفعة يجب أن يكون رقماً موجباً صالحاً" }, order: null, invoice: null };
+  }
   // Rate resolution: an order's own creation rate is the SYP source of truth
   // when an order is involved; a standalone invoice resolves its own rate
   // exactly as the invoice endpoint always has.
@@ -44,7 +50,7 @@ export function applyPayment(params: {
 
   const payAmtSYP = currency === "SYP" ? Math.round(inputAmount) : Math.round(inputAmount * rate);
   const payAmtUSD = currency === "SYP" ? payAmtSYP / rate : inputAmount;
-  if (!Number.isFinite(inputAmount) || inputAmount <= 0 || payAmtSYP <= 0) {
+  if (payAmtSYP <= 0) {
     return { ok: false, status: 400, body: { error: "مبلغ الدفعة يجب أن يكون أكبر من الصفر", message: "مبلغ الدفعة يجب أن يكون رقمًا أكبر من الصفر" }, order: null, invoice: null };
   }
 
@@ -76,7 +82,10 @@ export function applyPayment(params: {
     return { ok: false, status: 409, body: { error: "هذه الدفعة مسجلة مسبقاً", message: "هذه الدفعة مسجلة مسبقاً" }, order: null, invoice: null };
   }
 
-  const methodLabel = paymentMethod === 'transfer' ? 'تحويل بنكي' : paymentMethod === 'card' ? 'بطاقة / شيك' : 'نقدي كاش';
+  const safePaymentMethod = paymentMethod === "transfer" || paymentMethod === "card" || paymentMethod === "cash"
+    ? paymentMethod
+    : "cash";
+  const methodLabel = safePaymentMethod === "transfer" ? "تحويل بنكي" : safePaymentMethod === "card" ? "بطاقة / شيك" : "نقدي كاش";
   const paymentRecord = {
     id: paymentId ? String(paymentId) : "pay_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
     orderId: order?.id || inv?.orderId || null,
@@ -85,7 +94,7 @@ export function applyPayment(params: {
     amountSYP: payAmtSYP,
     exchangeRate: rate,
     currency: "SYP",
-    paymentMethod: paymentMethod || "cash",
+    paymentMethod: safePaymentMethod,
     notes: notes || (order ? "دفعة مقبوضة للطلب" : "دفعة فاتورة"),
     recordedBy: params.actorId || "system",
     createdAt: new Date().toISOString()
