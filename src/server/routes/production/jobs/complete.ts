@@ -63,14 +63,25 @@ app.post("/api/production/jobs/:id/complete", async (req, res) => {
       return;
     }
 
+    const requiredMaterialQuantity = Number(job.materialQuantity ?? 1);
     if (job.materialId) {
       const inventory = INVENTORY.find(item => item.materialId === job.materialId);
       const availableQuantity = Number(inventory?.availableQuantity ?? inventory?.quantity ?? 0);
-      if (!inventory || Number(inventory.quantity) < 1 || availableQuantity < 1) {
+      if (!Number.isFinite(requiredMaterialQuantity) || requiredMaterialQuantity <= 0) {
+        res.status(409).json({
+          success: false,
+          code: "INVALID_MATERIAL_CONSUMPTION",
+          message: "كمية استهلاك الخامة المسجلة للمهمة غير صالحة",
+        });
+        return;
+      }
+      if (!inventory || availableQuantity + 1e-9 < requiredMaterialQuantity) {
         res.status(409).json({
           success: false,
           code: "INSUFFICIENT_STOCK",
           message: "Production cannot be completed because material stock is insufficient",
+          requiredQuantity: requiredMaterialQuantity,
+          availableQuantity,
         });
         return;
       }
@@ -136,9 +147,9 @@ app.post("/api/production/jobs/:id/complete", async (req, res) => {
 
     if (job.materialId) {
       const inventory = INVENTORY.find(item => item.materialId === job.materialId);
-      if (inventory && Number(inventory.quantity) > 0) {
+      if (inventory && Number(inventory.quantity) >= requiredMaterialQuantity) {
         const beforeQty = Number(inventory.quantity);
-        inventory.quantity = beforeQty - 1;
+        inventory.quantity = beforeQty - requiredMaterialQuantity;
         inventory.availableQuantity = inventory.quantity - Number(inventory.reservedQuantity || 0);
 
         const materialDbId = idNum(job.materialId, "m-");
@@ -158,12 +169,12 @@ app.post("/api/production/jobs/:id/complete", async (req, res) => {
             await db.insert(inventoryTransactionsTable).values({
               materialId: materialDbId,
               type: "consumption",
-              quantity: -1,
+              quantity: -requiredMaterialQuantity,
               beforeQty,
               afterQty: inventory.quantity,
               referenceType: "production_job",
               referenceId: job.id,
-              reason: `استهلاك لوح لإنتاج مهمة: ${job.itemName} لطلب ${job.orderNumber}`,
+              reason: `استهلاك خامة بكمية ${requiredMaterialQuantity} لإنتاج مهمة: ${job.itemName} لطلب ${job.orderNumber}`,
             });
           }
         } catch (err) {
@@ -174,7 +185,7 @@ app.post("/api/production/jobs/:id/complete", async (req, res) => {
           id: nextEntityId("tx"),
           materialId: job.materialId,
           type: "consumption",
-          quantity: -1,
+          quantity: -requiredMaterialQuantity,
           beforeQty,
           afterQty: inventory.quantity,
           referenceType: "production_job",
