@@ -23,4 +23,19 @@ assert(cappedDiscount.discount === 100 && cappedDiscount.total === 0, "discount 
 assert(calculateLineTotal(3, 20, 10, 5) === 55, "line total formula is incorrect");
 assert(calculateLineTotal("invalid", 20, 10, 5) === 0, "invalid quantity did not fail closed");
 
+const invoice = (await import("../src/server/domain/financial/pricing-engine.ts")).calculateInvoiceTotals(
+  [
+    { quantity: 2, unitPrice: 100 },
+    { quantity: 1, unitPrice: 50 },
+  ],
+  [10, 0],
+  [5, 0],
+  10,
+  20,
+);
+assert(invoice.subtotal === 250, `unexpected invoice subtotal: ${invoice.subtotal}`);
+assert(invoice.taxAmount === 22.5, `unexpected invoice document tax: ${invoice.taxAmount}`);
+assert(invoice.total === 242.5, `unexpected invoice total: ${invoice.total}`);
+
+
 console.log("financial-pricing-engine-smoke: PASS");
