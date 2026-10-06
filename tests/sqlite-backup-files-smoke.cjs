@@ -112,7 +112,7 @@ function assert(condition, message) {
     const originalContent = Buffer.from("AXIS LAB BACKUP FILE TEST\n");
     form.append("file", new Blob([originalContent], { type: "application/octet-stream" }), "backup-proof.dxf");
     form.append("entityType", "order");
-    form.append("entityId", "ord-backup-test");
+    form.append("entityId", "ord-1");
     const uploadResponse = await request("/api/files/upload", { method: "POST", body: form });
     const uploadBody = await uploadResponse.json();
     assert(uploadResponse.ok && uploadBody.file?.id, `upload failed: ${JSON.stringify(uploadBody)}`);
@@ -151,7 +151,7 @@ function assert(condition, message) {
     assert(fs.existsSync(uploadedFilePath), "restore did not recreate uploaded file");
     assert(fs.readFileSync(uploadedFilePath).equals(originalContent), "restored uploaded file content changed");
 
-    const restoredFilesResponse = await request("/api/files/entity/order/ord-backup-test");
+    const restoredFilesResponse = await request("/api/files/entity/order/ord-1");
     const restoredFilesBody = await restoredFilesResponse.json();
     assert(restoredFilesResponse.ok && restoredFilesBody.files?.some(file => file.id === uploadedFile.id),
       `file metadata was not restored: ${JSON.stringify(restoredFilesBody)}`);
