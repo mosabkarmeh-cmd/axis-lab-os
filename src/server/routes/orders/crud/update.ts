@@ -2,6 +2,7 @@ import express from "express";
 import * as core from "../../../server-core.ts";
 import { getActorId, orderForResponse } from "../response.ts";
 import { asOrderItem, type OrderItem } from "../crud-shared.ts";
+import { calculateDocumentTotals } from "../../../domain/financial/pricing-engine.ts";
 
 const {
   ORDERS,
@@ -121,11 +122,13 @@ export function registerOrderUpdateRoutes(app: express.Express) {
       });
     }
 
-    const itemsSubtotal = order.items.reduce((acc: number, cur: OrderItem) => acc + nonNegativeNumber(cur.totalPrice), 0);
-    const taxRate = Math.max(0, finiteNumber(order.taxPercent));
-    const discountAmt = Math.min(itemsSubtotal, nonNegativeNumber(order.discount));
+    const pricing = calculateDocumentTotals(order.items, order.taxPercent, order.discount);
+    const itemsSubtotal = pricing.subtotal;
+    const taxRate = pricing.taxPercent;
+    const discountAmt = pricing.discount;
+    order.taxPercent = taxRate;
     order.discount = discountAmt;
-    order.totalPrice = Math.max(0, itemsSubtotal + (itemsSubtotal * (taxRate / 100)) - discountAmt);
+    order.totalPrice = pricing.total;
     order.paidAmount = Math.min(order.paidAmount, order.totalPrice);
     order.remaining = Math.max(0, order.totalPrice - order.paidAmount);
 
