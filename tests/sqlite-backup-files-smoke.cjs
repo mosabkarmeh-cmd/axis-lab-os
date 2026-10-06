@@ -108,11 +108,29 @@ function assert(condition, message) {
     start();
     await waitForHealth();
 
+    const customerResponse = await request("/api/customers", {
+      method: "POST",
+      body: JSON.stringify({ name: "Backup Fixture Customer", phone: "+15550000010" }),
+    });
+    const customerBody = await customerResponse.json();
+    assert(customerResponse.ok && customerBody.id, `backup fixture customer failed: ${JSON.stringify(customerBody)}`);
+
+    const orderResponse = await request("/api/orders", {
+      method: "POST",
+      body: JSON.stringify({
+        customerId: customerBody.id,
+        items: [{ productName: "Backup Fixture Order", quantity: 1, unitPrice: 100 }],
+      }),
+    });
+    const orderBody = await orderResponse.json();
+    assert(orderResponse.ok && orderBody.id, `backup fixture order failed: ${JSON.stringify(orderBody)}`);
+    const backupOrderId = orderBody.id;
+
     const form = new FormData();
     const originalContent = Buffer.from("AXIS LAB BACKUP FILE TEST\n");
     form.append("file", new Blob([originalContent], { type: "application/octet-stream" }), "backup-proof.dxf");
     form.append("entityType", "order");
-    form.append("entityId", "ord-1");
+    form.append("entityId", backupOrderId);
     const uploadResponse = await request("/api/files/upload", { method: "POST", body: form });
     const uploadBody = await uploadResponse.json();
     assert(uploadResponse.ok && uploadBody.file?.id, `upload failed: ${JSON.stringify(uploadBody)}`);
@@ -151,7 +169,7 @@ function assert(condition, message) {
     assert(fs.existsSync(uploadedFilePath), "restore did not recreate uploaded file");
     assert(fs.readFileSync(uploadedFilePath).equals(originalContent), "restored uploaded file content changed");
 
-    const restoredFilesResponse = await request("/api/files/entity/order/ord-1");
+    const restoredFilesResponse = await request(`/api/files/entity/order/${backupOrderId}`);
     const restoredFilesBody = await restoredFilesResponse.json();
     assert(restoredFilesResponse.ok && restoredFilesBody.files?.some(file => file.id === uploadedFile.id),
       `file metadata was not restored: ${JSON.stringify(restoredFilesBody)}`);
