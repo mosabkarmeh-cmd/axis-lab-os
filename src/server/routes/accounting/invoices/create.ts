@@ -46,7 +46,8 @@ export function registerInvoiceCreateRoutes(app: express.Express) {
 
     const computedSubtotal = invItems.reduce((sum: number, it: InvoiceItem) => sum + (it.quantity * it.unitPrice), 0);
     const computedTotal = invItems.reduce((sum: number, it: InvoiceItem) => sum + it.total, 0);
-    const finalTotal = totalPrice !== undefined ? Number(totalPrice) : computedTotal;
+    const safeTotal = Number.isFinite(computedTotal) ? Math.max(0, computedTotal) : 0;
+    const finalTotal = safeTotal;
 
     const newInv = {
       id: invoiceId,
@@ -57,8 +58,8 @@ export function registerInvoiceCreateRoutes(app: express.Express) {
       dueDate: dueDate || new Date(Date.now() + 3600000 * 24 * 7).toISOString(), // default 7 days
       totalPrice: finalTotal,
       subtotal: computedSubtotal,
-      taxPercent: Number(taxPercent) || 0,
-      discount: Number(discount) || 0,
+      taxPercent: Number.isFinite(Number(taxPercent)) ? Math.max(0, Number(taxPercent)) : 0,
+      discount: Number.isFinite(Number(discount)) ? Math.max(0, Number(discount)) : 0,
       paidAmount: 0,
       remaining: finalTotal,
       status: "draft", // Starts as draft per request
