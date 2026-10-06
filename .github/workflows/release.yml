@@ -58,20 +58,8 @@ jobs:
             Write-Host "Release CI gate: $workflowName PASS"
           }
 
-      - name: Validate TypeScript
-        run: npm run lint
-      - name: Decomposition audit
-        run: npm run test:decomposition
-      - name: Static source audit
-        run: npm run test:source
-      - name: Architecture audit
-        run: npm run test:architecture
-      - name: Static security audit
-        run: npm run test:security-static
-      - name: Desktop security smoke
-        run: npm run test:desktop-security
-      - name: Employee financial boundary smoke
-        run: npm run test:employee-boundary
+      - name: Deterministic release gate
+        run: npm run test:release-gate
       - name: Full backend smoke test
         run: npm run test:smoke
       - name: Network smoke test
