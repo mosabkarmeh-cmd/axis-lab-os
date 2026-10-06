@@ -14,6 +14,8 @@ const {
   nextActivityLogId,
   idNum,
   getRequestUser,
+  USE_POSTGRES,
+  persistMutationWithFastDurability,
 } = core;
 
 function getActorId(req: express.Request): string {
@@ -100,20 +102,31 @@ app.get("/api/remnants", (req, res) => {
       return;
     }
 
-    const newRem = {
+    let newRem = {
       id: nextEntityId("rem"),
-      materialId,
-      width: w,
-      height: h,
-      area: w * h,
-      quantity: q,
-      status: "available",
-      location: location || "صندوق البقايا الرئيسي",
+      materialId, width: w, height: h, area: w * h, quantity: q,
+      status: "available", location: location || "صندوق البقايا الرئيسي",
       createdAt: new Date().toISOString()
     };
 
-    REMNANTS.push(newRem);
+    if (USE_POSTGRES) {
+      const materialDbId = idNum(materialId, "m-");
+      if (!materialDbId) { res.status(400).json({ success: false, message: "معرف المادة غير صالح" }); return; }
+      try {
+        const inserted = await db.insert(remnantsTable).values({
+          materialId: materialDbId, width: w, height: h, area: w * h, quantity: q,
+          status: "available", location: location || "صندوق البقايا الرئيسي"
+        }).returning();
+        const row = inserted[0];
+        if (!row) throw new Error("تعذر إنشاء سجل البقايا");
+        newRem = { ...newRem, id: "rem-" + row.id };
+      } catch (error: unknown) {
+        res.status(500).json({ success: false, message: "فشل حفظ البقايا: " + (error instanceof Error ? error.message : String(error)) });
+        return;
+      }
+    }
 
+    REMNANTS.push(newRem);
     ACTIVITY_LOGS.unshift({
       id: nextActivityLogId(),
       userId: getActorId(req),
@@ -123,6 +136,7 @@ app.get("/api/remnants", (req, res) => {
       createdAt: new Date().toISOString()
     });
 
+    await persistMutationWithFastDurability();
     res.status(201).json({ success: true, remnant: newRem });
   });
 
