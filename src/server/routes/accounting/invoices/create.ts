@@ -29,8 +29,9 @@ export function registerInvoiceCreateRoutes(app: express.Express) {
     }
 
     const invoiceId = nextEntityId("inv");
-    const invItems = Array.isArray(items) && items.length > 0 ? (() => {
-      const normalized = [];
+    let invItems: InvoiceItem[];
+    if (Array.isArray(items) && items.length > 0) {
+      invItems = [];
       for (let idx = 0; idx < items.length; idx++) {
         const it = asInvoiceItem(items[idx]);
         const quantity = Number(it.quantity);
@@ -38,25 +39,41 @@ export function registerInvoiceCreateRoutes(app: express.Express) {
         const lineDiscount = Number(it.discount ?? 0);
         const lineTax = Number(it.tax ?? 0);
         if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitPrice) || unitPrice < 0 || !Number.isFinite(lineDiscount) || lineDiscount < 0 || !Number.isFinite(lineTax) || lineTax < 0) {
-          throw new Error("بيانات بند الفاتورة غير صالحة في السطر " + (idx + 1));
+          res.status(400).json({ success: false, message: "بيانات بند الفاتورة غير صالحة في السطر " + (idx + 1) });
+          return;
         }
         const total = Math.max(0, quantity * unitPrice - lineDiscount + lineTax);
-        if (!Number.isFinite(total)) throw new Error("إجمالي بند الفاتورة غير صالح في السطر " + (idx + 1));
-        normalized.push({
+        if (!Number.isFinite(total)) {
+          res.status(400).json({ success: false, message: "إجمالي بند الفاتورة غير صالح في السطر " + (idx + 1) });
+          return;
+        }
+        invItems.push({
           id: "invitem-" + Date.now() + "-" + idx, invoiceId,
           productName: it.productName || "بند مخصص", quantity, unitPrice,
           discount: lineDiscount, tax: lineTax, total, createdAt: new Date().toISOString()
         });
       }
-      return normalized;
-    })() : [
-      { id: "invitem-" + Date.now() + "-0", invoiceId, productName: "فاتورة يدوية مخصصة",
-        quantity: 1, unitPrice: Number(totalPrice) || 0, discount: Number(discount) || 0,
-        tax: 0, total: Math.max(0, Number(totalPrice) || 0), createdAt: new Date().toISOString() }
-    ];
+    } else {
+      const manualTotal = Number(totalPrice);
+      const manualDiscount = Number(discount ?? 0);
+      if (!Number.isFinite(manualTotal) || manualTotal < 0 || !Number.isFinite(manualDiscount) || manualDiscount < 0) {
+        res.status(400).json({ success: false, message: "قيمة الفاتورة اليدوية غير صالحة" });
+        return;
+      }
+      invItems = [{
+        id: "invitem-" + Date.now() + "-0", invoiceId, productName: "فاتورة يدوية مخصصة",
+        quantity: 1, unitPrice: manualTotal, discount: Math.min(manualDiscount, manualTotal),
+        tax: 0, total: Math.max(0, manualTotal - Math.min(manualDiscount, manualTotal)),
+        createdAt: new Date().toISOString()
+      }];
+    }
     const computedSubtotal = invItems.reduce((sum: number, it: InvoiceItem) => sum + (it.quantity * it.unitPrice), 0);
     const computedTotal = invItems.reduce((sum: number, it: InvoiceItem) => sum + it.total, 0);
-    const safeTotal = Number.isFinite(computedTotal) ? Math.max(0, computedTotal) : 0;
+    if (!Number.isFinite(computedSubtotal) || !Number.isFinite(computedTotal) || computedTotal < 0) {
+      res.status(400).json({ success: false, message: "تعذر حساب إجمالي الفاتورة" });
+      return;
+    }
+    const safeTotal = Math.max(0, computedTotal);
     const finalTotal = safeTotal;
 
     const newInv = {
