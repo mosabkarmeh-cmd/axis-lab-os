@@ -13,6 +13,15 @@ const {
   sypToUsd,
 } = core;
 
+function finiteNumber(value: unknown, fallback = 0): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function nonNegativeNumber(value: unknown, fallback = 0): number {
+  return Math.max(0, finiteNumber(value, fallback));
+}
+
 export function registerOrderUpdateRoutes(app: express.Express) {
   // API - Update Order (Edit details)
   app.put("/api/orders/:id", async (req, res) => {
@@ -59,33 +68,33 @@ export function registerOrderUpdateRoutes(app: express.Express) {
     if (notes !== undefined) order.notes = notes;
     if (deliveryDateExpected) order.deliveryDateExpected = deliveryDateExpected;
     if (paidAmount !== undefined) {
-      order.paidAmount = Math.max(0, Number(paidAmount) || 0);
+      order.paidAmount = nonNegativeNumber(paidAmount);
     }
 
-    if (taxPercent !== undefined) order.taxPercent = Number(taxPercent) || 0;
-    if (discount !== undefined) order.discount = Number(discount) || 0;
+    if (taxPercent !== undefined) order.taxPercent = Math.max(0, finiteNumber(taxPercent));
+    if (discount !== undefined) order.discount = Math.min(itemsSubtotal, nonNegativeNumber(discount));
 
     if (items && items.length > 0) {
       order.items = items.map((rawItem, idx: number) => {
         const it = asOrderItem(rawItem);
-        const qty = Number(it.quantity) || 1;
-        const comp = it.completedQuantity !== undefined ? Number(it.completedQuantity) : (it.isCompleted ? qty : 0);
+        const qty = Math.max(1, finiteNumber(it.quantity, 1));
+        const comp = it.completedQuantity !== undefined ? finiteNumber(it.completedQuantity) : (it.isCompleted ? qty : 0);
         return {
           id: it.id || `item-${Date.now()}-${idx}`,
           productName: it.productName,
           quantity: qty,
           completedQuantity: Math.max(0, Math.min(qty, comp)),
           isCompleted: comp >= qty,
-          unitPrice: Number(it.unitPrice) || 0,
+          unitPrice: nonNegativeNumber(it.unitPrice),
           totalPrice: qty * (Number(it.unitPrice) || 0),
           notes: it.notes || ""
         };
       });
     }
 
-    const itemsSubtotal = order.items.reduce((acc: number, cur: OrderItem) => acc + Number(cur.totalPrice || 0), 0);
-    const taxRate = order.taxPercent !== undefined ? order.taxPercent : 0;
-    const discountAmt = order.discount !== undefined ? order.discount : 0;
+    const itemsSubtotal = order.items.reduce((acc: number, cur: OrderItem) => acc + nonNegativeNumber(cur.totalPrice), 0);
+    const taxRate = Math.max(0, finiteNumber(order.taxPercent));
+    const discountAmt = Math.min(itemsSubtotal, nonNegativeNumber(order.discount));
     order.totalPrice = Math.max(0, itemsSubtotal + (itemsSubtotal * (taxRate / 100)) - discountAmt);
     order.paidAmount = Math.min(order.paidAmount, order.totalPrice);
     order.remaining = Math.max(0, order.totalPrice - order.paidAmount);
