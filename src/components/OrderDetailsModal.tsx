@@ -30,9 +30,6 @@ import {
 import { FileUploader } from "./FileUploader";
 
 export default function OrderDetailsModal(props: Record<string, any>) {
-  const { Activity, AlertTriangle, Calculator, Check, CheckCircle2, Clock, Coins, Command, Copy, DollarSign, Edit3, ExternalLink, FileDown, FileText, FolderOpen, HelpCircle, Info, Instagram, Layers, Mail, MessageCircle, Play, Plus, PlusCircle, Printer, QrCode, Receipt, RefreshCw, Scissors, Search, Share2, Shield, ShieldAlert, ShieldCheck, Sparkles, Trash2, Truck, Users, Wrench, X, Zap } = Lucide as any;
-
-export default function GlobalDialogs(props: Record<string, any>) {
   const {
     USERS,
     activeView,
@@ -288,11 +285,12 @@ export default function GlobalDialogs(props: Record<string, any>) {
   } = props;
 
   const [ratingNotesDraft, setRatingNotesDraft] = useState("");
-
   const orderPaymentRate = Number(selectedOrder?.exchangeRateAtFinalization || selectedOrder?.exchangeRateAtIssue || exchangeRate || 135);
   const orderRemainingSYP = Math.max(0, Math.round(Number(selectedOrder?.remainingSYP ?? selectedOrder?.remaining ?? 0)));
   const orderRemainingUSD = Math.max(0, Number(selectedOrder?.remainingUSD ?? (orderRemainingSYP / orderPaymentRate)));
 
+  return (
+    <>
       {/* 👁️ ORDER DETAILS MODAL (WITH TABS) */}
       <AnimatePresence>
         {selectedOrder && (
@@ -1421,4 +1419,6 @@ export default function GlobalDialogs(props: Record<string, any>) {
         )}
       </AnimatePresence>
 
+    </>
+  );
 }
