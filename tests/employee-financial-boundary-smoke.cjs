@@ -32,6 +32,7 @@ function start() {
       JWT_SECRET: secret,
       AXIS_DATA_FILE: dbFile,
       AXIS_LEGACY_DATA_FILE: path.join(tempDir, "missing.json"),
+      AXIS_FILES_DIR: path.join(tempDir, "uploads"),
       SQLITE_WASM_PATH: path.resolve("node_modules/sql.js/dist/sql-wasm.wasm"),
     },
     stdio: ["ignore", "pipe", "pipe"],
@@ -202,6 +203,54 @@ function assert(condition, message) {
     });
     assert(blockedEmployeeOrderUpdate.response.status === 403,
       `employee financial order update was not blocked: ${blockedEmployeeOrderUpdate.response.status}`);
+
+    const orderFileForm = new FormData();
+    orderFileForm.append("entityType", "order");
+    orderFileForm.append("entityId", orderCreate.body.id);
+    orderFileForm.append("file", new Blob(["AXIS order drawing fixture"], { type: "text/plain" }), "order-drawing.dxf");
+    const orderFileUploadResponse = await fetch(`${baseUrl}/api/files/upload`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${adminToken}` },
+      body: orderFileForm,
+    });
+    const orderFileUpload = await orderFileUploadResponse.json();
+    assert(orderFileUploadResponse.ok && orderFileUpload.file?.id,
+      `order file upload fixture failed: ${JSON.stringify(orderFileUpload)}`);
+    const orderFileId = orderFileUpload.file.id;
+
+    const employeeOrderFiles = await employeeRequest(`/api/files/entity/order/${orderCreate.body.id}`);
+    assert(employeeOrderFiles.response.ok && employeeOrderFiles.body.files?.some(file => file.id === orderFileId),
+      `employee could not list authorized order file: ${JSON.stringify(employeeOrderFiles.body)}`);
+
+    const employeeOrderDownload = await employeeRequest(`/api/files/${orderFileId}/download`);
+    assert(employeeOrderDownload.response.ok, `employee could not download authorized order file: ${employeeOrderDownload.response.status}`);
+    assert((await employeeOrderDownload.response.text()).includes("AXIS order drawing fixture"),
+      "authorized order file content was not returned");
+
+    const customerFileForm = new FormData();
+    customerFileForm.append("entityType", "customer");
+    customerFileForm.append("entityId", customerCreate.body.id);
+    customerFileForm.append("file", new Blob(["PRIVATE CUSTOMER FIXTURE"], { type: "text/plain" }), "customer-private.pdf");
+    const customerFileUploadResponse = await fetch(`${baseUrl}/api/files/upload`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${adminToken}` },
+      body: customerFileForm,
+    });
+    const customerFileUpload = await customerFileUploadResponse.json();
+    assert(customerFileUploadResponse.ok && customerFileUpload.file?.id,
+      `customer file upload fixture failed: ${JSON.stringify(customerFileUpload)}`);
+
+    const employeeCustomerFiles = await employeeRequest(`/api/files/entity/customer/${customerCreate.body.id}`);
+    assert(employeeCustomerFiles.response.status === 403,
+      `employee accessed private customer file listing: ${employeeCustomerFiles.response.status}`);
+
+    const employeeCustomerDownload = await employeeRequest(`/api/files/${customerFileUpload.file.id}/download`);
+    assert(employeeCustomerDownload.response.status === 403,
+      `employee accessed private customer file download: ${employeeCustomerDownload.response.status}`);
+
+    const unknownEntityFiles = await employeeRequest("/api/files/entity/order/order-does-not-exist");
+    assert(unknownEntityFiles.response.status === 404,
+      `nonexistent entity lookup did not fail closed: ${unknownEntityFiles.response.status}`);
 
     const employeeOrders = await employeeRequest("/api/orders");
     assert(employeeOrders.response.ok && Array.isArray(employeeOrders.body), "employee cannot read orders");
