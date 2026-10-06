@@ -71,6 +71,9 @@ function assert(condition, message) { if (!condition) throw new Error(message); 
     const invalid = await request('admin', `/api/orders/${orderId}/status`, { method: 'PATCH', body: JSON.stringify({ status: 'not-a-real-status' }) });
     assert(invalid.response.status === 400, `Invalid status was accepted: ${invalid.response.status}`);
 
+    const invalidTransition = await request('admin', `/api/orders/${orderId}/status`, { method: 'PATCH', body: JSON.stringify({ status: 'delivered' }) });
+    assert(invalidTransition.response.status === 409, `Invalid workflow jump was accepted: ${invalidTransition.response.status}`);
+
     const blockedDeliveryOrder = await request('admin', '/api/orders', { method: 'POST', body: JSON.stringify({ customerId: 'c-1', items: [{ productName: 'Unpaid integration order', quantity: 1, unitPrice: 1000 }], totalPrice: 1000, paidAmount: 0, priority: 'normal' }) });
     assert(blockedDeliveryOrder.response.ok && blockedDeliveryOrder.body.id, 'Could not create unpaid order');
     const blockedDelivery = await request('admin', `/api/orders/${blockedDeliveryOrder.body.id}/status`, { method: 'PATCH', body: JSON.stringify({ status: 'delivered' }) });
