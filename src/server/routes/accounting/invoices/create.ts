@@ -13,6 +13,11 @@ const {
 
 export function registerInvoiceCreateRoutes(app: express.Express) {
   app.post("/api/accounting/invoices", async (req, res) => {
+    const user = core.getRequestUser(req);
+    if (!user || !["admin", "accountant"].includes(user.role)) {
+      res.status(403).json({ success: false, message: "إنشاء الفواتير متاح للإدارة والحسابات فقط" });
+      return;
+    }
     const { customerId, totalPrice, dueDate, notes, items, taxPercent, discount } = req.body;
     if (!customerId) {
       res.status(400).json({ success: false, message: "العميل مطلوب" });
