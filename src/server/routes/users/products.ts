@@ -20,6 +20,15 @@ function sanitizeProduct<T extends Record<string, unknown>>(product: T, req: exp
   return { ...product, price: 0 } as T;
 }
 
+function requireProductAdmin(req: express.Request, res: express.Response): boolean {
+  const role = getRequestUser(req)?.role;
+  if (role !== "admin") {
+    res.status(403).json({ success: false, message: "إدارة المنتجات متاحة لمدير النظام فقط" });
+    return false;
+  }
+  return true;
+}
+
 export function registerLegacyProductRoutes(app: express.Express) {
 // API - Get Products
   app.get("/api/products", (req, res) => {
@@ -39,6 +48,7 @@ export function registerLegacyProductRoutes(app: express.Express) {
 
   // API - Add Product
   app.post("/api/products", (req, res) => {
+    if (!requireProductAdmin(req, res)) return;
     const { name, code, category, price, description, stock } = req.body;
     if (!name || !price) {
       res.status(400).json({ error: "الاسم والسعر حقلان إجباريان" });
@@ -71,6 +81,7 @@ export function registerLegacyProductRoutes(app: express.Express) {
 
   // API - Update Product
   app.put("/api/products/:id", (req, res) => {
+    if (!requireProductAdmin(req, res)) return;
     const { name, code, category, price, description, stock } = req.body;
     const prod = PRODUCTS.find(p => p.id === req.params.id);
     if (!prod) {
@@ -99,6 +110,7 @@ export function registerLegacyProductRoutes(app: express.Express) {
 
   // API - Delete Product
   app.delete("/api/products/:id", (req, res) => {
+    if (!requireProductAdmin(req, res)) return;
     const user = getRequestUser(req);
     const index = PRODUCTS.findIndex(p => p.id === req.params.id);
     if (index === -1) {
