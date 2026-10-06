@@ -38,19 +38,36 @@ export function registerInvoiceUpdateRoutes(app: express.Express) {
     }
 
     if (items !== undefined) {
-      if (!Array.isArray(items) || items.length === 0) { res.status(400).json({ success: false, message: "يجب أن تحتوي الفاتورة على بند واحد على الأقل" }); return; }
-      inv.items = items.map((raw, idx: number) => {
-        const it = asInvoiceItem(raw);
+      if (!Array.isArray(items) || items.length === 0) {
+        res.status(400).json({ success: false, message: "يجب أن تحتوي الفاتورة على بند واحد على الأقل" });
+        return;
+      }
+      const normalizedItems = [];
+      for (let idx = 0; idx < items.length; idx++) {
+        const it = asInvoiceItem(items[idx]);
         const quantity = Number(it.quantity);
         const unitPrice = Number(it.unitPrice);
         const lineDiscount = Number(it.discount ?? 0);
         const lineTax = Number(it.tax ?? 0);
-        if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitPrice) || unitPrice < 0 || !Number.isFinite(lineDiscount) || lineDiscount < 0 || !Number.isFinite(lineTax) || lineTax < 0) throw new Error("بيانات بند الفاتورة غير صالحة في السطر " + (idx + 1));
+        if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitPrice) || unitPrice < 0 || !Number.isFinite(lineDiscount) || lineDiscount < 0 || !Number.isFinite(lineTax) || lineTax < 0) {
+          res.status(400).json({ success: false, message: "بيانات بند الفاتورة غير صالحة في السطر " + (idx + 1) });
+          return;
+        }
         const total = Math.max(0, quantity * unitPrice - lineDiscount + lineTax);
-        return { id: it.id || ("invitem-" + Date.now() + "-" + idx), invoiceId: inv.id, productName: it.productName || "بند مخصص", quantity, unitPrice, discount: lineDiscount, tax: lineTax, total, createdAt: it.createdAt || new Date().toISOString() };
-      });
+        if (!Number.isFinite(total)) {
+          res.status(400).json({ success: false, message: "إجمالي بند الفاتورة غير صالح في السطر " + (idx + 1) });
+          return;
+        }
+        normalizedItems.push({
+          id: it.id || ("invitem-" + Date.now() + "-" + idx),
+          invoiceId: inv.id,
+          productName: it.productName || "بند مخصص",
+          quantity, unitPrice, discount: lineDiscount, tax: lineTax, total,
+          createdAt: it.createdAt || new Date().toISOString()
+        });
+      }
+      inv.items = normalizedItems;
     }
-
     const computedSubtotal = Array.isArray(inv.items) ? inv.items.reduce((sum: number, it) => sum + Number(it.quantity || 0) * Number(it.unitPrice || 0), 0) : 0;
     const computedTotal = Array.isArray(inv.items) ? inv.items.reduce((sum: number, it) => sum + Number(it.total || 0), 0) : 0;
     if (!Number.isFinite(computedSubtotal) || !Number.isFinite(computedTotal) || computedTotal < 0) { res.status(400).json({ success: false, message: "تعذر حساب إجمالي الفاتورة من البنود" }); return; }
