@@ -1,6 +1,7 @@
 import express from "express";
 import * as core from "../../../server-core.ts";
 import { asInvoiceItem, getActorId, type InvoiceItem } from "./shared.ts";
+import { calculateLineTotal } from "../../../domain/financial/pricing-engine.ts";
 
 const {
   INVOICES,
@@ -47,7 +48,7 @@ export function registerInvoiceCreateRoutes(app: express.Express) {
           res.status(400).json({ success: false, message: "بيانات بند الفاتورة غير صالحة في السطر " + (idx + 1) });
           return;
         }
-        const total = Math.max(0, quantity * unitPrice - lineDiscount + lineTax);
+        const total = calculateLineTotal(quantity, unitPrice, lineDiscount, lineTax);
         if (!Number.isFinite(total)) {
           res.status(400).json({ success: false, message: "إجمالي بند الفاتورة غير صالح في السطر " + (idx + 1) });
           return;
