@@ -19,6 +19,15 @@ const {
   sendProductionJobEmailNotification,
 } = core;
 
+function requireProductionOperator(req: express.Request, res: express.Response): boolean {
+  const role = core.getRequestUser(req)?.role;
+  if (!role || !["admin", "employee"].includes(role)) {
+    res.status(403).json({ success: false, message: "عمليات الإنتاج متاحة للإدارة والموظفين التشغيليين فقط" });
+    return false;
+  }
+  return true;
+}
+
 export function registerProductionJobQueueRoutes(app: express.Express) {
   app.get("/api/production/jobs", (req, res) => {
     const list = productionJobs.map(job => {
@@ -45,6 +54,7 @@ export function registerProductionJobQueueRoutes(app: express.Express) {
   });
 
   app.post("/api/production/jobs", async (req, res) => {
+    if (!requireProductionOperator(req, res)) return;
     const {
       orderId,
       orderNumber,
@@ -64,7 +74,8 @@ export function registerProductionJobQueueRoutes(app: express.Express) {
 
     const material = MATERIALS.find(m => m.id === materialId);
     const canViewPricing = ["admin", "accountant"].includes(core.getRequestUser(req)?.role || "");
-    const estSec = Number(estTimeSec) || 90;
+    const estSec = Number(estTimeSec);
+    if (!Number.isFinite(estSec) || estSec <= 0) { res.status(400).json({ success: false, message: "زمن المهمة يجب أن يكون رقماً موجباً صالحاً" }); return; }
     const calcTechCost = Number(((estSec / 60) * 0.25).toFixed(2));
     const calcMatCost = material ? Number(((Number(material.pricePerUnit) || 15) * 0.15).toFixed(2)) : 2.25;
 
@@ -119,8 +130,8 @@ export function registerProductionJobQueueRoutes(app: express.Express) {
       progress: 0,
       estTimeSec: estSec,
       elapsedTimeSec: 0,
-      laserPower: Number(laserPower) || 80,
-      laserSpeed: Number(laserSpeed) || 30,
+      laserPower: Number.isFinite(Number(laserPower)) ? Math.max(0, Number(laserPower)) : 80,
+      laserSpeed: Number.isFinite(Number(laserSpeed)) ? Math.max(0, Number(laserSpeed)) : 30,
       operatorId: null,
       materialCostUSD: canViewPricing && Number(materialCostUSD) > 0 ? Number(materialCostUSD) : calcMatCost,
       technicianCostUSD: canViewPricing && Number(technicianCostUSD) > 0 ? Number(technicianCostUSD) : calcTechCost,
@@ -143,6 +154,7 @@ export function registerProductionJobQueueRoutes(app: express.Express) {
   });
 
   app.post("/api/production/jobs/reorder", async (req, res) => {
+    if (!requireProductionOperator(req, res)) return;
     const { orderedIds } = req.body;
     if (!Array.isArray(orderedIds)) {
       res.status(400).json({ success: false, message: "Invalid orderedIds array" });
@@ -169,6 +181,7 @@ export function registerProductionJobQueueRoutes(app: express.Express) {
   });
 
   app.post("/api/production/jobs/auto-assign", async (req, res) => {
+    if (!requireProductionOperator(req, res)) return;
     const { jobIds, autoStart } = req.body;
 
     let targetJobs = productionJobs.filter(job => job.status === "pending");
