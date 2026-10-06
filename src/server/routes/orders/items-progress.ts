@@ -135,7 +135,9 @@ export function registerOrderItemProgressRoutes(app: express.Express) {
     const isAllPartsFinished = totalReq > 0 && totalDone >= totalReq;
     const isPartiallyStarted = totalDone > 0;
 
-    // Auto update order status based on overall parts completion
+    // Auto update order status based on overall parts completion.
+    // Capture the status before mutating it so the audit history records the real transition.
+    const statusBeforeProgress = order.status;
     if (isAllPartsFinished && (order.status === 'in_progress' || order.status === 'new')) {
       order.status = 'ready';
       autoNote += " 🎉 تم استكمال قص وإنجاز كافة أجزاء ومواد الطلب بالكامل (100%)، وتم تحويل حالة الطلب تلقائياً إلى (جاهز للتسليم).";
@@ -146,10 +148,11 @@ export function registerOrderItemProgressRoutes(app: express.Express) {
 
     if (!order.statusHistory) order.statusHistory = [];
     order.statusHistory.unshift({
-      oldStatus: order.status,
+      oldStatus: statusBeforeProgress,
       newStatus: order.status,
       notes: autoNote,
-      changedAt: new Date().toISOString()
+      changedAt: new Date().toISOString(),
+      changedById: getActorId(req),
     });
 
     ACTIVITY_LOGS.unshift({
