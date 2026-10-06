@@ -58,6 +58,10 @@ app.get("/api/supply-orders", (req, res) => {
 
     const supId = idNum(supplierId, "s-");
     const matId = idNum(materialId, "m-");
+    if (!SUPPLIERS.some(supplier => supplier.id === supplierId) || !MATERIALS.some(material => material.id === materialId)) {
+      res.status(400).json({ success: false, message: "المورد أو المادة المحددة غير موجودة" });
+      return;
+    }
     if (!supId || !matId) {
       res.status(400).json({ success: false, message: "مورد أو مادة غير صالحة" });
       return;
@@ -71,6 +75,10 @@ app.get("/api/supply-orders", (req, res) => {
     }
     const orderDate = new Date().toISOString().split('T')[0];
     const expDelivery = expectedDeliveryDate || new Date(Date.now() + 3600000 * 24 * 5).toISOString().split('T')[0];
+    if (expectedDeliveryDate !== undefined && Number.isNaN(Date.parse(String(expectedDeliveryDate)))) {
+      res.status(400).json({ success: false, message: "تاريخ التسليم المتوقع غير صالح" });
+      return;
+    }
 
     try {
       let newOrder: typeof SUPPLY_ORDERS[number];
@@ -140,6 +148,14 @@ app.get("/api/supply-orders", (req, res) => {
     const soId = idNum(id, "so-");
     const matId = idNum(order.materialId, "m-");
     const previousStatus = order.status;
+    if (previousStatus === "completed" && normalizedStatus !== "completed") {
+      res.status(409).json({ success: false, message: "طلب التوريد المكتمل لا يمكن التراجع عن استلامه." });
+      return;
+    }
+    if (previousStatus === "cancelled" && normalizedStatus === "completed") {
+      res.status(409).json({ success: false, message: "لا يمكن تحويل طلب توريد ملغى مباشرة إلى مستلم." });
+      return;
+    }
     order.status = normalizedStatus;
 
     try {
@@ -147,6 +163,12 @@ app.get("/api/supply-orders", (req, res) => {
         order.actualDeliveryDate = new Date().toISOString().split('T')[0];
 
         const inv = INVENTORY.find(i => i.materialId === order.materialId);
+        if (!inv || !matId) {
+          order.status = previousStatus;
+          order.actualDeliveryDate = "";
+          res.status(409).json({ success: false, message: "لا يوجد سجل مخزون صالح للمادة المستلمة" });
+          return;
+        }
         if (inv && matId) {
           const beforeQty = inv.quantity;
           const afterQty = beforeQty + order.quantity;
