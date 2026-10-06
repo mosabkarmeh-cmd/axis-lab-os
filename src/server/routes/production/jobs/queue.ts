@@ -63,6 +63,7 @@ export function registerProductionJobQueueRoutes(app: express.Express) {
       laserPower,
       laserSpeed,
       estTimeSec,
+      materialQuantity,
       materialCostUSD,
       technicianCostUSD,
     } = req.body;
@@ -76,8 +77,14 @@ export function registerProductionJobQueueRoutes(app: express.Express) {
     const canViewPricing = ["admin", "accountant"].includes(core.getRequestUser(req)?.role || "");
     const estSec = Number(estTimeSec);
     if (!Number.isFinite(estSec) || estSec <= 0) { res.status(400).json({ success: false, message: "زمن المهمة يجب أن يكون رقماً موجباً صالحاً" }); return; }
+    const requestedMaterialQuantity = Number(materialQuantity ?? 1);
+    if (!Number.isFinite(requestedMaterialQuantity) || requestedMaterialQuantity <= 0) {
+      res.status(400).json({ success: false, message: "كمية الخامة المطلوبة يجب أن تكون رقماً موجباً وصالحاً" });
+      return;
+    }
+    const normalizedMaterialQuantity = Number(requestedMaterialQuantity.toFixed(4));
     const calcTechCost = Number(((estSec / 60) * 0.25).toFixed(2));
-    const calcMatCost = material ? Number(((Number(material.pricePerUnit) || 15) * 0.15).toFixed(2)) : 2.25;
+    const calcMatCost = material ? Number(((Number(material.pricePerUnit) || 15) * 0.15 * normalizedMaterialQuantity).toFixed(2)) : Number((2.25 * normalizedMaterialQuantity).toFixed(2));
 
     let assignedMachineId = req.body.machineId || null;
     if (!assignedMachineId && req.body.autoAssign) {
@@ -125,6 +132,7 @@ export function registerProductionJobQueueRoutes(app: express.Express) {
       orderNumber: orderNumber || "يدوي",
       itemName,
       materialId,
+      materialQuantity: normalizedMaterialQuantity,
       machineId: assignedMachineId,
       status: "pending",
       progress: 0,
