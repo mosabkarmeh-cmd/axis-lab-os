@@ -39,7 +39,7 @@ router.get("/", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     const user = getRequestUser(req);
-    if (user && user.role === "accountant") {
+    if (!user || user.role !== "admin") {
       return res.status(403).json({ error: "غير مصرح للمحاسبين بإضافة منتجات جديدة" });
     }
 
@@ -73,7 +73,7 @@ router.post("/", async (req, res) => {
 router.put("/:id", async (req, res) => {
   try {
     const user = getRequestUser(req);
-    if (user && user.role === "accountant") {
+    if (!user || user.role !== "admin") {
       return res.status(403).json({ error: "غير مصرح للمحاسبين بتعديل المنتجات" });
     }
 
@@ -104,7 +104,7 @@ router.put("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   try {
     const user = getRequestUser(req);
-    if (user && user.role === "accountant") {
+    if (!user || user.role !== "admin") {
       return res.status(403).json({ error: "غير مصرح للمحاسبين بحذف المنتجات" });
     }
 
