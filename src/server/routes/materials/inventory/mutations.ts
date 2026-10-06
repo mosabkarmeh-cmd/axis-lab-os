@@ -17,7 +17,22 @@ const {
   idNum,
   persistStateNow,
   getRequestUser,
+  ORDERS,
 } = core;
+
+function requireInventoryRole(req: express.Request, res: express.Response, allowed: readonly string[]): boolean {
+  const role = getRequestUser(req)?.role;
+  if (!role || !allowed.includes(role)) {
+    res.status(403).json({ success: false, message: "غير مصرح لك بتعديل المخزون" });
+    return false;
+  }
+  return true;
+}
+
+function hasOrder(orderId: unknown): boolean {
+  if (typeof orderId !== "string" || !orderId.trim()) return false;
+  return ORDERS.some(order => order.id === orderId || order.id === orderId.replace(/^order-/, ""));
+}
 
 function getActorId(req: express.Request): string {
   return getRequestUser(req)?.id || "system";
@@ -25,8 +40,10 @@ function getActorId(req: express.Request): string {
 
 export function registerInventoryMutationRoutes(app: express.Express) {
 app.post("/api/inventory/:materialId/update", async (req, res) => {
+    if (!requireInventoryRole(req, res, ["admin", "accountant"])) return;
+
     const { materialId } = req.params;
-    const { quantity, type, referenceType, referenceId, reason, userId, location } = req.body;
+    const { quantity, type, referenceType, referenceId, reason, location } = req.body;
 
     const inv = INVENTORY.find(i => i.materialId === materialId);
     if (!inv) {
@@ -41,12 +58,19 @@ app.post("/api/inventory/:materialId/update", async (req, res) => {
       return;
     }
     const afterQty = beforeQty + qtyChange;
+    const adjustmentType = typeof type === "string" && type.trim() ? type.trim().toLowerCase() : "adjustment";
+    const allowedTypes = new Set(["adjustment", "receive", "consume", "waste", "return"]);
+    if (!allowedTypes.has(adjustmentType)) {
+      res.status(400).json({ success: false, message: "نوع حركة المخزون غير صالح" });
+      return;
+    }
 
     if (afterQty < 0 || afterQty < Number(inv.reservedQuantity || 0)) {
       res.status(400).json({ success: false, message: `Insufficient stock. Available: ${beforeQty - Number(inv.reservedQuantity || 0)}, Requested adjustment: ${qtyChange}` });
       return;
     }
 
+    const previousLocation = inv.location;
     inv.quantity = afterQty;
     inv.availableQuantity = afterQty - inv.reservedQuantity;
     if (location) inv.location = location;
@@ -64,7 +88,7 @@ app.post("/api/inventory/:materialId/update", async (req, res) => {
         }
         if (matId) {
           await db.insert(inventoryTransactionsTable).values({
-            materialId: matId, type: type || "adjustment", quantity: qtyChange, beforeQty, afterQty,
+            materialId: matId, type: adjustmentType, quantity: qtyChange, beforeQty, afterQty,
             referenceType: referenceType || null, referenceId: referenceId || null,
             reason: reason || "تحديث يدوي للمخزون",
           });
@@ -74,7 +98,7 @@ app.post("/api/inventory/:materialId/update", async (req, res) => {
       const newTx = {
         id: nextEntityId("tx"),
         materialId,
-        type: type || "adjustment",
+        type: adjustmentType,
         quantity: qtyChange,
         beforeQty,
         afterQty,
@@ -89,7 +113,7 @@ app.post("/api/inventory/:materialId/update", async (req, res) => {
       ACTIVITY_LOGS.unshift({
         id: nextActivityLogId(),
         userId: getActorId(req),
-        action: `INVENTORY_${type ? type.toUpperCase() : 'ADJUSTMENT'}`,
+        action: `INVENTORY_${adjustmentType.toUpperCase()}`,
         entityType: "Inventory",
         entityId: inv.id,
         createdAt: new Date().toISOString()
@@ -98,12 +122,17 @@ app.post("/api/inventory/:materialId/update", async (req, res) => {
       await persistStateNow();
       res.json({ success: true, inventory: inv });
     } catch (err: unknown) {
+      inv.quantity = beforeQty;
+      inv.availableQuantity = beforeQty - Number(inv.reservedQuantity || 0);
+      inv.location = previousLocation;
       console.error("Error updating inventory:", err);
       res.status(500).json({ success: false, message: `فشل تحديث المخزون: ${err instanceof Error ? err.message : String(err)}` });
     }
   });
 
   app.post("/api/inventory/:materialId/reserve", async (req, res) => {
+    if (!requireInventoryRole(req, res, ["admin", "employee"])) return;
+
     const { materialId } = req.params;
     const { quantity, referenceId } = req.body;
 
@@ -113,7 +142,7 @@ app.post("/api/inventory/:materialId/update", async (req, res) => {
       return;
     }
 
-    const qty = Number(quantity);
+    if (!hasOrder(referenceId)) {\n      res.status(400).json({ success: false, message: "يجب ربط الحجز بطلب صالح" });\n      return;\n    }\n\n    const qty = Number(quantity);
     if (!Number.isFinite(qty) || qty <= 0) {
       res.status(400).json({ success: false, message: "Reservation quantity must be a positive finite number" });
       return;
@@ -169,6 +198,8 @@ app.post("/api/inventory/:materialId/update", async (req, res) => {
   });
 
   app.post("/api/inventory/:materialId/unreserve", async (req, res) => {
+    if (!requireInventoryRole(req, res, ["admin", "employee"])) return;
+
     const { materialId } = req.params;
     const { quantity, referenceId } = req.body;
 
@@ -178,7 +209,7 @@ app.post("/api/inventory/:materialId/update", async (req, res) => {
       return;
     }
 
-    const qty = Number(quantity);
+    if (!hasOrder(referenceId)) {\n      res.status(400).json({ success: false, message: "يجب ربط إلغاء الحجز بطلب صالح" });\n      return;\n    }\n\n    const qty = Number(quantity);
     if (!Number.isFinite(qty) || qty <= 0) {
       res.status(400).json({ success: false, message: "Unreservation quantity must be a positive finite number" });
       return;
