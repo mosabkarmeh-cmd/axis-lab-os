@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import os from "os";
 import * as core from "../server-core.ts";
 
 const {
@@ -87,6 +88,33 @@ export function registerSystemRoutes(app: express.Express) {
       console.error("[RESET] Business data reset failed:", error);
       res.status(500).json({ success: false, message: "تعذر تصفير بيانات الأعمال بأمان" });
     }
+  });
+
+  app.get("/api/network/info", (req, res) => {
+    const user = getRequestUser(req);
+    if (!user || user.role !== "admin") {
+      res.status(403).json({ success: false, message: "معلومات الشبكة الداخلية متاحة لمدير النظام فقط" });
+      return;
+    }
+
+    const interfaces = Object.entries(os.networkInterfaces()).flatMap(([name, addresses]) =>
+      (addresses || [])
+        .filter((address) => !address.internal)
+        .map((address) => ({
+          interface: name,
+          address: address.address,
+          family: address.family,
+          netmask: address.netmask,
+          mac: address.mac,
+        })),
+    );
+
+    res.json({
+      success: true,
+      hostname: os.hostname(),
+      platform: process.platform,
+      interfaces,
+    });
   });
 
   app.get("/api/logs", (req, res) => {
