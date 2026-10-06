@@ -31,7 +31,7 @@ router.get("/machines", async (req, res) => {
 router.post("/machines", async (req, res) => {
   try {
     const user = getRequestUser(req);
-    if (user && user.role === "accountant") {
+    if (!user || user.role !== "admin") {
       return res.status(403).json({ error: "غير مصرح للمحاسبين بإضافة ماكينات" });
     }
 
@@ -77,7 +77,10 @@ router.put("/machines/:id", async (req, res) => {
     const values: Partial<typeof machines.$inferInsert> = {};
     if (name) values.name = name;
     if (type) values.type = type;
-    if (status) values.status = status;
+    if (status) {
+      if (!["idle", "running", "maintenance", "offline"].includes(status)) return res.status(400).json({ error: "حالة الماكينة غير صالحة" });
+      values.status = status;
+    }
     if (maxDimensions) values.maxDimensions = maxDimensions;
 
     await db.update(machines).set(values).where(eq(machines.id, rawId));
