@@ -105,7 +105,7 @@ router.get("/materials", async (req, res) => {
 router.post("/materials", async (req, res) => {
   try {
     const user = getRequestUser(req);
-    if (user && user.role === "accountant") {
+    if (!user || user.role !== "admin") {
       return res.status(403).json({ error: "غير مصرح للمحاسبين بإضافة خامات جديدة" });
     }
 
@@ -158,7 +158,7 @@ router.post("/materials", async (req, res) => {
 router.put("/materials/:id", async (req, res) => {
   try {
     const user = getRequestUser(req);
-    if (user && user.role === "accountant") {
+    if (!user || user.role !== "admin") {
       return res.status(403).json({ error: "غير مصرح للمحاسبين بتعديل الخامات" });
     }
 
@@ -197,7 +197,7 @@ router.put("/materials/:id", async (req, res) => {
 router.delete("/materials/:id", async (req, res) => {
   try {
     const user = getRequestUser(req);
-    if (user && user.role === "accountant") {
+    if (!user || user.role !== "admin") {
       return res.status(403).json({ error: "غير مصرح للمحاسبين بأرشفة الخامات" });
     }
 
