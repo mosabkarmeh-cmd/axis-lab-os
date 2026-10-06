@@ -85,7 +85,14 @@ export function handleFastLocalLookupAction(action: unknown, payload: FastLocalP
                 (p.category || "").toLowerCase().includes(query)
               ).slice(0, 5);
     
-              res.json(matched);
+              const productResults = matched.map(p => {
+                const user = core.getRequestUser(req);
+                if (user?.role === "employee" || user?.role === "viewer") {
+                  return { id: p.id, name: p.name, code: p.code, category: p.category, description: p.description || "", stock: p.stock || 0, price: 0 };
+                }
+                return p;
+              });
+              res.json(productResults);
               break;
             }
     
