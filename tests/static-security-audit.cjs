@@ -68,6 +68,13 @@ if (!customerCsv.includes('return core.getRequestUser(req)?.role === "admin"')) 
 if (!materialCsv.includes('includePricing = canViewMaterialPricing(req)')) fail.push('material CSV pricing boundary missing');
 if (!inventoryExcel.includes('includePricing = canViewMaterialPricing(req)')) fail.push('inventory Excel pricing boundary missing');
 
+const filesRoute = read('src/server/routes/files.ts');
+if (!filesRoute.includes('function canAccessFileEntity')) fail.push('file entity access policy is missing');
+if (!filesRoute.includes('if (!canAccessFileEntity(req, file))')) fail.push('file download route lacks entity authorization');
+if (!filesRoute.includes('if (!canAccessFileEntity(req, target))')) fail.push('file entity listing lacks entity authorization');
+if (!filesRoute.includes('const uploadTarget = validateUploadTarget(req)')) fail.push('file upload route lacks upload-target authorization');
+if (!filesRoute.includes('entityExists("order", entityId)')) fail.push('file access does not validate order ownership/existence');
+
 const server = read('server.ts');
 if (server.includes('path.join(process.cwd(), "Amiri-Regular.ttf")')) fail.push('server has unstable font path');
 if (server.includes('path.join(process.cwd(), "node_modules", "sql.js"')) fail.push('server has unstable wasm path');
