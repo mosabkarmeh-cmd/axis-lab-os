@@ -21,6 +21,21 @@ function requireStatusRole(req: express.Request, res: express.Response): boolean
   }
   return true;
 }
+\nconst ORDER_STATUS_TRANSITIONS: Record<string, readonly string[]> = {
+  new: ["design", "in_progress", "cancelled"],
+  design: ["design_approved", "cancelled"],
+  design_approved: ["cutting", "cancelled"],
+  cutting: ["cutting_complete", "cancelled"],
+  cutting_complete: ["assembly", "cancelled"],
+  assembly: ["assembly_complete", "cancelled"],
+  assembly_complete: ["packaging", "cancelled"],
+  packaging: ["ready", "cancelled"],
+  ready: ["delivered", "cancelled"],
+  in_progress: ["cutting", "ready", "cancelled"],
+  delivered: [],
+  cancelled: [],
+};
+
 
 export function registerOrderStatusRoute(app: express.Express) {
 app.patch("/api/orders/:id/status", async (req, res) => {
@@ -39,6 +54,17 @@ app.patch("/api/orders/:id/status", async (req, res) => {
 
     if (status === "cancelled" && core.getRequestUser(req)?.role !== "admin") {
       res.status(403).json({ success: false, message: "إلغاء الطلبات متاح لمدير النظام فقط" });
+      return;
+    }
+
+    const allowedNextStatuses = ORDER_STATUS_TRANSITIONS[order.status];
+    if (status !== order.status && allowedNextStatuses && !allowedNextStatuses.includes(status)) {
+      res.status(409).json({
+        success: false,
+        message: `انتقال غير مسموح من حالة [${order.status}] إلى [${status}]. يجب اتباع تسلسل مراحل الطلب.`,
+        oldStatus: order.status,
+        newStatus: status,
+      });
       return;
     }
 
