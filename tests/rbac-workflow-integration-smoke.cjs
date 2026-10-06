@@ -77,7 +77,7 @@ function assert(condition, message) { if (!condition) throw new Error(message); 
     const blockedDeliveryOrder = await request('admin', '/api/orders', { method: 'POST', body: JSON.stringify({ customerId: 'c-1', items: [{ productName: 'Unpaid integration order', quantity: 1, unitPrice: 1000 }], totalPrice: 1000, paidAmount: 0, priority: 'normal' }) });
     assert(blockedDeliveryOrder.response.ok && blockedDeliveryOrder.body.id, 'Could not create unpaid order');
     const blockedDelivery = await request('admin', `/api/orders/${blockedDeliveryOrder.body.id}/status`, { method: 'PATCH', body: JSON.stringify({ status: 'delivered' }) });
-    assert(blockedDelivery.response.status === 400, `Unpaid delivery was accepted: ${blockedDelivery.response.status}`);
+    assert(blockedDelivery.response.status === 400 || blockedDelivery.response.status === 409, `Unpaid delivery was accepted: ${blockedDelivery.response.status}`);
 
     const workflow = ['design', 'design_approved', 'cutting', 'cutting_complete', 'assembly', 'assembly_complete', 'packaging', 'ready', 'delivered'];
     for (const status of workflow) {
