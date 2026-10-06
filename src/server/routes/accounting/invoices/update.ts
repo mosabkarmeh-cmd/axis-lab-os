@@ -7,10 +7,13 @@ const {
   ACTIVITY_LOGS,
   nextActivityLogId,
   persistMutationWithFastDurability,
+  getRequestUser,
 } = core;
 
 export function registerInvoiceUpdateRoutes(app: express.Express) {
   app.put("/api/accounting/invoices/:id", async (req, res) => {
+    const user = getRequestUser(req);
+    if (!user || !["admin", "accountant"].includes(user.role)) { res.status(403).json({ success: false, message: "تعديل الفواتير متاح للإدارة والحسابات فقط" }); return; }
     const inv = INVOICES.find(i => i.id === req.params.id);
     if (!inv) {
       res.status(404).json({ success: false, message: "الفاتورة غير موجودة" });
@@ -19,41 +22,45 @@ export function registerInvoiceUpdateRoutes(app: express.Express) {
 
     const { notes, dueDate, items, taxPercent, discount, totalPrice } = req.body;
     const oldData = JSON.parse(JSON.stringify(inv));
-    if (inv.currencyFinalizedAt && (items !== undefined || taxPercent !== undefined || discount !== undefined || totalPrice !== undefined)) {
-      res.status(409).json({ success: false, message: "الفاتورة نهائية ومثبتة؛ لا يمكن تعديل قيمتها بعد التسليم الكامل." });
-      return;
+    if (inv.currencyFinalizedAt) { res.status(409).json({ success: false, message: "الفاتورة نهائية ومثبتة؛ لا يمكن تعديلها بعد التسليم الكامل." }); return; }
+
+    if (dueDate !== undefined) { if (!String(dueDate || "").trim() || Number.isNaN(Date.parse(String(dueDate)))) { res.status(400).json({ success: false, message: "تاريخ الاستحقاق غير صالح" }); return; } inv.dueDate = dueDate; }
+    if (notes !== undefined) inv.notes = notes;
+    if (taxPercent !== undefined) {
+      const value = Number(taxPercent);
+      if (!Number.isFinite(value) || value < 0) { res.status(400).json({ success: false, message: "نسبة الضريبة غير صالحة" }); return; }
+      inv.taxPercent = value;
+    }
+    if (discount !== undefined) {
+      const value = Number(discount);
+      if (!Number.isFinite(value) || value < 0) { res.status(400).json({ success: false, message: "الخصم غير صالح" }); return; }
+      inv.discount = value;
     }
 
-    if (dueDate) inv.dueDate = dueDate;
-    if (notes !== undefined) inv.notes = notes;
-    if (taxPercent !== undefined) inv.taxPercent = Number(taxPercent) || 0;
-    if (discount !== undefined) inv.discount = Number(discount) || 0;
-
-    if (items && Array.isArray(items)) {
+    if (items !== undefined) {
+      if (!Array.isArray(items) || items.length === 0) { res.status(400).json({ success: false, message: "يجب أن تحتوي الفاتورة على بند واحد على الأقل" }); return; }
       inv.items = items.map((raw, idx: number) => {
         const it = asInvoiceItem(raw);
-        return {
-          id: it.id || `invitem-${Date.now()}-${idx}`,
-          invoiceId: inv.id,
-          productName: it.productName || "بند مخصص",
-          quantity: Number(it.quantity) || 1,
-          unitPrice: Number(it.unitPrice) || 0,
-          discount: Number(it.discount) || 0,
-          tax: Number(it.tax) || 0,
-          total: (Number(it.quantity) || 1) * (Number(it.unitPrice) || 0) - (Number(it.discount) || 0) + (Number(it.tax) || 0),
-          createdAt: it.createdAt || new Date().toISOString()
-        };
+        const quantity = Number(it.quantity);
+        const unitPrice = Number(it.unitPrice);
+        const lineDiscount = Number(it.discount ?? 0);
+        const lineTax = Number(it.tax ?? 0);
+        if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitPrice) || unitPrice < 0 || !Number.isFinite(lineDiscount) || lineDiscount < 0 || !Number.isFinite(lineTax) || lineTax < 0) throw new Error("بيانات بند الفاتورة غير صالحة في السطر " + (idx + 1));
+        const total = Math.max(0, quantity * unitPrice - lineDiscount + lineTax);
+        return { id: it.id || ("invitem-" + Date.now() + "-" + idx), invoiceId: inv.id, productName: it.productName || "بند مخصص", quantity, unitPrice, discount: lineDiscount, tax: lineTax, total, createdAt: it.createdAt || new Date().toISOString() };
       });
     }
 
-    const computedSubtotal = inv.items ? inv.items.reduce((sum: number, it) => sum + (it.quantity * it.unitPrice), 0) : inv.totalPrice;
+    const computedSubtotal = Array.isArray(inv.items) ? inv.items.reduce((sum: number, it) => sum + Number(it.quantity || 0) * Number(it.unitPrice || 0), 0) : 0;
+    const computedTotal = Array.isArray(inv.items) ? inv.items.reduce((sum: number, it) => sum + Number(it.total || 0), 0) : 0;
+    if (!Number.isFinite(computedSubtotal) || !Number.isFinite(computedTotal) || computedTotal < 0) { res.status(400).json({ success: false, message: "تعذر حساب إجمالي الفاتورة من البنود" }); return; }
+    const finalTotal = Math.max(0, computedTotal);
+    const paidAmount = Number.isFinite(Number(inv.paidAmount)) ? Math.max(0, Number(inv.paidAmount)) : 0;
+    if (paidAmount > finalTotal) { res.status(409).json({ success: false, message: "لا يمكن أن يتجاوز المدفوع إجمالي الفاتورة بعد التعديل." }); return; }
     inv.subtotal = computedSubtotal;
-
-    const computedTotal = inv.items ? inv.items.reduce((sum: number, it) => sum + it.total, 0) : inv.totalPrice;
-    const finalTotal = totalPrice !== undefined ? Number(totalPrice) : computedTotal;
     inv.totalPrice = finalTotal;
-    inv.remaining = Math.max(0, finalTotal - inv.paidAmount);
-
+    inv.remaining = finalTotal - paidAmount;
+    void totalPrice;
     // Record history
     const historyEntry = {
       id: `invhist-${Date.now()}`,
@@ -81,13 +88,24 @@ export function registerInvoiceUpdateRoutes(app: express.Express) {
     res.json({ success: true, invoice: inv });
   });
   app.post("/api/accounting/invoices/:id/status", async (req, res) => {
+    const user = getRequestUser(req);
+    if (!user || !["admin", "accountant"].includes(user.role)) { res.status(403).json({ success: false, message: "تعديل حالة الفاتورة متاح للإدارة والحسابات فقط" }); return; }
     const inv = INVOICES.find(i => i.id === req.params.id);
     if (!inv) {
       res.status(404).json({ success: false, message: "الفاتورة غير موجودة" });
       return;
     }
 
+    if (inv.currencyFinalizedAt) { res.status(409).json({ success: false, message: "الفاتورة نهائية ومثبتة؛ لا يمكن تغيير حالتها." }); return; }
     const { status } = req.body;
+    const allowedStatuses = new Set(["draft", "issued", "sent", "unpaid", "partially_paid", "paid", "cancelled"]);
+    if (typeof status !== "string" || !allowedStatuses.has(status)) { res.status(400).json({ success: false, message: "حالة الفاتورة غير صالحة" }); return; }
+    const paid = Math.max(0, Number(inv.paidAmount) || 0);
+    const total = Math.max(0, Number(inv.totalPrice) || 0);
+    const remaining = Math.max(0, total - paid);
+    if (status === "paid" && remaining > 0) { res.status(409).json({ success: false, message: "لا يمكن وضع الفاتورة كمدفوعة قبل تسديد كامل المبلغ." }); return; }
+    if (status === "partially_paid" && (paid <= 0 || remaining <= 0)) { res.status(409).json({ success: false, message: "حالة الدفعة الجزئية لا تطابق الرصيد المالي." }); return; }
+    if (status === "unpaid" && paid > 0) { res.status(409).json({ success: false, message: "لا يمكن وضع الفاتورة كغير مدفوعة مع وجود دفعات مسجلة." }); return; }
     const oldData = { status: inv.status };
     inv.status = status;
 
