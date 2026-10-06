@@ -147,6 +147,11 @@ export function registerFileRoutes(app: express.Express) {
 
   // Delete a file
   app.delete("/api/files/:id", async (req, res) => {
+    const currentUser = getRequestUser(req);
+    if (!currentUser || currentUser.role !== "admin") {
+      return res.status(403).json({ success: false, message: "حذف الملفات متاح لمدير النظام فقط" });
+    }
+
     const idx = FILES.findIndex(f => f.id === req.params.id);
     if (idx === -1) {
       return res.status(404).json({ success: false, message: "الملف غير موجود" });
