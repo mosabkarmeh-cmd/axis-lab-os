@@ -64,8 +64,8 @@ router.post("/machines", async (req, res) => {
 router.put("/machines/:id", async (req, res) => {
   try {
     const user = getRequestUser(req);
-    if (user && user.role === "accountant") {
-      return res.status(403).json({ error: "غير مصرح للمحاسبين بتعديل الماكينات" });
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ error: "غير مصرح لك بتعديل الماكينات" });
     }
 
     const rawId = parseInt(req.params.id.replace("mach-", ""));
@@ -95,8 +95,8 @@ router.put("/machines/:id", async (req, res) => {
 router.delete("/machines/:id", async (req, res) => {
   try {
     const user = getRequestUser(req);
-    if (user && user.role === "accountant") {
-      return res.status(403).json({ error: "غير مصرح للمحاسبين بحذف الماكينات" });
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ error: "غير مصرح لك بحذف الماكينات" });
     }
 
     const rawId = parseInt(req.params.id.replace("mach-", ""));
