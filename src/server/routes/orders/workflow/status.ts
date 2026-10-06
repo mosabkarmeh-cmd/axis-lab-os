@@ -13,16 +13,26 @@ const {
   freezeOrderCurrencySnapshot,
 } = core;
 
+function requireStatusRole(req: express.Request, res: express.Response): boolean {
+  const role = core.getRequestUser(req)?.role;
+  if (!role || !["admin", "employee"].includes(role)) {
+    res.status(403).json({ success: false, message: "تغيير حالة الطلب متاح للإدارة والموظفين التشغيليين فقط" });
+    return false;
+  }
+  return true;
+}
+
 export function registerOrderStatusRoute(app: express.Express) {
 app.patch("/api/orders/:id/status", async (req, res) => {
-    const { status, notes, changedById } = req.body;
+    if (!requireStatusRole(req, res)) return;
+    const { status, notes } = req.body;
     const order = ORDERS.find(o => o.id === req.params.id);
     if (!order) {
       res.status(404).json({ error: "الطلب غير موجود" });
       return;
     }
 
-    if (!ORDER_STATUSES.some((entry) => entry.id === status)) {
+    if (typeof status !== "string" || !ORDER_STATUSES.some((entry) => entry.id === status)) {
       res.status(400).json({ error: "حالة الطلب غير صالحة" });
       return;
     }
