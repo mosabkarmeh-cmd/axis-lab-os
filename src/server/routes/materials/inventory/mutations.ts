@@ -142,7 +142,12 @@ app.post("/api/inventory/:materialId/update", async (req, res) => {
       return;
     }
 
-    if (!hasOrder(referenceId)) {\n      res.status(400).json({ success: false, message: "يجب ربط الحجز بطلب صالح" });\n      return;\n    }\n\n    const qty = Number(quantity);
+    if (!hasOrder(referenceId)) {
+      res.status(400).json({ success: false, message: "يجب ربط الحجز بطلب صالح" });
+      return;
+    }
+
+    const qty = Number(quantity);
     if (!Number.isFinite(qty) || qty <= 0) {
       res.status(400).json({ success: false, message: "Reservation quantity must be a positive finite number" });
       return;
@@ -153,7 +158,8 @@ app.post("/api/inventory/:materialId/update", async (req, res) => {
       return;
     }
 
-    inv.reservedQuantity += qty;
+    const previousReserved = Number(inv.reservedQuantity || 0);
+    inv.reservedQuantity = previousReserved + qty;
     inv.availableQuantity = inv.quantity - inv.reservedQuantity;
 
     const matId = idNum(materialId, "m-");
@@ -192,6 +198,8 @@ app.post("/api/inventory/:materialId/update", async (req, res) => {
       await persistStateNow();
       res.json({ success: true, inventory: inv });
     } catch (err: unknown) {
+      inv.reservedQuantity = previousReserved;
+      inv.availableQuantity = inv.quantity - previousReserved;
       console.error("Error reserving inventory:", err);
       res.status(500).json({ success: false, message: "فشل حجز المخزون: " + (err instanceof Error ? err.message : String(err)) });
     }
@@ -209,7 +217,12 @@ app.post("/api/inventory/:materialId/update", async (req, res) => {
       return;
     }
 
-    if (!hasOrder(referenceId)) {\n      res.status(400).json({ success: false, message: "يجب ربط إلغاء الحجز بطلب صالح" });\n      return;\n    }\n\n    const qty = Number(quantity);
+    if (!hasOrder(referenceId)) {
+      res.status(400).json({ success: false, message: "يجب ربط إلغاء الحجز بطلب صالح" });
+      return;
+    }
+
+    const qty = Number(quantity);
     if (!Number.isFinite(qty) || qty <= 0) {
       res.status(400).json({ success: false, message: "Unreservation quantity must be a positive finite number" });
       return;
@@ -218,7 +231,8 @@ app.post("/api/inventory/:materialId/update", async (req, res) => {
       res.status(400).json({ success: false, message: "Cannot release more stock than is currently reserved" });
       return;
     }
-    inv.reservedQuantity = inv.reservedQuantity - qty;
+    const previousReserved = Number(inv.reservedQuantity || 0);
+    inv.reservedQuantity = previousReserved - qty;
     inv.availableQuantity = inv.quantity - inv.reservedQuantity;
 
     const matId = idNum(materialId, "m-");
@@ -257,6 +271,8 @@ app.post("/api/inventory/:materialId/update", async (req, res) => {
       await persistStateNow();
       res.json({ success: true, inventory: inv });
     } catch (err: unknown) {
+      inv.reservedQuantity = previousReserved;
+      inv.availableQuantity = inv.quantity - previousReserved;
       console.error("Error unreserving inventory:", err);
       res.status(500).json({ success: false, message: "فشل إلغاء حجز المخزون: " + (err instanceof Error ? err.message : String(err)) });
     }
