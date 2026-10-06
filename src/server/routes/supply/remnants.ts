@@ -19,6 +19,15 @@ function getActorId(req: express.Request): string {
   return getRequestUser(req)?.id || "system";
 }
 
+function requireRemnantOperator(req: express.Request, res: express.Response): boolean {
+  const role = getRequestUser(req)?.role;
+  if (!role || !["admin", "employee"].includes(role)) {
+    res.status(403).json({ success: false, message: "عمليات البقايا متاحة للإدارة والموظفين التشغيليين فقط" });
+    return false;
+  }
+  return true;
+}
+
 export function registerRemnantRoutes(app: express.Express) {
 app.get("/api/remnants", (req, res) => {
     const { materialId, minWidth, minHeight } = req.query;
@@ -62,6 +71,7 @@ app.get("/api/remnants", (req, res) => {
   });
 
   app.post("/api/remnants", (req, res) => {
+    if (!requireRemnantOperator(req, res)) return;
     const { materialId, width, height, quantity, location } = req.body;
     if (!materialId || !width || !height) {
       res.status(400).json({ success: false, message: "MaterialId, width, and height are required" });
@@ -70,7 +80,11 @@ app.get("/api/remnants", (req, res) => {
 
     const w = Number(width) || 0;
     const h = Number(height) || 0;
-    const q = Number(quantity) || 1;
+    const q = quantity === undefined ? 1 : Number(quantity);
+    if (!Number.isFinite(w) || !Number.isFinite(h) || !Number.isFinite(q) || w <= 0 || h <= 0 || q <= 0) {
+      res.status(400).json({ success: false, message: "أبعاد وكمية البقايا يجب أن تكون أرقاماً موجبة وصالحة" });
+      return;
+    }
 
     if (w < 100 || h < 100) {
       res.status(400).json({ success: false, message: "Remnant piece too small (minimum 100x100mm)" });
@@ -130,7 +144,12 @@ app.get("/api/remnants", (req, res) => {
       return;
     }
 
-    const quantity = Number(req.body.quantity) || 1;
+    if (!requireRemnantOperator(req, res)) return;
+    const quantity = req.body.quantity === undefined ? 1 : Number(req.body.quantity);
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      res.status(400).json({ success: false, message: "كمية الاستهلاك يجب أن تكون رقماً موجباً وصالحاً" });
+      return;
+    }
     if (rem.quantity < quantity) {
       res.status(400).json({ success: false, message: `Insufficient remnant quantity. Available: ${rem.quantity}` });
       return;
@@ -149,7 +168,7 @@ app.get("/api/remnants", (req, res) => {
 
       ACTIVITY_LOGS.unshift({
         id: nextActivityLogId(),
-        userId: "u-2",
+        userId: getActorId(req),
         action: "CONSUME_REMNANT",
         entityType: "Remnant",
         entityId: rem.id,
@@ -158,18 +177,22 @@ app.get("/api/remnants", (req, res) => {
 
       res.json({ success: true, remnant: rem });
     } catch (err: unknown) {
+      rem.quantity += quantity;
+      rem.status = rem.quantity > 0 ? "available" : "consumed";
       console.error("Error consuming remnant:", err);
       res.status(500).json({ success: false, message: "فشل استهلاك البقايا: " + (err instanceof Error ? err.message : String(err)) });
     }
   });
 
   app.post("/api/remnants/waste/:id", async (req, res) => {
+    if (!requireRemnantOperator(req, res)) return;
     const rem = REMNANTS.find(r => r.id === req.params.id);
     if (!rem) {
       res.status(404).json({ success: false, message: "Remnant piece not found" });
       return;
     }
 
+    const previousStatus = rem.status;
     rem.status = "waste";
 
     try {
@@ -180,7 +203,7 @@ app.get("/api/remnants", (req, res) => {
 
       ACTIVITY_LOGS.unshift({
         id: nextActivityLogId(),
-        userId: "u-2",
+        userId: getActorId(req),
         action: "WASTE_REMNANT",
         entityType: "Remnant",
         entityId: rem.id,
@@ -189,6 +212,7 @@ app.get("/api/remnants", (req, res) => {
 
       res.json({ success: true, remnant: rem });
     } catch (err: unknown) {
+      rem.status = previousStatus;
       console.error("Error marking remnant as waste:", err);
       res.status(500).json({ success: false, message: "فشل تحديث حالة البقايا: " + (err instanceof Error ? err.message : String(err)) });
     }
