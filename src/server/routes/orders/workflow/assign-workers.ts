@@ -10,14 +10,24 @@ const {
   persistStateNow,
 } = core;
 
+function requireWorkerAssignmentAdmin(req: express.Request, res: express.Response): boolean {
+  const role = core.getRequestUser(req)?.role;
+  if (!role || role !== "admin") {
+    res.status(403).json({ success: false, message: "تعيين عمال الطلبات متاح لمدير النظام فقط" });
+    return false;
+  }
+  return true;
+}
+
 export function registerOrderWorkerAssignmentRoute(app: express.Express) {
 app.patch("/api/orders/:id/assign-workers", async (req, res) => {
+    if (!requireWorkerAssignmentAdmin(req, res)) return;
     const order = ORDERS.find(o => o.id === req.params.id);
     if (!order) {
       res.status(404).json({ error: "الطلب غير موجود" });
       return;
     }
-    const { designerId, cutterId, assemblerId, changedById } = req.body;
+    const { designerId, cutterId, assemblerId } = req.body;
     const assignableRoles = new Set(["admin", "employee"]);
     if (designerId !== undefined) {
       if (designerId && !USERS.some(u => u.id === designerId && assignableRoles.has(u.role))) {
