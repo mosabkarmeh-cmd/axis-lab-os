@@ -24,6 +24,15 @@ function getActorId(req: express.Request): string {
   return getRequestUser(req)?.id || "system";
 }
 
+function requireSupplyFinanceRole(req: express.Request, res: express.Response): boolean {
+  const role = getRequestUser(req)?.role;
+  if (!role || !["admin", "accountant"].includes(role)) {
+    res.status(403).json({ success: false, message: "طلبات التوريد متاحة للإدارة والحسابات فقط" });
+    return false;
+  }
+  return true;
+}
+
 export function registerSupplyOrderRoutes(app: express.Express) {
 app.get("/api/supply-orders", (req, res) => {
     const populated = SUPPLY_ORDERS.map(order => {
@@ -40,6 +49,7 @@ app.get("/api/supply-orders", (req, res) => {
   });
 
   app.post("/api/supply-orders", async (req, res) => {
+    if (!requireSupplyFinanceRole(req, res)) return;
     const { supplierId, materialId, quantity, unitPrice, expectedDeliveryDate, notes } = req.body;
     if (!supplierId || !materialId || !quantity || !unitPrice) {
       res.status(400).json({ success: false, message: "جميع الحقول الأساسية مطلوبة (المورد، المادة، الكمية، سعر الوحدة)" });
@@ -55,6 +65,10 @@ app.get("/api/supply-orders", (req, res) => {
 
     const qty = Number(quantity);
     const price = Number(unitPrice);
+    if (!Number.isFinite(qty) || qty <= 0 || !Number.isFinite(price) || price <= 0) {
+      res.status(400).json({ success: false, message: "الكمية وسعر الوحدة يجب أن يكونا رقمين موجبين وصالحين" });
+      return;
+    }
     const orderDate = new Date().toISOString().split('T')[0];
     const expDelivery = expectedDeliveryDate || new Date(Date.now() + 3600000 * 24 * 5).toISOString().split('T')[0];
 
@@ -106,6 +120,7 @@ app.get("/api/supply-orders", (req, res) => {
   });
 
   app.put("/api/supply-orders/:id/status", async (req, res) => {
+    if (!requireSupplyFinanceRole(req, res)) return;
     const { id } = req.params;
     const { status } = req.body;
 
