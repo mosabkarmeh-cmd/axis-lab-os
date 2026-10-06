@@ -3,6 +3,7 @@ import { db } from "../../../db/index.ts";
 import { remnants as remnantsTable } from "../../../db/schema.ts";
 import { eq } from "drizzle-orm";
 import * as core from "../../server-core.ts";
+import { isEmployee } from "../materials/materials/shared.ts";
 
 const {
   REMNANTS,
@@ -41,7 +42,11 @@ app.get("/api/remnants", (req, res) => {
       const mat = MATERIALS.find(m => m.id === r.materialId);
       return {
         ...r,
-        material: mat || null
+        material: mat
+          ? (isEmployee(req)
+            ? { id: mat.id, name: mat.name, category: mat.category, subCategory: mat.subCategory, thickness: mat.thickness, color: mat.color, width: mat.width, height: mat.height, unit: mat.unit }
+            : mat)
+          : null
       };
     }).sort((a, b) => b.area - a.area); // Largest first
 
