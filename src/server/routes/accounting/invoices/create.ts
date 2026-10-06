@@ -74,7 +74,7 @@ export function registerInvoiceCreateRoutes(app: express.Express) {
       }];
     }
     const invoicePricing = calculateInvoiceTotals(
-      invItems,
+      invItems.map((item) => ({ quantity: Number(item.quantity || 0), unitPrice: Number(item.unitPrice || 0) })),
       invItems.map((item) => Number(item.discount || 0)),
       invItems.map((item) => Number(item.tax || 0)),
       taxPercent,
