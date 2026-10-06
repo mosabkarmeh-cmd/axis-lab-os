@@ -17,10 +17,10 @@ const req = async (url, options = {}) => { const r = await fetch(`http://127.0.0
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 (async () => { try {
   start(); await wait();
-  const c = await req('/api/customers', { method: 'POST', body: JSON.stringify({ name: 'Negative Customer' }) });
+  const c = await req('/api/customers', { method: 'POST', body: JSON.stringify({ name: 'Negative Customer', phone: '+15550000009' }) });
   const customerId = c.body.id || 'c-1';
   const inv = await req('/api/accounting/invoices', { method: 'POST', body: JSON.stringify({ customerId, totalPrice: 100, items: [{ productName: 'Test', quantity: 1, unitPrice: 100 }] }) });
-  assert(inv.r.ok && inv.body.invoice?.id, 'invoice create failed');
+  assert(inv.r.ok && inv.body.invoice?.id, `invoice create failed: status=${inv.r.status} body=${JSON.stringify(inv.body)}`);
   const id = inv.body.invoice.id;
   const overpay = await req(`/api/accounting/invoices/${id}/payments`, { method: 'POST', body: JSON.stringify({ amount: 101, currency: 'USD', paymentId: 'negative-overpay' }) });
   assert(overpay.r.status === 400, `overpayment accepted: ${overpay.r.status}`);
