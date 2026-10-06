@@ -1,8 +1,19 @@
 import type { Router } from "express";
+import express from "express";
+import * as core from "../../../server-core.ts";
 import { db } from "../../../../db/index.ts";
 import { remnants } from "../../../../db/schema.ts";
 
 const errorMessage = (err: unknown) => err instanceof Error ? err.message : String(err);
+
+function requireRemnantOperator(req: express.Request, res: express.Response): boolean {
+  const role = core.getRequestUser(req)?.role;
+  if (!role || !["admin", "employee"].includes(role)) {
+    res.status(403).json({ success: false, message: "عمليات البقايا متاحة للإدارة والموظفين التشغيليين فقط" });
+    return false;
+  }
+  return true;
+}
 
 export function registerPostgresRemnantRoutes(router: Router) {
 // 6. Get all remnants
@@ -29,16 +40,23 @@ router.get("/remnants", async (req, res) => {
 
 // 7. Add remnant
 router.post("/remnants", async (req, res) => {
+  if (!requireRemnantOperator(req, res)) return;
   try {
     const { materialId, width, height, quantity, location, notes } = req.body;
     if (!materialId || !width || !height || !quantity) {
       return res.status(400).json({ error: "جميع حقول البقايا إجبارية" });
     }
 
-    const rawMatId = parseInt(materialId.replace("m-", ""));
-    const w = parseInt(width);
-    const h = parseInt(height);
-    const qty = parseInt(quantity);
+    const rawMatId = core.idNum(materialId, "m-");
+    const w = Number(width);
+    const h = Number(height);
+    const qty = Number(quantity);
+    if (!rawMatId || !core.MATERIALS.some(material => material.id === materialId)) {
+      return res.status(400).json({ error: "معرف المادة غير صالح أو المادة غير موجودة" });
+    }
+    if (!Number.isFinite(w) || !Number.isFinite(h) || !Number.isFinite(qty) || w < 100 || h < 100 || qty <= 0) {
+      return res.status(400).json({ error: "الأبعاد يجب أن تكون 100 مم على الأقل والكمية رقمًا موجبًا صالحًا" });
+    }
     const area = w * h;
 
     const values = {
