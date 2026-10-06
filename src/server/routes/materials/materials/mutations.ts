@@ -13,8 +13,20 @@ const {
   createNotification,
 } = core;
 
+function requireMaterialAdmin(req: express.Request, res: express.Response): boolean {
+  const role = getRequestUser(req)?.role;
+  if (role !== "admin") { res.status(403).json({ success: false, message: "تعديل كتالوج الخامات متاح لمدير النظام فقط" }); return false; }
+  return true;
+}
+function requireMaterialOperationalRole(req: express.Request, res: express.Response): boolean {
+  const role = getRequestUser(req)?.role;
+  if (!role || !["admin", "employee"].includes(role)) { res.status(403).json({ success: false, message: "تحديث حالة الخامة متاح للإدارة والموظفين التشغيليين فقط" }); return false; }
+  return true;
+}
+
 export function registerMaterialMutationRoutes(app: express.Express) {
   app.post("/api/materials", (req, res) => {
+    if (!requireMaterialAdmin(req, res)) return;
     const { name, category, subCategory, thickness, color, width, height, unit, pricePerUnit, minimumStock, supplierId, notes, qualityStatus } = req.body;
     if (!name || !category) {
       res.status(400).json({ success: false, message: "Name and Category are required" });
@@ -66,6 +78,7 @@ export function registerMaterialMutationRoutes(app: express.Express) {
   });
 
   app.put("/api/materials/:id", (req, res) => {
+    if (!requireMaterialAdmin(req, res)) return;
     const material = MATERIALS.find(item => item.id === req.params.id);
     if (!material) {
       res.status(404).json({ success: false, message: "Material not found" });
@@ -106,6 +119,7 @@ export function registerMaterialMutationRoutes(app: express.Express) {
   });
 
   app.patch("/api/materials/:id/quality-status", (req, res) => {
+    if (!requireMaterialOperationalRole(req, res)) return;
     const material = MATERIALS.find(item => item.id === req.params.id);
     if (!material) {
       res.status(404).json({ success: false, message: "Material not found" });
@@ -128,6 +142,7 @@ export function registerMaterialMutationRoutes(app: express.Express) {
   });
 
   app.delete("/api/materials/:id", (req, res) => {
+    if (!requireMaterialAdmin(req, res)) return;
     const user = getRequestUser(req);
     const index = MATERIALS.findIndex(item => item.id === req.params.id);
     if (index === -1) {
@@ -167,6 +182,7 @@ export function registerMaterialMutationRoutes(app: express.Express) {
   });
 
   app.post("/api/materials/:id/restore", (req, res) => {
+    if (!requireMaterialAdmin(req, res)) return;
     const material = MATERIALS.find(item => item.id === req.params.id);
     if (!material) {
       res.status(404).json({ success: false, message: "Material not found" });
