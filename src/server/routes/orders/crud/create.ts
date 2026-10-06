@@ -25,12 +25,15 @@ export function registerOrderCreateRoutes(app: express.Express) {
     const actor = core.getRequestUser(req);
     const financialRestricted = actor?.role === "employee" || actor?.role === "viewer";
     const hasNonZeroFinancialInput =
-      Number(paidAmount) !== 0 ||
-      Number(taxPercent) !== 0 ||
-      Number(discount) !== 0 ||
+      (paidAmount !== undefined && paidAmount !== null && Number(paidAmount) !== 0) ||
+      (taxPercent !== undefined && taxPercent !== null && Number(taxPercent) !== 0) ||
+      (discount !== undefined && discount !== null && Number(discount) !== 0) ||
       (Array.isArray(items) && items.some((rawItem: unknown) => {
         const item = asOrderItem(rawItem);
-        return Number(item.unitPrice) !== 0 || Number(item.totalPrice) !== 0;
+        return (
+          (item.unitPrice !== undefined && item.unitPrice !== null && Number(item.unitPrice) !== 0) ||
+          (item.totalPrice !== undefined && item.totalPrice !== null && Number(item.totalPrice) !== 0)
+        );
       }));
 
     if (actor?.role === "viewer") {
