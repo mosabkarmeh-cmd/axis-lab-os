@@ -329,6 +329,24 @@ function assert(condition, message) {
     const accounting = await employeeRequest("/api/accounting/invoices");
     assert(accounting.response.status === 403, `employee accounting access was not blocked: ${accounting.response.status}`);
 
+    const employeeInvoiceCreate = await employeeRequest("/api/accounting/invoices", {
+      method: "POST",
+      body: JSON.stringify({
+        customerId: customerCreate.body.id,
+        totalPrice: 1000,
+        items: [{ productName: "Employee forbidden invoice", quantity: 1, unitPrice: 1000 }],
+      }),
+    });
+    assert(employeeInvoiceCreate.response.status === 403,
+      `employee invoice creation was not blocked: ${employeeInvoiceCreate.response.status}`);
+
+    const directPaymentEdit = await request(`/api/orders/${orderCreate.body.id}`, {
+      method: "PUT",
+      body: JSON.stringify({ paidAmount: 9999 }),
+    });
+    assert(directPaymentEdit.response.status === 409,
+      `direct order paidAmount mutation was not blocked: ${directPaymentEdit.response.status}`);
+
     const settingsWrite = await employeeRequest("/api/settings", {
       method: "PUT",
       body: JSON.stringify({ pricing: { defaultProfitMargin: 999 } }),
