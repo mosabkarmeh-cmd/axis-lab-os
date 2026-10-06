@@ -46,7 +46,7 @@ export function registerFileRoutes(app: express.Express) {
     return false;
   };
 
-  const canAccessFileEntity = (req: express.Request, file: Record<string, any>): boolean => {
+  const canAccessFileEntity = (req: express.Request, file: Record<string, unknown>): boolean => {
     const user = getRequestUser(req);
     if (!user) return false;
     if (user.role === "admin") return true;
