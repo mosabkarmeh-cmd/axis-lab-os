@@ -17,6 +17,23 @@ export interface LocalSqliteRuntimeDependencies {
 
 export type LocalSqliteRow = Array<string | number | Uint8Array | null>;
 
+export interface BackupPackageManifest {
+  formatVersion: 1;
+  kind: string;
+  createdAt: string;
+  schemaVersion: number;
+  database: {
+    path: "axis-data.sqlite";
+    size: number;
+    sha256: string;
+  };
+  uploads: Array<{
+    path: string;
+    size: number;
+    sha256: string;
+  }>;
+}
+
 export let localSqlite: Database | null = null;
 
 export function setLocalSqlite(database: Database) {
@@ -80,7 +97,8 @@ export function createLocalSqliteRuntime(config: LocalSqliteRuntimeConfig, deps:
           .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
         for (const candidate of candidates) {
           try {
-            bytes = fs.readFileSync(candidate);
+            const inspected = await inspectSqliteBackup(candidate);
+            bytes = fs.readFileSync(inspected.databaseFile);
             localSqlite = openDatabase(bytes);
             recoveredFrom = candidate;
             console.error(`[SQLITE] Recovered database from backup ${candidate}`);
@@ -107,7 +125,16 @@ export function createLocalSqliteRuntime(config: LocalSqliteRuntimeConfig, deps:
         console.error("[SQLITE] Legacy JSON migration failed:", error);
       }
     }
-    if (recoveredFrom) await flushLocalSqlite();
+    if (recoveredFrom) {
+      if (fs.existsSync(recoveredFrom) && fs.statSync(recoveredFrom).isDirectory()) {
+        try {
+          await restoreUploadedFilesFromBackup(recoveredFrom);
+        } catch (error) {
+          console.error("[SQLITE] Recovered database but failed to restore its uploaded files:", error);
+        }
+      }
+      await flushLocalSqlite();
+    }
     return localSqlite;
   }
 
@@ -158,23 +185,181 @@ export function createLocalSqliteRuntime(config: LocalSqliteRuntimeConfig, deps:
     });
   }
 
-  async function createSqliteBackup(kind = "manual") {
+  async function listFilesRecursive(rootDir: string, relativeDir = ""): Promise<string[]> {
+    if (!fs.existsSync(rootDir)) return [];
+    const entries = await fs.promises.readdir(rootDir, { withFileTypes: true });
+    const files: string[] = [];
+    for (const entry of entries) {
+      const relativePath = relativeDir ? path.join(relativeDir, entry.name) : entry.name;
+      const fullPath = path.join(rootDir, entry.name);
+      if (entry.isDirectory()) {
+        files.push(...await listFilesRecursive(fullPath, relativePath));
+      } else if (entry.isFile()) {
+        files.push(relativePath);
+      }
+    }
+    return files;
+  }
+
+  async function copyDirectoryContents(sourceDir: string, destinationDir: string) {
+    await fs.promises.mkdir(destinationDir, { recursive: true });
+    if (!fs.existsSync(sourceDir)) return;
+    const entries = await fs.promises.readdir(sourceDir, { withFileTypes: true });
+    for (const entry of entries) {
+      const sourcePath = path.join(sourceDir, entry.name);
+      const destinationPath = path.join(destinationDir, entry.name);
+      if (entry.isDirectory()) {
+        await copyDirectoryContents(sourcePath, destinationPath);
+      } else if (entry.isFile()) {
+        await fs.promises.mkdir(path.dirname(destinationPath), { recursive: true });
+        await fs.promises.copyFile(sourcePath, destinationPath);
+      }
+    }
+  }
+
+  function uploadDirectory() {
+    return process.env.AXIS_FILES_DIR || path.join(path.dirname(dataFile), "uploads");
+  }
+
+  async function inspectSqliteBackup(filePath: string, expectedSha256?: string) {
+    const stat = await fs.promises.stat(filePath);
+    const isPackage = stat.isDirectory();
+    const databaseFile = isPackage ? path.join(filePath, "axis-data.sqlite") : filePath;
+    const manifestFile = isPackage ? path.join(filePath, "manifest.json") : null;
+    let manifest: BackupPackageManifest | null = null;
+
+    if (isPackage) {
+      if (!fs.existsSync(manifestFile!)) throw new Error("النسخة الاحتياطية لا تحتوي على manifest صالح.");
+      try {
+        manifest = JSON.parse(await fs.promises.readFile(manifestFile!, "utf8")) as BackupPackageManifest;
+      } catch {
+        throw new Error("تعذر قراءة manifest النسخة الاحتياطية.");
+      }
+      if (manifest.formatVersion !== 1 || manifest.database?.path !== "axis-data.sqlite") {
+        throw new Error("إصدار أو بنية النسخة الاحتياطية غير مدعوم.");
+      }
+      if (manifest.schemaVersion > schemaVersion) {
+        throw new Error(`النسخة الاحتياطية أحدث من إصدار قاعدة البيانات الحالي (v${manifest.schemaVersion} > v${schemaVersion}).`);
+      }
+    }
+
+    if (!fs.existsSync(databaseFile)) throw new Error("ملف قاعدة البيانات داخل النسخة غير موجود.");
+    const databaseSha256 = await checksumFile(databaseFile);
+    const requiredSha256 = manifest?.database.sha256 || expectedSha256;
+    if (requiredSha256 && databaseSha256 !== requiredSha256) {
+      throw new Error("فشل التحقق من سلامة قاعدة البيانات؛ checksum غير مطابق.");
+    }
+
+    if (manifest) {
+      for (const file of manifest.uploads) {
+        const safeRelativePath = path.normalize(file.path);
+        if (path.isAbsolute(safeRelativePath) || safeRelativePath.startsWith(`..${path.sep}`) || safeRelativePath === "..") {
+          throw new Error("مسار ملف مرفوع غير آمن داخل النسخة الاحتياطية.");
+        }
+        const candidate = path.join(filePath, "uploads", safeRelativePath);
+        if (!fs.existsSync(candidate) || !(await fs.promises.stat(candidate)).isFile()) {
+          throw new Error(`ملف مرفوع مفقود من النسخة: ${file.path}`);
+        }
+        const fileSha256 = await checksumFile(candidate);
+        if (fileSha256 !== file.sha256) {
+          throw new Error(`فشل التحقق من ملف مرفوع: ${file.path}`);
+        }
+      }
+    }
+
+    return { isPackage, packagePath: isPackage ? filePath : null, databaseFile, manifest };
+  }
+
+  async function createSqliteBackup(kind: "manual" | "safety" | "auto" = "manual") {
     if (!useSqlite) return null;
     await deps.persistStateNow();
+    await flushLocalSqlite();
     await fs.promises.mkdir(backupDirectory(), { recursive: true });
+
     const id = `b_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const filePath = path.join(backupDirectory(), `${id}.sqlite`);
-    await fs.promises.copyFile(dataFile, filePath);
-    const stat = await fs.promises.stat(filePath);
+    const packagePath = path.join(backupDirectory(), `${id}.sqlite`);
+    await fs.promises.mkdir(packagePath, { recursive: true });
+
+    const databaseBackupPath = path.join(packagePath, "axis-data.sqlite");
+    await fs.promises.copyFile(dataFile, databaseBackupPath);
+    const databaseStat = await fs.promises.stat(databaseBackupPath);
+    const databaseSha256 = await checksumFile(databaseBackupPath);
+
+    const uploads: BackupPackageManifest["uploads"] = [];
+    const sourceUploadsDir = uploadDirectory();
+    const backupUploadsDir = path.join(packagePath, "uploads");
+    for (const relativePath of await listFilesRecursive(sourceUploadsDir)) {
+      const sourcePath = path.join(sourceUploadsDir, relativePath);
+      const destinationPath = path.join(backupUploadsDir, relativePath);
+      await fs.promises.mkdir(path.dirname(destinationPath), { recursive: true });
+      await fs.promises.copyFile(sourcePath, destinationPath);
+      const stat = await fs.promises.stat(destinationPath);
+      uploads.push({
+        path: relativePath.split(path.sep).join("/"),
+        size: stat.size,
+        sha256: await checksumFile(destinationPath),
+      });
+    }
+
+    const manifest: BackupPackageManifest = {
+      formatVersion: 1,
+      kind,
+      createdAt: new Date().toISOString(),
+      schemaVersion,
+      database: {
+        path: "axis-data.sqlite",
+        size: databaseStat.size,
+        sha256: databaseSha256,
+      },
+      uploads,
+    };
+    await fs.promises.writeFile(path.join(packagePath, "manifest.json"), JSON.stringify(manifest, null, 2), "utf8");
+
+    const packageSize = databaseStat.size + uploads.reduce((sum, file) => sum + file.size, 0);
     return {
       id,
-      name: `${kind === "safety" ? "نسخة أمان قبل الاستعادة" : "نسخة احتياطية يدوية"} - ${new Date().toLocaleDateString("ar-EG")}`,
-      createdAt: new Date().toISOString(),
+      name: `${kind === "safety" ? "نسخة أمان قبل الاستعادة" : kind === "auto" ? "نسخة احتياطية تلقائية" : "نسخة احتياطية يدوية"} - ${new Date().toLocaleDateString("ar-EG")}`,
+      createdAt: manifest.createdAt,
       status: "completed",
-      filePath,
-      size: stat.size,
-      sha256: await checksumFile(filePath),
+      kind,
+      filePath: packagePath,
+      size: packageSize,
+      sha256: databaseSha256,
+      formatVersion: manifest.formatVersion,
+      schemaVersion: manifest.schemaVersion,
+      includesUploads: uploads.length > 0,
     };
+  }
+
+  async function deleteSqliteBackup(filePath: string) {
+    await fs.promises.rm(filePath, { recursive: true, force: true });
+  }
+
+  async function restoreUploadedFilesFromBackup(filePath: string) {
+    const stat = await fs.promises.stat(filePath);
+    if (!stat.isDirectory()) return false;
+    const sourceUploadsDir = path.join(filePath, "uploads");
+    if (!fs.existsSync(sourceUploadsDir)) return false;
+
+    const targetDir = uploadDirectory();
+    const stagingDir = `${targetDir}.restore-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const previousDir = `${targetDir}.previous-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    await copyDirectoryContents(sourceUploadsDir, stagingDir);
+    try {
+      if (fs.existsSync(targetDir)) await fs.promises.rename(targetDir, previousDir);
+      await fs.promises.rename(stagingDir, targetDir);
+      if (fs.existsSync(previousDir)) await fs.promises.rm(previousDir, { recursive: true, force: true });
+      return true;
+    } catch (error) {
+      try {
+        if (fs.existsSync(stagingDir)) await fs.promises.rm(stagingDir, { recursive: true, force: true });
+      } catch {}
+      if (!fs.existsSync(targetDir) && fs.existsSync(previousDir)) {
+        try { await fs.promises.rename(previousDir, targetDir); } catch {}
+      }
+      throw error;
+    }
   }
 
   function readFinancialTablesFromSqlite() {
@@ -216,6 +401,10 @@ export function createLocalSqliteRuntime(config: LocalSqliteRuntimeConfig, deps:
     backupDirectory,
     checksumFile,
     createSqliteBackup,
+    inspectSqliteBackup,
+    restoreUploadedFilesFromBackup,
+    deleteSqliteBackup,
+    uploadDirectory,
     readFinancialTablesFromSqlite,
   };
 }
