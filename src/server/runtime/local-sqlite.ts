@@ -156,19 +156,43 @@ export function createLocalSqliteRuntime(config: LocalSqliteRuntimeConfig, deps:
     throw lastError;
   }
 
+  let flushInFlight: Promise<void> | null = null;
+
   async function flushLocalSqlite() {
     if (!localSqlite) return;
-    await fs.promises.mkdir(path.dirname(dataFile), { recursive: true });
-    const bytes = localSqlite.export();
-    const tempFile = `${dataFile}.tmp`;
-    const handle = await fs.promises.open(tempFile, "w");
-    try {
-      await handle.writeFile(Buffer.from(bytes));
-      await handle.sync();
-    } finally {
-      await handle.close();
+    if (flushInFlight) {
+      await flushInFlight;
+      return;
     }
-    await fs.promises.rename(tempFile, dataFile);
+
+    const flushPromise = (async () => {
+      await fs.promises.mkdir(path.dirname(dataFile), { recursive: true });
+      const bytes = localSqlite!.export();
+      const tempFile = dataFile + ".tmp-" + process.pid + "-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+      const handle = await fs.promises.open(tempFile, "wx");
+      try {
+        await handle.writeFile(Buffer.from(bytes));
+        await handle.sync();
+      } finally {
+        await handle.close();
+      }
+
+      try {
+        await fs.promises.rename(tempFile, dataFile);
+      } catch (error) {
+        try {
+          await fs.promises.rm(tempFile, { force: true });
+        } catch {}
+        throw error;
+      }
+    })();
+
+    flushInFlight = flushPromise;
+    try {
+      await flushPromise;
+    } finally {
+      if (flushInFlight === flushPromise) flushInFlight = null;
+    }
   }
 
   function backupDirectory() {
