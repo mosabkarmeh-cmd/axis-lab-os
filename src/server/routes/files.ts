@@ -33,6 +33,67 @@ export function registerFileRoutes(app: express.Express) {
     return safeFile;
   };
 
+  const normalizeEntityType = (value: unknown): string => String(value || "").trim().toLowerCase();
+
+  const entityExists = (entityType: string, entityId: string): boolean => {
+    if (entityType === "order") return core.ORDERS.some(order => order.id === entityId);
+    if (entityType === "customer") return core.CUSTOMERS.some(customer => customer.id === entityId);
+    if (entityType === "design") {
+      return core.ORDERS.some(order =>
+        Array.isArray(order.items) && order.items.some((item: { id?: string }) => item.id === entityId)
+      );
+    }
+    return false;
+  };
+
+  const canAccessFileEntity = (req: express.Request, file: Record<string, any>): boolean => {
+    const user = getRequestUser(req);
+    if (!user) return false;
+    if (user.role === "admin") return true;
+
+    const entityType = normalizeEntityType(file.entityType);
+    const entityId = String(file.entityId || "");
+
+    // Operational staff may access drawings/documents attached to a real order.
+    // They may not use a guessed file ID to reach unlinked files or customer-private documents.
+    if (entityType === "order") {
+      return entityExists("order", entityId);
+    }
+
+    // Design files are only accessible when the design belongs to an existing order item.
+    if (entityType === "design") {
+      return entityExists("design", entityId);
+    }
+
+    // Customer attachments are treated as private customer data.
+    if (entityType === "customer") {
+      return user.role === "accountant" && entityExists("customer", entityId);
+    }
+
+    return false;
+  };
+
+  const validateUploadTarget = (req: express.Request): { entityType: string | null; entityId: string | null } | null => {
+    const user = getRequestUser(req);
+    if (!user) return null;
+
+    const rawType = normalizeEntityType(req.body?.entityType);
+    const rawId = String(req.body?.entityId || "").trim();
+
+    // Unlinked files have no operational owner and therefore require admin access.
+    if (!rawType && !rawId) {
+      return user.role === "admin" ? { entityType: null, entityId: null } : null;
+    }
+
+    if (!rawType || !rawId || !entityExists(rawType, rawId)) return null;
+
+    const target = { entityType: rawType, entityId: rawId };
+    const probe = { entityType: rawType, entityId: rawId };
+
+    // Reuse the exact same access boundary used for reads/downloads.
+    return canAccessFileEntity(req, probe) ? target : null;
+  };
+
   const storage = multer.diskStorage({
     destination: (req, file, cb) => {
       cb(null, UPLOAD_DIR);
@@ -78,7 +139,15 @@ export function registerFileRoutes(app: express.Express) {
         return res.status(400).json({ success: false, message: "لم يتم رفع أي ملف" });
       }
 
-      const { entityType, entityId } = req.body;
+      const uploadTarget = validateUploadTarget(req);
+      if (!uploadTarget) {
+        try { if (isPathInsideUploadDir(file.path) && fs.existsSync(file.path)) fs.unlinkSync(file.path); } catch {}
+        return res.status(403).json({
+          success: false,
+          message: "غير مصرح برفع ملف لهذا السجل.",
+        });
+      }
+
       const actorId = getRequestUser(req)?.id || "system";
       const newFile = {
         id: "f-" + Date.now(),
@@ -87,8 +156,8 @@ export function registerFileRoutes(app: express.Express) {
         mimeType: file.mimetype,
         size: file.size,
         path: file.path,
-        entityType: entityType || null,
-        entityId: entityId || null,
+        entityType: uploadTarget.entityType,
+        entityId: uploadTarget.entityId,
         uploadedById: actorId,
         createdAt: new Date().toISOString()
       };
@@ -124,9 +193,20 @@ export function registerFileRoutes(app: express.Express) {
 
   // Get files of an entity
   app.get("/api/files/entity/:entityType/:entityId", (req, res) => {
-    const { entityType, entityId } = req.params;
+    const entityType = normalizeEntityType(req.params.entityType);
+    const entityId = req.params.entityId;
+    const target = { entityType, entityId };
+
+    if (!entityExists(entityType, entityId)) {
+      return res.status(404).json({ success: false, message: "السجل المرتبط بالملفات غير موجود" });
+    }
+
+    if (!canAccessFileEntity(req, target)) {
+      return res.status(403).json({ success: false, message: "غير مصرح بالوصول إلى ملفات هذا السجل" });
+    }
+
     const filtered = FILES
-      .filter(f => f.entityType === entityType && f.entityId === entityId)
+      .filter(f => normalizeEntityType(f.entityType) === entityType && f.entityId === entityId)
       .map(publicFile);
     res.json({ success: true, files: filtered });
   });
@@ -136,6 +216,10 @@ export function registerFileRoutes(app: express.Express) {
     const file = FILES.find(f => f.id === req.params.id);
     if (!file) {
       return res.status(404).json({ success: false, message: "الملف غير موجود" });
+    }
+
+    if (!canAccessFileEntity(req, file)) {
+      return res.status(403).json({ success: false, message: "غير مصرح بالوصول إلى هذا الملف" });
     }
 
     if (file.path && isPathInsideUploadDir(file.path) && fs.existsSync(file.path)) {
