@@ -47,6 +47,7 @@ function requireAdmin(req: express.Request, res: express.Response): boolean {
   });
 
   app.delete("/api/notifications/:id", (req, res) => {
+    if (!requireAdmin(req, res)) return;
     const index = NOTIFICATIONS.findIndex(n => n.id === req.params.id);
     if (index !== -1) {
       NOTIFICATIONS.splice(index, 1);
@@ -55,6 +56,7 @@ function requireAdmin(req: express.Request, res: express.Response): boolean {
   });
 
   app.post("/api/notifications", (req, res) => {
+    if (!requireAdmin(req, res)) return;
     const { title, message, type, priority, link } = req.body;
     if (!title || !message) {
       res.status(400).json({ success: false, message: "العنوان والرسالة مطلوبان" });
