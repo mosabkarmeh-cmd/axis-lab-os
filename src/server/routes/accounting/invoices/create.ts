@@ -19,31 +19,41 @@ export function registerInvoiceCreateRoutes(app: express.Express) {
       return;
     }
 
-    const invoiceId = nextEntityId("inv");
-    const invItems = (items && items.length > 0) ? items.map((raw, idx: number) => { const it = asInvoiceItem(raw); return ({
-      id: `invitem-${Date.now()}-${idx}`,
-      invoiceId: invoiceId,
-      productName: it.productName || "بند مخصص",
-      quantity: Number(it.quantity) || 1,
-      unitPrice: Number(it.unitPrice) || 0,
-      discount: Number(it.discount) || 0,
-      tax: Number(it.tax) || 0,
-      total: (Number(it.quantity) || 1) * (Number(it.unitPrice) || 0) - (Number(it.discount) || 0) + (Number(it.tax) || 0),
-      createdAt: new Date().toISOString()
-    }); }) : [
-      {
-        id: `invitem-${Date.now()}-0`,
-        invoiceId: invoiceId,
-        productName: "فاتورة يدوية مخصصة",
-        quantity: 1,
-        unitPrice: Number(totalPrice) || 0,
-        discount: Number(discount) || 0,
-        tax: 0,
-        total: Number(totalPrice) || 0,
-        createdAt: new Date().toISOString()
-      }
-    ];
+    if (!core.CUSTOMERS.some(customer => customer.id === customerId)) {
+      res.status(400).json({ success: false, message: "العميل المحدد غير موجود" });
+      return;
+    }
+    if (dueDate !== undefined && (!String(dueDate || "").trim() || Number.isNaN(Date.parse(String(dueDate))))) {
+      res.status(400).json({ success: false, message: "تاريخ الاستحقاق غير صالح" });
+      return;
+    }
 
+    const invoiceId = nextEntityId("inv");
+    const invItems = Array.isArray(items) && items.length > 0 ? (() => {
+      const normalized = [];
+      for (let idx = 0; idx < items.length; idx++) {
+        const it = asInvoiceItem(items[idx]);
+        const quantity = Number(it.quantity);
+        const unitPrice = Number(it.unitPrice);
+        const lineDiscount = Number(it.discount ?? 0);
+        const lineTax = Number(it.tax ?? 0);
+        if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitPrice) || unitPrice < 0 || !Number.isFinite(lineDiscount) || lineDiscount < 0 || !Number.isFinite(lineTax) || lineTax < 0) {
+          throw new Error("بيانات بند الفاتورة غير صالحة في السطر " + (idx + 1));
+        }
+        const total = Math.max(0, quantity * unitPrice - lineDiscount + lineTax);
+        if (!Number.isFinite(total)) throw new Error("إجمالي بند الفاتورة غير صالح في السطر " + (idx + 1));
+        normalized.push({
+          id: "invitem-" + Date.now() + "-" + idx, invoiceId,
+          productName: it.productName || "بند مخصص", quantity, unitPrice,
+          discount: lineDiscount, tax: lineTax, total, createdAt: new Date().toISOString()
+        });
+      }
+      return normalized;
+    })() : [
+      { id: "invitem-" + Date.now() + "-0", invoiceId, productName: "فاتورة يدوية مخصصة",
+        quantity: 1, unitPrice: Number(totalPrice) || 0, discount: Number(discount) || 0,
+        tax: 0, total: Math.max(0, Number(totalPrice) || 0), createdAt: new Date().toISOString() }
+    ];
     const computedSubtotal = invItems.reduce((sum: number, it: InvoiceItem) => sum + (it.quantity * it.unitPrice), 0);
     const computedTotal = invItems.reduce((sum: number, it: InvoiceItem) => sum + it.total, 0);
     const safeTotal = Number.isFinite(computedTotal) ? Math.max(0, computedTotal) : 0;
