@@ -114,7 +114,7 @@ function syncNormalizedLocalEntities(database: Parameters<typeof syncLocalEntiti
   return syncLocalEntities(database, NORMALIZED_LOCAL_COLLECTIONS, LOCAL_ENTITY_COLLECTIONS);
 }
 function assertFinancialStateInvariants() {
-  return assertFinancialState({ invoices: INVOICES, expenses: EXPENSES });
+  return assertFinancialState({ invoices: INVOICES, expenses: EXPENSES, orders: ORDERS });
 }
 function syncNormalizedFinancialEntities(database: Parameters<typeof syncFinancialEntities>[0]) {
   return syncFinancialEntities(database, { invoices: INVOICES, expenses: EXPENSES, orders: ORDERS });
