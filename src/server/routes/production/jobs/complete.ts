@@ -190,7 +190,7 @@ app.post("/api/production/jobs/:id/complete", async (req, res) => {
           afterQty: inventory.quantity,
           referenceType: "production_job",
           referenceId: job.id,
-          reason: `استهلاك لوح لإنتاج مهمة: ${job.itemName} لطلب ${job.orderNumber}`,
+          reason: `استهلاك خامة بكمية ${requiredMaterialQuantity} لإنتاج مهمة: ${job.itemName} لطلب ${job.orderNumber}`,
           createdById: job.operatorId || getActorId(req),
           createdAt: new Date().toISOString(),
         });
