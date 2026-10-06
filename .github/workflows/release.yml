@@ -97,6 +97,21 @@ jobs:
       - name: Build Windows installer (All Users)
         run: npm run desktop:package:win:all -- --publish never
 
+      - name: Generate release SHA-256 checksums
+        shell: pwsh
+        run: |
+          $checksumFile = Join-Path $env:GITHUB_WORKSPACE 'release-assets/SHA256SUMS.txt'
+          $files = @(
+            Get-ChildItem -Path release-assets -Filter '*Setup*.exe' | Select-Object -First 1
+            Get-ChildItem -Path dist-all-users -Filter '*AllUsers*.exe' -Recurse | Select-Object -First 1
+          )
+          $lines = foreach ($file in $files) {
+            $hash = (Get-FileHash -Algorithm SHA256 -Path $file.FullName).Hash
+            "$hash  $($file.Name)"
+          }
+          $lines | Set-Content -Path $checksumFile -Encoding utf8
+          Get-Content $checksumFile
+
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -113,4 +128,4 @@ jobs:
           if (-not $release) {
             gh release create $tag --generate-notes --title "AXIS LAB OS $tag"
           }
-          gh release upload $tag $installer.FullName $blockmap.FullName $latest.FullName $allUsers.FullName --clobber
+          gh release upload $tag $installer.FullName $blockmap.FullName $latest.FullName $allUsers.FullName (Join-Path $env:GITHUB_WORKSPACE "release-assets/SHA256SUMS.txt") --clobber
