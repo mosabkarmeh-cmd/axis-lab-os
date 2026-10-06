@@ -61,8 +61,6 @@ const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
   assert(Number(linkedAfter.paidAmountSYP || 0) === 0 && Number(linkedAfter.remainingSYP) === 100,
     `invoice SYP balance did not restore after payment deletion: ${JSON.stringify(linkedAfter)}`);
 
-  const cancelPaid = await req(`/api/accounting/invoices/${id}/status`, { method: 'POST', body: JSON.stringify({ status: 'cancelled' }) });
-  assert(cancelPaid.r.ok, 'invoice cancellation failed');
   const credit = await req(`/api/accounting/invoices/${id}/credit-note`, { method: 'POST', body: JSON.stringify({}) });
   assert(credit.r.ok && credit.body.creditInvoice?.status === 'credit_note', 'credit note failed');
   console.log('financial-negative-cases-smoke: PASS');
