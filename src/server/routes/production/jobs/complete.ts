@@ -40,8 +40,15 @@ type RemnantRecord = {
   location: string;
 };
 
+function requireProductionOperator(req: express.Request, res: express.Response): boolean {
+  const role = getRequestUser(req)?.role;
+  if (!role || !["admin", "employee"].includes(role)) { res.status(403).json({ success: false, message: "عمليات الإنتاج متاحة للإدارة والموظفين التشغيليين فقط" }); return false; }
+  return true;
+}
+
 export function registerProductionCompleteRoute(app: express.Express) {
 app.post("/api/production/jobs/:id/complete", async (req, res) => {
+    if (!requireProductionOperator(req, res)) return;
     const { id } = req.params;
     const { remnantWidth, remnantHeight, remnantLocation } = req.body;
     const job = productionJobs.find(item => item.id === id);
