@@ -44,6 +44,7 @@ jobs:
           Write-Host "Release integrity: tag=$env:GITHUB_REF_NAME sha=$tagSha version=$packageVersion"
 
           $requiredWorkflows = @(
+            'Windows CI',
             'Electron GUI Smoke',
             'Windows Unpacked QA'
           )
