@@ -7,13 +7,24 @@ const {
   nextEntityId,
   getNextNumber,
   persistMutationWithFastDurability,
+  getRequestUser,
 } = core;
 
 export function registerInvoiceCreditNoteRoutes(app: express.Express) {
   app.post("/api/accounting/invoices/:id/credit-note", async (req, res) => {
+    const user = getRequestUser(req);
+    if (!user || !["admin", "accountant"].includes(user.role)) { res.status(403).json({ success: false, message: "إصدار الإشعارات الدائنة متاح للإدارة والحسابات فقط" }); return; }
     const inv = INVOICES.find(i => i.id === req.params.id);
     if (!inv) {
       res.status(404).json({ success: false, message: "الفاتورة الأصلية غير موجودة" });
+      return;
+    }
+    if (inv.currencyFinalizedAt) {
+      res.status(409).json({ success: false, message: "الفاتورة نهائية ومثبتة؛ لا يمكن إصدار إشعار دائن بعد التسليم." });
+      return;
+    }
+    if (inv.status === "cancelled" || inv.status === "credit_note") {
+      res.status(409).json({ success: false, message: "لا يمكن إصدار إشعار دائن لفاتورة ملغاة أو إشعار دائن." });
       return;
     }
 
