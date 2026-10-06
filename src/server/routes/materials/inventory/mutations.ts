@@ -59,7 +59,7 @@ app.post("/api/inventory/:materialId/update", async (req, res) => {
     }
     const afterQty = beforeQty + qtyChange;
     const adjustmentType = typeof type === "string" && type.trim() ? type.trim().toLowerCase() : "adjustment";
-    const allowedTypes = new Set(["adjustment", "receive", "consume", "waste", "return"]);
+    const allowedTypes = new Set(["adjustment", "purchase", "receive", "consume", "consumption", "waste", "return"]);
     if (!allowedTypes.has(adjustmentType)) {
       res.status(400).json({ success: false, message: "نوع حركة المخزون غير صالح" });
       return;
