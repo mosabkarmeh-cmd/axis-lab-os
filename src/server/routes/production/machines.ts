@@ -71,7 +71,7 @@ export function registerProductionMachineRoutes(app: express.Express) {
   // API - Update Production Machine settings / calibration (Admin / Manager)
   app.put("/api/production/machines/:id", (req, res) => {
     const user = getRequestUser(req);
-    if (!user || (user.role !== "admin" && user.role !== "manager" && user.role !== "employee")) {
+    if (!user || !["admin", "employee"].includes(user.role)) {
       res.status(403).json({ success: false, message: "غير مصرح لك بتعديل إعدادات الآلات" });
       return;
     }
@@ -82,10 +82,33 @@ export function registerProductionMachineRoutes(app: express.Express) {
       return;
     }
     
-    if (req.body.name !== undefined) machine.name = req.body.name;
-    if (req.body.status !== undefined) machine.status = req.body.status;
-    if (req.body.workingHours !== undefined) machine.workingHours = Number(req.body.workingHours);
+    if (req.body.name !== undefined) {
+      if (user.role !== "admin" || !String(req.body.name).trim()) {
+        res.status(403).json({ success: false, message: "تغيير اسم الماكينة متاح لمدير النظام فقط" });
+        return;
+      }
+      machine.name = String(req.body.name).trim();
+    }
+    if (req.body.status !== undefined) {
+      if (!["idle", "running", "maintenance", "offline"].includes(req.body.status)) {
+        res.status(400).json({ success: false, message: "حالة الماكينة غير صالحة" });
+        return;
+      }
+      machine.status = req.body.status;
+    }
+    if (req.body.workingHours !== undefined) {
+      const hours = Number(req.body.workingHours);
+      if (!Number.isFinite(hours) || hours < 0) {
+        res.status(400).json({ success: false, message: "ساعات التشغيل يجب أن تكون رقماً غير سالب وصالحاً" });
+        return;
+      }
+      machine.workingHours = hours;
+    }
     if (req.body.calibrationSettings !== undefined) {
+      if (user.role !== "admin" || !req.body.calibrationSettings || typeof req.body.calibrationSettings !== "object") {
+        res.status(403).json({ success: false, message: "معايرة الماكينة متاحة لمدير النظام فقط" });
+        return;
+      }
       machine.calibrationSettings = {
         ...(machine.calibrationSettings || {}),
         ...req.body.calibrationSettings
@@ -97,12 +120,13 @@ export function registerProductionMachineRoutes(app: express.Express) {
 // API - Machine Maintenance Trigger
   app.post("/api/production/machines/:id/maintenance", async (req, res) => {
     const user = getRequestUser(req);
-    if (!user || user.role === "accountant") {
+    if (!user || !["admin", "employee"].includes(user.role)) {
       res.status(403).json({ success: false, message: "غير مصرح للمحاسب المالي بتعديل حالة الآلات" });
       return;
     }
     const { id } = req.params;
     const { status } = req.body; // "maintenance" or "idle"
+    if (!["maintenance", "idle"].includes(status)) { res.status(400).json({ success: false, message: "حالة الصيانة غير صالحة" }); return; }
 
     const mac = machines.find(m => m.id === id);
     if (!mac) {
