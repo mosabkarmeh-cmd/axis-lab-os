@@ -23,10 +23,18 @@ const {
   ORDERS,
   ACTIVITY_LOGS,
   nextActivityLogId,
+  getRequestUser,
 } = core;
+
+function requireProductionOperator(req: express.Request, res: express.Response): boolean {
+  const role = getRequestUser(req)?.role;
+  if (!role || !["admin", "employee"].includes(role)) { res.status(403).json({ success: false, message: "عمليات الإنتاج متاحة للإدارة والموظفين التشغيليين فقط" }); return false; }
+  return true;
+}
 
 export function registerProductionAssignRoute(app: express.Express) {
 app.post("/api/production/jobs/:id/assign", async (req, res) => {
+    if (!requireProductionOperator(req, res)) return;
     const { id } = req.params;
     const { machineId, operatorId } = req.body;
     const job = productionJobs.find(item => item.id === id);
