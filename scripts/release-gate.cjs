@@ -87,6 +87,7 @@ if (process.env.AXIS_RELEASE_SKIP_BUILD !== "1") {
   run("build", ["run", "build"]);
 }
 run("lint", ["run", "lint"]);
+run("pricing engine", ["exec", "tsx", "tests/financial-pricing-engine-smoke.ts"]);
 run("pre-release audits", ["run", "test:pre-release"]);
 run("employee financial boundary", ["exec", "node", "--", "tests/employee-financial-boundary-smoke.cjs"]);
 run("workflow RBAC", ["exec", "node", "--", "tests/rbac-workflow-integration-smoke.cjs"]);
