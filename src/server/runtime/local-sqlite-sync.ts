@@ -60,6 +60,19 @@ export function assertFinancialStateInvariants({
   invoices,
   expenses,
 }: Pick<FinancialCollections, "invoices" | "expenses">) {
+  for (const rawOrder of orders) {
+    const order = asRecord(rawOrder);
+    const total = Number(order.totalPrice) || 0;
+    const paid = Number(order.paidAmount) || 0;
+    const remaining = Number(order.remaining) || 0;
+    if (Math.abs(remaining - Math.max(0, total - paid)) > 0.02) {
+      throw new Error(`Financial invariant failed for order ${order.id}: remaining mismatch`);
+    }
+    if (paid < -0.02 || paid > total + 0.02) {
+      throw new Error(`Financial invariant failed for order ${order.id}: paid amount outside total`);
+    }
+  }
+
   for (const rawInvoice of invoices) {
     const invoice = asRecord(rawInvoice);
     const total = Number(invoice.totalPrice) || 0;
