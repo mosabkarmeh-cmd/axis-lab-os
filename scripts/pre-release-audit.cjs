@@ -1,4 +1,22 @@
 const { spawnSync } = require('node:child_process');
+const releaseWorkflow = require('node:fs').readFileSync(require('node:path').resolve(__dirname, '../.github/workflows/release.yml'), 'utf8');
+if (!releaseWorkflow.includes("name: Windows CI")) {
+  console.error('[PRE-RELEASE-AUDIT] FAIL: Windows CI is not part of release validation');
+  process.exit(1);
+}
+if (!releaseWorkflow.includes("name: Electron GUI Smoke")) {
+  console.error('[PRE-RELEASE-AUDIT] FAIL: Electron GUI Smoke is not part of release validation');
+  process.exit(1);
+}
+if (!releaseWorkflow.includes("name: Windows Unpacked QA")) {
+  console.error('[PRE-RELEASE-AUDIT] FAIL: Windows Unpacked QA is not part of release validation');
+  process.exit(1);
+}
+if (!releaseWorkflow.includes("Release signing gate") || !releaseWorkflow.includes("CSC_CERT_BASE64") || !releaseWorkflow.includes("Official GitHub Releases are blocked")) {
+  console.error('[PRE-RELEASE-AUDIT] FAIL: official release signing gate is missing');
+  process.exit(1);
+}
+
 const checks = [
   ['architecture','scripts/architecture-audit.cjs'],
   ['decomposition','scripts/decomposition-audit.cjs'],
