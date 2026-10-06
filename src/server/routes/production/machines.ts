@@ -71,7 +71,7 @@ export function registerProductionMachineRoutes(app: express.Express) {
   });
 
   // API - Update Production Machine settings / calibration (Admin / Manager)
-  app.put("/api/production/machines/:id", (req, res) => {
+  app.put("/api/production/machines/:id", async (req, res) => {
     const user = getRequestUser(req);
     if (!user || !["admin", "employee"].includes(user.role)) {
       res.status(403).json({ success: false, message: "غير مصرح لك بتعديل إعدادات الآلات" });
