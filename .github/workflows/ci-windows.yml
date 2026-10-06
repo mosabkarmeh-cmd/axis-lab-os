@@ -115,6 +115,20 @@ jobs:
             Get-Process -Name 'AXIS LAB OS' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
             if (-not $process.HasExited) { $process.Kill() }
           }
+      - name: Generate installer SHA-256 checksums
+        shell: pwsh
+        run: |
+          $checksumFile = Join-Path $env:RUNNER_TEMP 'SHA256SUMS.txt'
+          $files = @(
+            Get-Item (Join-Path $env:RUNNER_TEMP 'axis-lab-current-user-setup.exe')
+            Get-ChildItem -Path dist-all-users -Filter '*AllUsers*.exe' -Recurse | Select-Object -First 1
+          )
+          $lines = foreach ($file in $files) {
+            $hash = (Get-FileHash -Algorithm SHA256 -Path $file.FullName).Hash
+            "$hash  $($file.Name)"
+          }
+          $lines | Set-Content -Path $checksumFile -Encoding utf8
+          Get-Content $checksumFile
       - name: Upload Windows installers
         uses: actions/upload-artifact@v4
         with:
@@ -122,4 +136,5 @@ jobs:
           if-no-files-found: error
           path: |
             ${{ runner.temp }}/axis-lab-current-user-setup.exe
+            ${{ runner.temp }}/SHA256SUMS.txt
             dist-all-users/**/*AllUsers*.exe
