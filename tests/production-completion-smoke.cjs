@@ -31,12 +31,34 @@ const waitForHealth = async () => { const deadline = Date.now() + 15000; while (
     const materials = await request("/api/materials");
     const stockedMaterial = (materials.body.materials || []).find(material => material.id === stockedMaterialId && Number(material.inventory?.quantity) > 0);
     assert(stockedMaterial, `No stocked material available after explicit setup: ${JSON.stringify(materials.body)}`);
-    const job = await request("/api/production/jobs", { method: "POST", body: JSON.stringify({ itemName: "Duplicate completion guard", materialId: stockedMaterial.id, estTimeSec: 60 }) });
+    const insufficientQuantityJob = await request("/api/production/jobs", {
+      method: "POST",
+      body: JSON.stringify({ itemName: "Insufficient quantity guard", materialId: stockedMaterial.id, materialQuantity: 6, estTimeSec: 60 }),
+    });
+    assert(insufficientQuantityJob.response.status === 201, `insufficient-quantity job create failed: ${JSON.stringify(insufficientQuantityJob.body)}`);
+    const insufficientCompletion = await request(`/api/production/jobs/${insufficientQuantityJob.body.job.id}/complete`, { method: "POST", body: JSON.stringify({}) });
+    assert(
+      insufficientCompletion.response.status === 409 && insufficientCompletion.body.code === "INSUFFICIENT_STOCK",
+      `completion exceeded available material quantity: ${JSON.stringify(insufficientCompletion.body)}`,
+    );
+
+    const job = await request("/api/production/jobs", {
+      method: "POST",
+      body: JSON.stringify({ itemName: "Exact material consumption guard", materialId: stockedMaterial.id, materialQuantity: 2, estTimeSec: 60 }),
+    });
     assert(job.response.status === 201, `stocked job create failed: ${JSON.stringify(job.body)}`);
+    assert(Number(job.body.job.materialQuantity) === 2, `material quantity was not persisted: ${JSON.stringify(job.body.job)}`);
+
     const first = await request(`/api/production/jobs/${job.body.job.id}/complete`, { method: "POST", body: JSON.stringify({}) });
     assert(first.response.ok, `first completion failed: ${JSON.stringify(first.body)}`);
+
+    const materialsAfterCompletion = await request("/api/materials");
+    const stockedAfterCompletion = (materialsAfterCompletion.body.materials || []).find(material => material.id === stockedMaterial.id);
+    const remainingInventory = Number(stockedAfterCompletion?.inventory?.quantity);
+    assert(remainingInventory === 3, `production completion consumed the wrong material quantity: ${JSON.stringify(stockedAfterCompletion)}`);
+
     const second = await request(`/api/production/jobs/${job.body.job.id}/complete`, { method: "POST", body: JSON.stringify({}) });
-    assert(second.response.status === 409, `duplicate completion was not rejected: ${JSON.stringify(second.body)}`);
+    assert(second.response.status === 409, `duplicate completion was not rejected: ${second.response.status}`);
     console.log("production-completion-smoke: PASS");
   } finally {
     if (child && !child.killed) child.kill("SIGTERM");
