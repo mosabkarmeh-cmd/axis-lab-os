@@ -39,7 +39,9 @@
     "test:desktop-security": "node tests/desktop-security-smoke.cjs",
     "test:employee-boundary": "npm run build && node tests/employee-financial-boundary-smoke.cjs",
     "test:backup-files": "npm run build && node tests/sqlite-backup-files-smoke.cjs",
-    "test:backup-scheduler": "npx tsx tests/backup-scheduler-smoke.ts"
+    "test:backup-scheduler": "npx tsx tests/backup-scheduler-smoke.ts",
+    "test:release-gate": "node scripts/release-gate.cjs",
+    "release:win": "node scripts/release-win.cjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
