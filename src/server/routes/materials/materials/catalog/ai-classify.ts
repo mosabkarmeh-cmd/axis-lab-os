@@ -2,10 +2,12 @@ import express from "express";
 import { Type } from "@google/genai";
 import * as core from "../../../../server-core.ts";
 
-const { ai } = core;
+const { ai, getRequestUser } = core;
 
 export function registerMaterialAiClassificationRoute(app: express.Express) {
 app.post("/api/materials/ai-classify", async (req, res) => {
+    const role = getRequestUser(req)?.role;
+    if (!role || !["admin", "employee"].includes(role)) { res.status(403).json({ success: false, message: "التصنيف الذكي متاح للإدارة والموظفين التشغيليين فقط" }); return; }
     try {
       const { name, thickness, color, notes } = req.body;
       if (!name) {
