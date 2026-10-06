@@ -77,7 +77,7 @@ app.get("/api/remnants", (req, res) => {
     res.json({ success: true, stats: { total, byMaterial } });
   });
 
-  app.post("/api/remnants", (req, res) => {
+  app.post("/api/remnants", async (req, res) => {
     if (!requireRemnantOperator(req, res)) return;
     const { materialId, width, height, quantity, location } = req.body;
     if (!materialId || !width || !height) {
