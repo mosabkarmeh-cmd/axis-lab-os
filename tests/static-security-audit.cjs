@@ -95,6 +95,7 @@ if (!inventoryMutations.includes('hasOrder(referenceId)')) fail.push('inventory 
 if (!inventoryMutations.includes('Number.isFinite(qtyChange)')) fail.push('inventory adjustment lacks finite-number validation');
 if (!inventoryMutations.includes('inv.quantity = beforeQty')) fail.push('inventory mutation failure does not restore in-memory quantity');
 if (!orderPayments.includes('[\"admin\", \"accountant\"]')) fail.push('order payment role boundary missing');
+if (!read('src/server/routes/orders/crud/update.ts').includes('لا يمكن تعديل الدفعة مباشرة من تعديل الطلب')) fail.push('order update still allows direct paidAmount edits');
 if (!invoicePayments.includes('[\"admin\", \"accountant\"]')) fail.push('invoice payment role boundary missing');
 if (!invoiceUpdate.includes('["admin", "accountant"]')) fail.push('invoice update role boundary missing');
 if (!invoiceCreate.includes('["admin", "accountant"]')) fail.push('invoice create role boundary missing');
