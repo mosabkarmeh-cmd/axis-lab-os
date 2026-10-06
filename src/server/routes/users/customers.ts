@@ -74,10 +74,6 @@ app.get("/api/customers", (req, res) => {
       res.status(403).json({ error: "تعديل العملاء متاح للإدارة والموظفين فقط" });
       return;
     }
-    if (user && user.role === "accountant") {
-      res.status(403).json({ error: "غير مصرح للمحاسبين بتعديل بيانات العملاء" });
-      return;
-    }
     const { name, phone, whatsapp, email, company, address, notes, category } = req.body;
     if (!name || !phone) {
       res.status(400).json({ error: "الاسم ورقم الهاتف حقلان إجباريان" });
