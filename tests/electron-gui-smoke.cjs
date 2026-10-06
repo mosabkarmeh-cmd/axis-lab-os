@@ -78,6 +78,39 @@ async function main() {
     const leaked = forbiddenLabels.filter((label) => bodyText.includes(label));
     if (leaked.length) throw new Error(`Employee UI exposed forbidden financial fields: ${leaked.join(", ")}`);
 
+    // Employee sessions are intentionally blocked from submitting financial values.
+    // Switch to an admin CI fixture before exercising the real financial order workflow.
+    const adminFixtureResponse = await fetch("http://127.0.0.1:3210/api/test/gui-session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role: "admin" })
+    });
+    const adminFixtureBody = await adminFixtureResponse.json().catch(() => ({}));
+    if (!adminFixtureResponse.ok) throw new Error("GUI admin session fixture failed: HTTP " + adminFixtureResponse.status + " body=" + JSON.stringify(adminFixtureBody));
+    const adminCookies = typeof adminFixtureResponse.headers.getSetCookie === "function"
+      ? adminFixtureResponse.headers.getSetCookie()
+      : [adminFixtureResponse.headers.get("set-cookie")].filter(Boolean);
+    const adminSessionCookie = adminCookies.find((value) => /^axislab_token=/i.test(value || ""));
+    if (!adminSessionCookie) throw new Error("GUI admin session fixture did not return axislab_token cookie");
+    const adminTokenMatch = adminSessionCookie.match(/^axislab_token=([^;]+)/i);
+    if (!adminTokenMatch) throw new Error("Unable to parse admin axislab_token cookie");
+    await electronApp.context().addCookies([{
+      name: "axislab_token",
+      value: adminTokenMatch[1],
+      domain: "127.0.0.1",
+      path: "/",
+      httpOnly: true,
+      secure: false,
+      sameSite: "Lax"
+    }]);
+    const adminVerify = await page.evaluate(async () => {
+      const response = await fetch("/api/auth/verify");
+      return { status: response.status, body: await response.text() };
+    });
+    if (adminVerify.status !== 200) throw new Error("GUI admin token verification failed: " + JSON.stringify(adminVerify));
+    await page.reload();
+    await page.getByText("الطلبات والعملاء", { exact: false }).first().waitFor({ timeout: 15000 });
+
     await page.getByRole("button", { name: /الإنتاج والتشغيل اليدوي/ }).click();
     await page.getByText("الإنتاج والتشغيل اليدوي", { exact: false }).first().waitFor();
     await page.getByRole("button", { name: /الرئيسية/ }).click();
