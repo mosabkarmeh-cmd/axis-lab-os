@@ -23,6 +23,16 @@ const {
 function getActorId(req: express.Request): string {
   return getRequestUser(req)?.id || "system";
 }
+function publicSupplyOrder(order: typeof SUPPLY_ORDERS[number], req: express.Request) {
+  const role = getRequestUser(req)?.role;
+  if (role === "employee" || role === "viewer") {
+    const safe = { ...order };
+    safe.unitPrice = 0;
+    safe.totalPrice = 0;
+    return safe;
+  }
+  return order;
+}
 
 function requireSupplyFinanceRole(req: express.Request, res: express.Response): boolean {
   const role = getRequestUser(req)?.role;
@@ -39,7 +49,7 @@ app.get("/api/supply-orders", (req, res) => {
       const supplier = SUPPLIERS.find(s => s.id === order.supplierId);
       const material = MATERIALS.find(m => m.id === order.materialId);
       return {
-        ...order,
+        ...publicSupplyOrder(order, req),
         supplierName: supplier ? supplier.name : "مورد غير معروف",
         materialName: material ? material.name : "مادة غير معروفة",
         materialCategory: material ? material.category : "عام"
@@ -221,7 +231,7 @@ app.get("/api/supply-orders", (req, res) => {
         createdAt: new Date().toISOString()
       });
 
-      res.json({ success: true, supplyOrder: order });
+      res.json({ success: true, supplyOrder: publicSupplyOrder(order, req) });
     } catch (err: unknown) {
       console.error("Error updating supply order status:", err);
       res.status(500).json({ success: false, message: "فشل تحديث حالة طلب التوريد: " + (err instanceof Error ? err.message : String(err)) });
