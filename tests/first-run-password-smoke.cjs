@@ -1,9 +1,10 @@
 const { spawn } = require("node:child_process");
+const net = require("node:net");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const port = 3800 + Math.floor(Math.random() * 300);
+let port;
 const password = "12345";
 const newPassword = "ChangedPass123";
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "axis-lab-first-run-"));
@@ -21,10 +22,28 @@ const env = {
   SQLITE_WASM_PATH: path.resolve("node_modules/sql.js/dist/sql-wasm.wasm"),
 };
 let server;
+let logs = "";
+const allocateFreePort = () => new Promise((resolve, reject) => {
+  const probe = net.createServer();
+  probe.unref();
+  probe.once("error", reject);
+  probe.listen(0, "127.0.0.1", () => {
+    const address = probe.address();
+    const assigned = address && typeof address === "object" ? address.port : null;
+    probe.close((error) => error ? reject(error) : assigned ? resolve(assigned) : reject(new Error("Could not allocate free TCP port")));
+  });
+});
 const stop = () => new Promise((resolve) => {
   if (!server || server.killed) return resolve();
-  server.once("exit", resolve);
+  const done = () => resolve();
+  server.once("exit", done);
   server.kill("SIGTERM");
+  setTimeout(() => {
+    if (!server.killed) {
+      try { server.kill("SIGKILL"); } catch {}
+      resolve();
+    }
+  }, 3000);
 });
 async function waitForHealth() {
   const deadline = Date.now() + 15_000;
@@ -35,12 +54,16 @@ async function waitForHealth() {
     } catch {}
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error("Server did not become healthy");
+  throw new Error(`Server did not become healthy:\n${logs}`);
 }
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 (async () => {
   try {
-    server = spawn(process.execPath, [path.resolve("dist/server.cjs")], { cwd: process.cwd(), env, stdio: "ignore" });
+    port = await allocateFreePort();
+    env.PORT = String(port);
+    server = spawn(process.execPath, [path.resolve("dist/server.cjs")], { cwd: process.cwd(), env, stdio: ["ignore", "pipe", "pipe"] });
+    server.stdout.on("data", chunk => { logs += chunk.toString(); });
+    server.stderr.on("data", chunk => { logs += chunk.toString(); });
     await waitForHealth();
     const loginResponse = await fetch(`http://127.0.0.1:${port}/api/auth/login`, {
       method: "POST",
