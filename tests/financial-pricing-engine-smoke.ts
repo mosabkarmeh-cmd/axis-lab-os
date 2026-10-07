@@ -22,16 +22,16 @@ assert(cappedDiscount.discount === 100 && cappedDiscount.total === 0, "discount 
 
 assert(calculateLineTotal(3, 20, 10, 5) === 55, "line total formula is incorrect");
 
-const invoice = calculateDocumentTotals(
+const invoiceAdjustments = calculateDocumentTotals(
   [{ quantity: 1, unitPrice: 100, discount: 10, tax: 5 }],
   10,
   5,
 );
-assert(invoice.subtotal === 100, `unexpected invoice subtotal: ${invoice.subtotal}`);
-assert(invoice.taxableSubtotal === 95, `unexpected invoice taxable subtotal: ${invoice.taxableSubtotal}`);
-assert(invoice.taxAmount === 9.5, `unexpected invoice tax: ${invoice.taxAmount}`);
-assert(invoice.discount === 5, `unexpected invoice additional discount: ${invoice.discount}`);
-assert(invoice.total === 99.5, `unexpected invoice total: ${invoice.total}`);
+assert(invoiceAdjustments.subtotal === 100, `unexpected invoice subtotal: ${invoiceAdjustments.subtotal}`);
+assert(invoiceAdjustments.taxableSubtotal === 95, `unexpected invoice taxable subtotal: ${invoiceAdjustments.taxableSubtotal}`);
+assert(invoiceAdjustments.taxAmount === 9.5, `unexpected invoice tax: ${invoiceAdjustments.taxAmount}`);
+assert(invoiceAdjustments.discount === 5, `unexpected invoice additional discount: ${invoiceAdjustments.discount}`);
+assert(invoiceAdjustments.total === 99.5, `unexpected invoice total: ${invoiceAdjustments.total}`);
 assert(calculateLineTotal("invalid", 20, 10, 5) === 0, "invalid quantity did not fail closed");
 
 const invoice = (await import("../src/server/domain/financial/pricing-engine.ts")).calculateInvoiceTotals(
