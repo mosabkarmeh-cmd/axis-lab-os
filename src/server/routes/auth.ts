@@ -101,8 +101,9 @@ export function registerAuthRoutes(app: express.Express) {
     if (process.env.AXIS_GUI_TEST !== "1") { res.status(404).json({ error: "Not found" }); return; }
     const role = req.body?.role || "employee";
     if (!["admin", "employee", "accountant"].includes(role)) { res.status(400).json({ error: "Invalid GUI test role" }); return; }
-    if (process.env.AXIS_GUI_TEST === "1" && role !== "admin") { const fixtureUser = USERS.find((candidate) => candidate.role === role); if (fixtureUser) fixtureUser.isActive = true; }
+    if (process.env.AXIS_GUI_TEST === "1" && role !== "admin") { const fixtureUser = USERS.find((candidate) => candidate.role === role); if (fixtureUser) { fixtureUser.isActive = true; fixtureUser.mustChangePassword = false; } }
     const user = USERS.find((candidate) => candidate.role === role && candidate.isActive);
+    if (user && process.env.AXIS_GUI_TEST === "1") user.mustChangePassword = false;
     if (!user) { res.status(404).json({ error: "No active GUI test user for role" }); return; }
     const token = generateJWT(user);
     res.cookie("axislab_token", token, { maxAge: 10 * 60 * 1000, httpOnly: true, secure: false, path: "/", sameSite: "lax" });
