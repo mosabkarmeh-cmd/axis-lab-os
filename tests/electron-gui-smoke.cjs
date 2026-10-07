@@ -111,8 +111,8 @@ async function main() {
     await page.reload();
     await page.getByText("الطلبات والعملاء", { exact: false }).first().waitFor({ timeout: 15000 });
 
-    await page.getByRole("button", { name: /الإنتاج والتشغيل اليدوي/ }).click();
-    await page.getByText("الإنتاج والتشغيل اليدوي", { exact: false }).first().waitFor();
+    await page.getByRole("button", { name: /الإنتاج والتشغيل/ }).click();
+    await page.getByText("الإنتاج والتشغيل", { exact: false }).first().waitFor();
     await page.getByRole("button", { name: /الرئيسية/ }).click();
     // Home navigation completed; continue directly into the business workflow.
 
