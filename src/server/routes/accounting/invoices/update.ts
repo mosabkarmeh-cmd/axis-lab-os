@@ -70,7 +70,10 @@ export function registerInvoiceUpdateRoutes(app: express.Express) {
       inv.items = normalizedItems;
     }
     const invoicePricing = calculateInvoiceTotals(
-      inv.items || [],
+      (inv.items || []).map((item) => ({
+        quantity: Number(item.quantity || 0),
+        unitPrice: Number(item.unitPrice || 0),
+      })),
       (inv.items || []).map((item) => Number(item.discount || 0)),
       (inv.items || []).map((item) => Number(item.tax || 0)),
       inv.taxPercent,
