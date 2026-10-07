@@ -1,10 +1,15 @@
 export interface PricingLine {
   quantity: number;
   unitPrice: number;
+  discount?: number;
+  tax?: number;
 }
 
 export interface DocumentTotals {
   subtotal: number;
+  taxableSubtotal: number;
+  lineDiscount: number;
+  lineTax: number;
   taxPercent: number;
   taxAmount: number;
   discount: number;
@@ -27,67 +32,35 @@ export function calculateDocumentTotals(
     return sum + quantity * unitPrice;
   }, 0);
 
+  const lineDiscount = lines.reduce((sum, line) => {
+    const quantity = Math.max(0, Number(line.quantity) || 0);
+    const unitPrice = finiteNonNegative(line.unitPrice);
+    return sum + Math.min(quantity * unitPrice, finiteNonNegative(line.discount));
+  }, 0);
+
+  const lineTax = lines.reduce((sum, line) => sum + finiteNonNegative(line.tax), 0);
+  const taxableSubtotal = lines.reduce((sum, line) => {
+    const quantity = Math.max(0, Number(line.quantity) || 0);
+    const unitPrice = finiteNonNegative(line.unitPrice);
+    const base = quantity * unitPrice;
+    const lineDiscountAmount = Math.min(base, finiteNonNegative(line.discount));
+    return sum + Math.max(0, base - lineDiscountAmount + finiteNonNegative(line.tax));
+  }, 0);
+
   const normalizedTaxPercent = finiteNonNegative(taxPercent);
-  const taxAmount = subtotal * (normalizedTaxPercent / 100);
-  const normalizedDiscount = Math.min(subtotal, finiteNonNegative(discount));
-  const total = Math.max(0, subtotal + taxAmount - normalizedDiscount);
+  const taxAmount = taxableSubtotal * (normalizedTaxPercent / 100);
+  const normalizedDiscount = Math.min(taxableSubtotal + taxAmount, finiteNonNegative(discount));
+  const total = Math.max(0, taxableSubtotal + taxAmount - normalizedDiscount);
 
   return {
     subtotal,
+    taxableSubtotal,
+    lineDiscount,
+    lineTax,
     taxPercent: normalizedTaxPercent,
     taxAmount,
     discount: normalizedDiscount,
     total,
-  };
-}
-
-export interface InvoiceTotals extends DocumentTotals {
-  lineAdjustments: number;
-}
-
-export function calculateInvoiceTotals(
-  lines: readonly PricingLine[],
-  lineDiscounts: readonly number[] = [],
-  lineTaxes: readonly number[] = [],
-  taxPercent: unknown = 0,
-  discount: unknown = 0,
-): InvoiceTotals {
-  const rawSubtotal = lines.reduce((sum, line) => {
-    const quantity = Math.max(0, Number(line.quantity) || 0);
-    const unitPrice = finiteNonNegative(line.unitPrice);
-    return sum + quantity * unitPrice;
-  }, 0);
-
-  const lineDiscountTotal = lines.reduce(
-    (sum, _, index) => sum + finiteNonNegative(lineDiscounts[index] ?? 0),
-    0,
-  );
-  const lineTaxTotal = lines.reduce(
-    (sum, _, index) => sum + finiteNonNegative(lineTaxes[index] ?? 0),
-    0,
-  );
-  const netBeforeDocumentAdjustments = Math.max(
-    0,
-    rawSubtotal - lineDiscountTotal + lineTaxTotal,
-  );
-  const normalizedTaxPercent = finiteNonNegative(taxPercent);
-  const taxAmount = netBeforeDocumentAdjustments * (normalizedTaxPercent / 100);
-  const normalizedDiscount = Math.min(
-    netBeforeDocumentAdjustments,
-    finiteNonNegative(discount),
-  );
-  const total = Math.max(
-    0,
-    netBeforeDocumentAdjustments + taxAmount - normalizedDiscount,
-  );
-
-  return {
-    subtotal: rawSubtotal,
-    taxPercent: normalizedTaxPercent,
-    taxAmount,
-    discount: normalizedDiscount,
-    total,
-    lineAdjustments: lineDiscountTotal - lineTaxTotal,
   };
 }
 
@@ -102,5 +75,6 @@ export function calculateLineTotal(
   const safeDiscount = finiteNonNegative(discount);
   const safeTax = finiteNonNegative(tax);
   if (!Number.isFinite(safeQuantity) || safeQuantity < 0) return 0;
-  return Math.max(0, safeQuantity * safeUnitPrice - safeDiscount + safeTax);
+  const base = safeQuantity * safeUnitPrice;
+  return Math.max(0, base - Math.min(base, safeDiscount) + safeTax);
 }
