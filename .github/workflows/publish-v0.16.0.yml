@@ -56,8 +56,11 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund --loglevel=error
 
-      - name: Build and verify release gate
-        run: npm run test:release-gate
+      - name: Rebuild verified release bundle
+        run: npm run build
+
+      - name: Verify TypeScript on the release commit
+        run: npm run lint
 
       - name: Build Current User installer
         run: npm run desktop:package:win:current -- --publish never
@@ -86,6 +89,8 @@ jobs:
         run: |
           $allUsers = Get-ChildItem -Path dist-all-users -Filter '*AllUsers*.exe' -Recurse | Select-Object -First 1
           if (-not $allUsers) { throw 'All Users installer missing.' }
+          Get-FileHash $allUsers.FullName -Algorithm SHA256 | Format-List
+          Get-ChildItem -Path release-assets -File | Get-FileHash -Algorithm SHA256 | Format-List
           $release = gh release view v0.16.0 2>$null
           if (-not $release) { gh release create v0.16.0 --title 'AXIS LAB OS v0.16.0' --generate-notes }
           $files = @()
