@@ -1,4 +1,5 @@
 name: Publish v0.16.0
+# Trigger commit: run publisher after workflow installation.
 
 on:
   push:
