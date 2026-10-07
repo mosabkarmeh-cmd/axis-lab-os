@@ -74,8 +74,8 @@ export function calculateInvoiceTotals(
   const adjustedLines: PricingLine[] = lines.map((line, index) => ({
     quantity: line.quantity,
     unitPrice: line.unitPrice,
-    discount: lineDiscounts[index] ?? 0,
-    tax: lineTaxes[index] ?? 0,
+    discount: Number(lineDiscounts[index] ?? 0),
+    tax: Number(lineTaxes[index] ?? 0),
   }));
   return calculateDocumentTotals(adjustedLines, taxPercent, discount);
 }
