@@ -216,14 +216,14 @@ async function persistStateNow() {
 }
 async function persistMutationWithFastDurability() {
   if (!deps.usePostgres && !deps.useSqlite) return;
-  if (persistInFlight) {
-    schedulePersist();
-    return;
-  }
   if (persistTimer) {
     clearTimeout(persistTimer);
     persistTimer = null;
   }
+
+  // A mutation is not durable until the persistence currently in flight has
+  // either included it or a follow-up persistence has flushed the new state.
+  // persistStateNow() already handles this with persistAgainAfter + waiters.
   await persistStateNow();
 }
 function schedulePersist() {
