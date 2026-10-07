@@ -1,0 +1,96 @@
+name: Publish v0.16.0
+
+on:
+  push:
+    branches:
+      - release/v0.16.0-publish
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      NODE_OPTIONS: --disable-warning=DEP0040 --disable-warning=DEP0169
+      HAS_CODE_SIGNING: ${{ secrets.CSC_CERT_BASE64 != '' && secrets.CSC_KEY_PASSWORD != '' }}
+
+    steps:
+      - name: Checkout verified release commit
+        uses: actions/checkout@v5
+        with:
+          ref: dba91ea16721910c565cc927c6a7d62ef8cfcf55
+          fetch-depth: 1
+
+      - name: Verify release tag target
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tagRef = gh api "repos/$env:GITHUB_REPOSITORY/git/ref/tags/v0.16.0" | ConvertFrom-Json
+          $tagObject = gh api "repos/$env:GITHUB_REPOSITORY/git/tags/$($tagRef.object.sha)" | ConvertFrom-Json
+          $tagCommit = $tagObject.object.sha
+          if ($tagCommit -ne 'dba91ea16721910c565cc927c6a7d62ef8cfcf55') { throw "v0.16.0 points to unexpected commit: $tagCommit" }
+          $version = (node -p "require('./package.json').version").Trim()
+          if ($version -ne '0.16.0') { throw "Unexpected package version: $version" }
+
+      - name: Report code-signing configuration
+        shell: pwsh
+        run: |
+          if ($env:HAS_CODE_SIGNING -eq 'true') { Write-Host 'Windows Authenticode signing secrets are configured.' } else { Write-Host 'Windows Authenticode signing secrets are NOT configured. This build will be published unsigned.' }
+
+      - name: Configure Windows code signing
+        if: ${{ env.HAS_CODE_SIGNING == 'true' }}
+        shell: pwsh
+        env:
+          CSC_CERT_BASE64: ${{ secrets.CSC_CERT_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+        run: |
+          $certPath = Join-Path $env:GITHUB_WORKSPACE 'axis-lab-code-signing.pfx'
+          [IO.File]::WriteAllBytes($certPath, [Convert]::FromBase64String($env:CSC_CERT_BASE64))
+          "CSC_LINK=$certPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "CSC_KEY_PASSWORD=$env:CSC_KEY_PASSWORD" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund --loglevel=error
+
+      - name: Build and verify release gate
+        run: npm run test:release-gate
+
+      - name: Build Current User installer
+        run: npm run desktop:package:win:current -- --publish never
+
+      - name: Preserve Current User release assets
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release-assets | Out-Null
+          $installer = Get-ChildItem -Path dist -Filter '*Setup*.exe' | Select-Object -First 1
+          $blockmap = Get-ChildItem -Path dist -Filter '*.blockmap' | Select-Object -First 1
+          $latest = Get-ChildItem -Path dist -Filter 'latest*.yml' | Select-Object -First 1
+          if (-not $installer) { throw 'Current User installer missing.' }
+          if (-not $blockmap) { throw 'Current User blockmap missing.' }
+          if (-not $latest) { throw 'Current User update metadata missing.' }
+          Copy-Item $installer.FullName release-assets/
+          Copy-Item $blockmap.FullName release-assets/
+          Copy-Item $latest.FullName release-assets/
+
+      - name: Build All Users installer
+        run: npm run desktop:package:win:all -- --publish never
+
+      - name: Verify and publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $allUsers = Get-ChildItem -Path dist-all-users -Filter '*AllUsers*.exe' -Recurse | Select-Object -First 1
+          if (-not $allUsers) { throw 'All Users installer missing.' }
+          $release = gh release view v0.16.0 2>$null
+          if (-not $release) { gh release create v0.16.0 --title 'AXIS LAB OS v0.16.0' --generate-notes }
+          $files = @()
+          $files += (Get-ChildItem -Path release-assets -Filter '*.exe').FullName
+          $files += (Get-ChildItem -Path release-assets -Filter '*.blockmap').FullName
+          $files += (Get-ChildItem -Path release-assets -Filter 'latest*.yml').FullName
+          $files += $allUsers.FullName
+          gh release upload v0.16.0 $files --clobber
+          Write-Host 'AXIS LAB OS v0.16.0 release assets uploaded successfully.'
