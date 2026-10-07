@@ -64,6 +64,22 @@ export function calculateDocumentTotals(
   };
 }
 
+export function calculateInvoiceTotals(
+  lines: readonly { quantity: number; unitPrice: number }[],
+  lineDiscounts: readonly unknown[] = [],
+  lineTaxes: readonly unknown[] = [],
+  taxPercent: unknown = 0,
+  discount: unknown = 0,
+): DocumentTotals {
+  const adjustedLines: PricingLine[] = lines.map((line, index) => ({
+    quantity: line.quantity,
+    unitPrice: line.unitPrice,
+    discount: lineDiscounts[index] ?? 0,
+    tax: lineTaxes[index] ?? 0,
+  }));
+  return calculateDocumentTotals(adjustedLines, taxPercent, discount);
+}
+
 export function calculateLineTotal(
   quantity: unknown,
   unitPrice: unknown,
