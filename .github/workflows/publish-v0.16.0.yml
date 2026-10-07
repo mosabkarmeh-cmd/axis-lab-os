@@ -1,4 +1,5 @@
 name: Publish v0.16.0
+# Trigger commit: run verified publisher after release-gate wrapper removal.
 # Trigger commit: run publisher after workflow installation.
 
 on:
