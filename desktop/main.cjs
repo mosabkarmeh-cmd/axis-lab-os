@@ -121,23 +121,31 @@ function setupAutoUpdater() {
 
   const githubToken = getGitHubUpdaterToken();
   let updaterConfigured = false;
-  if (githubToken && !process.env.AXIS_UPDATE_TEST_URL) {
-    // electron-updater supports private GitHub releases through its API provider.
-    // Set the header explicitly as well so a missing/invalid provider option can
-    // never silently fall back to the public releases.atom endpoint.
-    autoUpdater.requestHeaders = { authorization: `token ${githubToken}` };
-    autoUpdater.setFeedURL({
-      provider: 'github',
-      owner: 'mosabkarmeh-cmd',
-      repo: 'axis-lab-os',
-      private: true,
-      token: githubToken,
-      releaseType: 'release',
-    });
+  if (!process.env.AXIS_UPDATE_TEST_URL) {
+    // The production repository is public, so public GitHub releases can be used
+    // without embedding or provisioning a user-specific token. A token is still
+    // supported for private-release deployments.
+    if (githubToken) {
+      autoUpdater.requestHeaders = { authorization: `token ${githubToken}` };
+      autoUpdater.setFeedURL({
+        provider: 'github',
+        owner: 'mosabkarmeh-cmd',
+        repo: 'axis-lab-os',
+        private: true,
+        token: githubToken,
+        releaseType: 'release',
+      });
+      console.log('[AXIS UPDATER] Private GitHub update channel enabled.');
+    } else {
+      autoUpdater.setFeedURL({
+        provider: 'github',
+        owner: 'mosabkarmeh-cmd',
+        repo: 'axis-lab-os',
+        releaseType: 'release',
+      });
+      console.log('[AXIS UPDATER] Public GitHub release update channel enabled.');
+    }
     updaterConfigured = true;
-    console.log('[AXIS UPDATER] Private GitHub update channel enabled.');
-  } else if (!process.env.AXIS_UPDATE_TEST_URL) {
-    console.warn('[AXIS UPDATER] No private GitHub token found; automatic check skipped safely.');
   }
 
   if (process.env.AXIS_UPDATE_TEST_URL) {
