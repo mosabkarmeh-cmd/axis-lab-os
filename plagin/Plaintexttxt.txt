@@ -1,0 +1,40 @@
+AxisLabPro/
+├── package.json
+├── index.html
+├── vite.config.ts
+├── tsconfig.json
+├── server.ts
+├── INTEGRATION.md
+├── electron/
+│   └── main.js
+├── tests/
+│   └── engine.test.ts
+└── src/
+    ├── App.tsx
+    ├── main.tsx
+    ├── index.css
+    ├── types/
+    │   ├── batch.ts
+    │   └── cam.ts
+    ├── api/
+    │   ├── materialsApi.ts
+    │   └── ordersApi.ts
+    ├── data/
+    │   └── defaults.ts
+    ├── engine/
+    │   ├── DxfCamEngine.ts
+    │   ├── EnterpriseGeometryEngine.ts
+    │   ├── ImageToCadVectorizationEngine.ts
+    │   ├── dxfFlatten.ts
+    │   └── pricing.ts
+    └── components/
+        ├── NestingSimulator.tsx
+        ├── CamViewer3D.tsx
+        ├── MaterialManager.tsx
+        ├── BatchManager.tsx
+        ├── SettingsPanel.tsx
+        ├── PricingDashboard.tsx
+        ├── QuotationModal.tsx
+        ├── BatchQuotationModal.tsx
+        ├── SheetFitFeedback.tsx
+        └── OrdersArchive.tsx
